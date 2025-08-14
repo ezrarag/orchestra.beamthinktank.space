@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-orchestra-gold hover:bg-orchestra-brown text-orchestra-dark font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent border-2 border-orchestra-gold text-orchestra-gold hover:bg-orchestra-gold hover:text-orchestra-dark font-semibold py-3 px-6 rounded-lg transition-all duration-300;
+  }
+  
+  .card {
+    @apply bg-orchestra-cream/80 backdrop-blur-sm border border-orchestra-gold/30 rounded-xl shadow-xl p-6;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 border border-orchestra-gold/30 rounded-lg bg-orchestra-cream/50 focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-transparent;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .bg-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
