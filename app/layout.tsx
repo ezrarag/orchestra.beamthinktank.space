@@ -1,14 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Albert_Sans } from 'next/font/google'
 import './globals.css'
-import { Toaster } from 'react-hot-toast'
 
-const inter = Inter({ subsets: ['latin'] })
+const albertSans = Albert_Sans({ 
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-albert-sans'
+})
 
 export const metadata: Metadata = {
-  title: 'BEAM Orchestra - Orlando',
-  description: 'Building Excellence in Arts and Music - Join the BEAM Orchestra community for performances, rehearsals, and musical excellence.',
-  keywords: 'orchestra, music, BEAM, Orlando, classical music, performances, rehearsals',
+  title: 'BEAM Orchestra - Building Excellence in Arts and Music',
+  description: 'Experience the transformative power of classical music with Orlando\'s premier community orchestra. Join us for performances, rehearsals, and musical excellence.',
 }
 
 export default function RootLayout({
@@ -17,9 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-gradient-to-br from-orchestra-cream to-orchestra-dark min-h-screen`}>
-        <Toaster position="top-right" />
+    <html lang="en" className={albertSans.variable}>
+      <body className="antialiased">
         {children}
       </body>
     </html>

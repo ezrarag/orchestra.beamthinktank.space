@@ -2,42 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
-
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+    font-family: var(--font-albert-sans), 'Albert Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', Georgia, serif;
+  body {
+    font-family: var(--font-albert-sans), 'Albert Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  h1, h2, h3 {
+    font-family: var(--font-albert-sans), 'Albert Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700;
+    font-style: italic;
+  }
+  
+  p, span, div, a, button {
+    font-family: var(--font-albert-sans), 'Albert Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+    font-style: normal;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-orchestra-gold hover:bg-orchestra-brown text-orchestra-dark font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg;
+    @apply bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold px-6 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg;
   }
   
   .btn-secondary {
-    @apply bg-transparent border-2 border-orchestra-gold text-orchestra-gold hover:bg-orchestra-gold hover:text-orchestra-dark font-semibold py-3 px-6 rounded-lg transition-all duration-300;
+    @apply bg-transparent border-2 border-orchestra-gold text-orchestra-gold hover:bg-orchestra-gold hover:text-orchestra-dark font-bold px-6 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg;
   }
   
   .card {
-    @apply bg-orchestra-cream/80 backdrop-blur-sm border border-orchestra-gold/30 rounded-xl shadow-xl p-6;
+    @apply bg-white/95 backdrop-blur-md rounded-2xl p-6 shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300;
   }
   
-  .input-field {
-    @apply w-full px-4 py-3 border border-orchestra-gold/30 rounded-lg bg-orchestra-cream/50 focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-transparent;
+  .text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
   }
 }
 
 @layer utilities {
-  .text-shadow {
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   
-  .bg-pattern {
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  .backdrop-blur-md {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  
+  .backdrop-blur-lg {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  
+  .backdrop-blur-xl {
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+  }
+  
+  .scroll-blur {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 }
