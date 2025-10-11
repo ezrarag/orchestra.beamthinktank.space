@@ -9,7 +9,7 @@ import MediaPlayer from '@/components/MediaPlayer'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { Calendar, Music, ArrowRight, Heart, Target, TrendingUp, Users } from 'lucide-react'
+import { Calendar, Music, ArrowRight, Heart, Target, TrendingUp, Users, Award } from 'lucide-react'
 
 export default function Home() {
   const { scrollY } = useScroll()
@@ -308,6 +308,141 @@ export default function Home() {
         </div>
       </motion.section>
 
+      {/* BEAM Ecosystem Section */}
+      <motion.section 
+        id="ecosystem"
+        className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-blue-900/20"
+        style={{
+          opacity: ctaOpacity,
+          y: ctaY,
+          filter: `blur(${ctaBlur}px)`,
+        }}
+      >
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold text-orchestra-dark mb-6">
+              The BEAM Orchestra Ecosystem
+            </h2>
+            <p className="text-xl text-orchestra-brown/80 max-w-3xl mx-auto">
+              A comprehensive musical community spanning professional performance, training opportunities, 
+              and innovative collaboration projects
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Professional Orchestra */}
+            <motion.div
+              className="group"
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <Link href="/professional" className="block">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:border-purple-400/50 transition-all duration-300 h-full">
+                  <div className="flex items-center mb-6">
+                    <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mr-4">
+                      <Music className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-orchestra-dark group-hover:text-purple-600 transition-colors">
+                        Professional Orchestra
+                      </h3>
+                      <p className="text-orchestra-brown/70">
+                        Premier ensemble • 60+ musicians
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-orchestra-brown/80 mb-6 leading-relaxed">
+                    Our flagship professional orchestra presents world-class performances featuring 
+                    classical masterworks and contemporary compositions in Orlando's premier venues.
+                  </p>
+                  
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <Calendar className="w-4 h-4 mr-3 text-purple-500" />
+                      <span className="text-sm">12 concerts this season</span>
+                    </div>
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <Users className="w-4 h-4 mr-3 text-purple-500" />
+                      <span className="text-sm">Award-winning musicians</span>
+                    </div>
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <Award className="w-4 h-4 mr-3 text-purple-500" />
+                      <span className="text-sm">International collaborations</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center text-purple-600 font-semibold group-hover:text-purple-700 transition-colors">
+                    <span className="mr-2">Explore Performances</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+
+            {/* Training Orchestra */}
+            <motion.div
+              className="group"
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              <Link href="/training" className="block">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:border-blue-400/50 transition-all duration-300 h-full">
+                  <div className="flex items-center mb-6">
+                    <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-teal-500 rounded-2xl flex items-center justify-center mr-4">
+                      <Users className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-orchestra-dark group-hover:text-blue-600 transition-colors">
+                        Training Orchestra
+                      </h3>
+                      <p className="text-orchestra-brown/70">
+                        Contract projects • BEAM Coins
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-orchestra-brown/80 mb-6 leading-relaxed">
+                    Professional development through paid contract projects, innovative BEAM Coin rewards, 
+                    and collaborative partnerships with cultural organizations.
+                  </p>
+                  
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <Calendar className="w-4 h-4 mr-3 text-blue-500" />
+                      <span className="text-sm">Black Diaspora Symphony Orchestra</span>
+                    </div>
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <TrendingUp className="w-4 h-4 mr-3 text-blue-500" />
+                      <span className="text-sm">Digital token rewards</span>
+                    </div>
+                    <div className="flex items-center text-orchestra-brown/70">
+                      <Target className="w-4 h-4 mr-3 text-blue-500" />
+                      <span className="text-sm">Community partnerships</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center text-blue-600 font-semibold group-hover:text-blue-700 transition-colors">
+                    <span className="mr-2">View Projects</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </motion.section>
+
       {/* Call to Action with Scroll Effects */}
       <motion.section 
         id="cta"
@@ -349,8 +484,8 @@ export default function Home() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Link href="/rehearsals" className="btn-primary">
-                Join Rehearsals
+              <Link href="/training/contract-projects/black-diaspora-symphony" className="btn-primary">
+                Submit Audition
               </Link>
             </motion.div>
             <motion.div

@@ -46,6 +46,9 @@ export default function Header() {
             <Link href="/rehearsals" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Rehearsals
             </Link>
+            <Link href="/training" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+              Training
+            </Link>
             <Link href="/members" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Members
             </Link>
@@ -89,6 +92,9 @@ export default function Header() {
               </Link>
               <Link href="/rehearsals" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Rehearsals
+              </Link>
+              <Link href="/training" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+                Training
               </Link>
               <Link href="/members" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Members
