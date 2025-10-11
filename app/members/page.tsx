@@ -5,6 +5,19 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Users, Music, MapPin, Filter, Search, Mail, Phone } from 'lucide-react'
 // Removed Supabase import for deployment
+// ✅ ADD THIS TYPE DEFINITION AT THE TOP (below imports)
+type Member = {
+  id: string
+  name: string
+  instrument: string
+  section: string
+  city: string
+  phone?: string
+  email?: string
+  join_date?: string
+  status?: string
+}
+// ✅ END TYPE
 
 export default function MembersPage() {
   const [members, setMembers] = useState<any[]>([])
