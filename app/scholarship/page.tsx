@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { GraduationCap, Target, Users, Award, Filter, BookOpen } from 'lucide-react'
-import { supabase, ScholarshipFund } from '@/lib/supabase'
+// Removed Supabase import for deployment
 
 export default function ScholarshipPage() {
-  const [scholarshipFunds, setScholarshipFunds] = useState<ScholarshipFund[]>([])
+  const [scholarshipFunds, setScholarshipFunds] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
   const [loading, setLoading] = useState(true)
   const [showApplicationForm, setShowApplicationForm] = useState(false)

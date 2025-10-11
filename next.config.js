@@ -3,7 +3,7 @@ const nextConfig = {
   trailingSlash: true,
   images: {
     unoptimized: true,
-    domains: ['localhost', 'supabase.co'],
+    domains: ['localhost', 'images.unsplash.com'],
   },
 }
 

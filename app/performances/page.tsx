@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from 'lucide-react'
-import { supabase, Performance } from '@/lib/supabase'
+// Removed Supabase import for deployment
 import { format } from 'date-fns'
 
 export default function PerformancesPage() {
-  const [performances, setPerformances] = useState<Performance[]>([])
-  const [filteredPerformances, setFilteredPerformances] = useState<Performance[]>([])
+  const [performances, setPerformances] = useState<any[]>([])
+  const [filteredPerformances, setFilteredPerformances] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)

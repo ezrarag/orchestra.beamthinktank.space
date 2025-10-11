@@ -4,17 +4,17 @@ import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Calendar, Clock, MapPin, Users, Plus, Filter, Search } from 'lucide-react'
-import { supabase, Rehearsal } from '@/lib/supabase'
+// Removed Supabase import for deployment
 import { format } from 'date-fns'
 
 export default function RehearsalsPage() {
-  const [rehearsals, setRehearsals] = useState<Rehearsal[]>([])
-  const [filteredRehearsals, setFilteredRehearsals] = useState<Rehearsal[]>([])
+  const [rehearsals, setRehearsals] = useState<any[]>([])
+  const [filteredRehearsals, setFilteredRehearsals] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [showSignupModal, setShowSignupModal] = useState(false)
-  const [selectedRehearsal, setSelectedRehearsal] = useState<Rehearsal | null>(null)
+  const [selectedRehearsal, setSelectedRehearsal] = useState<any | null>(null)
 
   const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville']
 

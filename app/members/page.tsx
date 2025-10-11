@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Users, Music, MapPin, Filter, Search, Mail, Phone } from 'lucide-react'
-import { supabase, Member } from '@/lib/supabase'
+// Removed Supabase import for deployment
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>([])
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
+  const [members, setMembers] = useState<any[]>([])
+  const [filteredMembers, setFilteredMembers] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
   const [selectedInstrument, setSelectedInstrument] = useState('All')
   const [searchTerm, setSearchTerm] = useState('')

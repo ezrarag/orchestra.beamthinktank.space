@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Heart, DollarSign, Users, Target, Filter } from 'lucide-react'
-import { supabase, Donation } from '@/lib/supabase'
+// Removed Supabase import for deployment
 import { format } from 'date-fns'
 
 export default function DonatePage() {
-  const [donations, setDonations] = useState<Donation[]>([])
-  const [filteredDonations, setFilteredDonations] = useState<Donation[]>([])
+  const [donations, setDonations] = useState<any[]>([])
+  const [filteredDonations, setFilteredDonations] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
   const [loading, setLoading] = useState(true)
   const [showDonationForm, setShowDonationForm] = useState(false)

@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@stripe/stripe-js": "^2.2.0",
-    "@supabase/supabase-js": "^2.39.0",
     "autoprefixer": "^10.4.16",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
