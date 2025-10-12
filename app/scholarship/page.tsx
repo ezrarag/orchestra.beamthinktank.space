@@ -6,6 +6,15 @@ import Footer from '@/components/Footer'
 import { GraduationCap, Target, Users, Award, Filter, BookOpen } from 'lucide-react'
 // Removed Supabase import for deployment
 
+type ScholarshipFund = {
+  id: string
+  city: string
+  current_amount: number
+  goal_amount: number
+  description: string
+  last_updated: string
+}
+
 export default function ScholarshipPage() {
   const [scholarshipFunds, setScholarshipFunds] = useState<any[]>([])
   const [selectedCity, setSelectedCity] = useState('Orlando')
