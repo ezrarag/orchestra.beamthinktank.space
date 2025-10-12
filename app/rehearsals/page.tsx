@@ -7,6 +7,18 @@ import { Calendar, Clock, MapPin, Users, Plus, Filter, Search } from 'lucide-rea
 // Removed Supabase import for deployment
 import { format } from 'date-fns'
 
+type Rehearsal = {
+  id: string
+  date: string
+  time: string
+  duration: number
+  location: string
+  city?: string
+  description?: string
+  max_participants: number
+  current_participants: number
+}
+
 export default function RehearsalsPage() {
   const [rehearsals, setRehearsals] = useState<any[]>([])
   const [filteredRehearsals, setFilteredRehearsals] = useState<any[]>([])

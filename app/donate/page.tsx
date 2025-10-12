@@ -7,7 +7,6 @@ import { Heart, DollarSign, Users, Target, Filter } from 'lucide-react'
 // Removed Supabase import for deployment
 import { format } from 'date-fns'
 
-/* ✅ ADD THIS TYPE DEFINITION */
 type Donation = {
   id: string
   donor_name: string
@@ -17,7 +16,7 @@ type Donation = {
   created_at: string
   anonymous: boolean
 }
-/* ✅ END TYPE */
+
 
 export default function DonatePage() {
   const [donations, setDonations] = useState<Donation[]>([])
