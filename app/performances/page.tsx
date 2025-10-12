@@ -8,12 +8,15 @@ import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from 'lucide-reac
 import { format } from 'date-fns'
 
 type Performance = {
-  id: string            // ✅ Add this
+  id: string
   title: string
   date: string
   time: string
-  location: string
+  venue?: string
+  city?: string
   description?: string
+  ticket_price?: number
+  created_at?: string
 }
 
 export default function PerformancesPage() {
