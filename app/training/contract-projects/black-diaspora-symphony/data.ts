@@ -23,11 +23,14 @@ export const rosterData = [
   { 
     instrument: 'Viola', 
     needed: 6, 
-    confirmed: 0, 
-    remaining: 6, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
+    confirmed: 2, 
+    remaining: 4, 
+    percentage: 33, 
+    musicians: ['Nicole Gabriel', 'Anya Prakash'], 
+    musicianDetails: [
+      { name: 'Nicole Gabriel', email: 'ngabriel.nicole@gmail.com', status: 'Confirmed', source: 'Email (Sep 22)', notes: 'Performed with BDSO in 2024 Juneteenth Concert “Cries from Our Soil.” Returning for Memorial Concert.' },
+      { name: 'Anya Prakash', email: 'anyavani.prakash@gmail.com', status: 'Interested', source: 'Email (Oct 1)', notes: 'Violist in MYSO Senior Symphony; interested in Annual Memorial Concert.' }
+    ]
   },
   { 
     instrument: 'Cello', 
@@ -50,11 +53,13 @@ export const rosterData = [
   { 
     instrument: 'Flute', 
     needed: 2, 
-    confirmed: 0, 
-    remaining: 2, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
+    confirmed: 1, 
+    remaining: 1, 
+    percentage: 50, 
+    musicians: ['Zack Munoz'], 
+    musicianDetails: [
+      { name: 'Zack Munoz', email: 'zacklmunoz123@gmail.com', status: 'Confirmed', source: 'Email (Nov 20, 2023)', notes: 'MYSO Senior Symphony flutist; Cuban-Mexican-Puerto Rican heritage; played in 2023 BDSO concert.' }
+    ]
   },
   { 
     instrument: 'Oboe', 
@@ -91,18 +96,20 @@ export const rosterData = [
     percentage: 50, 
     musicians: ['Maya Schiek', 'Rachel Jacobson'], 
     musicianDetails: [
-      { name: 'Maya Schiek', email: 'MayaSchiek@outlook.com', status: 'Confirmed', source: 'Email (Oct 9)', notes: 'Experienced hornist, recently moved back to Milwaukee.' },
-      { name: 'Rachel Jacobson', email: 'rachel.jacobson.horn@gmail.com', status: 'Interested', source: 'Email (Sep 29)', notes: 'UWM graduate, available for December concert.' }
+      { name: 'Maya Schiek', email: 'MayaSchiek@outlook.com', status: 'Confirmed', source: 'Email (Oct 9)', notes: 'Experienced hornist with master’s degree; recently moved back to Milwaukee.' },
+      { name: 'Rachel Jacobson', email: 'rachel.jacobson.horn@gmail.com', status: 'Interested', source: 'Email (Sep 29)', notes: 'UWM graduate horn player; interested in December concert.' }
     ]
   },
   { 
     instrument: 'Trumpet', 
     needed: 3, 
-    confirmed: 0, 
-    remaining: 3, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
+    confirmed: 1, 
+    remaining: 2, 
+    percentage: 33, 
+    musicians: ['Katharine Wilhelm'], 
+    musicianDetails: [
+      { name: 'Katharine Wilhelm', email: 'reyjynkgw@gmail.com', status: 'Interested', source: 'Email (Oct 7)', notes: 'High school senior, MYSO Senior Symphony trumpet player; interested in Annual Memorial Concert.' }
+    ]
   },
   { 
     instrument: 'Trombone', 
@@ -152,6 +159,7 @@ export const rosterData = [
     musicianDetails: []
   }
 ]
+
 
 export const rehearsalSchedule = [
   { date: '2025-01-15', time: '7:00 PM', duration: 3, location: 'BEAM Rehearsal Hall', type: 'Sectional - Strings' },
