@@ -7,6 +7,15 @@ import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from 'lucide-reac
 // Removed Supabase import for deployment
 import { format } from 'date-fns'
 
+type Performance = {
+  id: string            // ✅ Add this
+  title: string
+  date: string
+  time: string
+  location: string
+  description?: string
+}
+
 export default function PerformancesPage() {
   const [performances, setPerformances] = useState<any[]>([])
   const [filteredPerformances, setFilteredPerformances] = useState<any[]>([])
