@@ -546,24 +546,24 @@ export default function BlackDiasporaSymphonyPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Sectional Rehearsal (3 hrs)</span>
-                    <span className="text-white font-semibold">$75</span>
+                    <span className="text-white font-semibold">$50</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Full Orchestra (4 hrs)</span>
-                    <span className="text-white font-semibold">$100</span>
+                    <span className="text-white font-semibold">$50</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Dress Rehearsal (4 hrs)</span>
-                    <span className="text-white font-semibold">$120</span>
+                    <span className="text-white font-semibold">$50</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-white/10 pt-4">
                     <span className="text-white font-semibold">Concert Performance (2 hrs)</span>
-                    <span className="text-white font-bold text-lg">$200</span>
+                    <span className="text-white font-bold text-lg">100</span>
                   </div>
                 </div>
                 <div className="mt-6 p-4 bg-green-500/10 rounded-lg border border-green-500/20">
                   <p className="text-green-200 text-sm">
-                    <strong>Total Project Earnings:</strong> Up to $495 USD per musician
+                    <strong>Total Project Earnings:</strong> Up to $250 aprroximately per musician
                   </p>
                 </div>
               </div>
