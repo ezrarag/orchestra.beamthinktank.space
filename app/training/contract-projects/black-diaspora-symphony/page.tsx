@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Users, 
   Music, 
@@ -23,7 +23,13 @@ import {
   MapPin as Location
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { rosterData, rehearsalSchedule, faqData, ravelExcerptDownloads } from './data'
+import { 
+  rosterData, 
+  rehearsalSchedule, 
+  faqData, 
+  ravelExcerptDownloads,
+  montgomeryExcerptDownloads
+} from './data'
 
 // Lazy load heavy components to reduce initial bundle size
 const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGallery'), {
@@ -44,9 +50,32 @@ export default function BlackDiasporaSymphonyPage() {
   const [showAuditionForm, setShowAuditionForm] = useState(false)
   const [submittedAudition, setSubmittedAudition] = useState(false)
   const [showRavelModal, setShowRavelModal] = useState(false)
+  const [hoveredExcerpt, setHoveredExcerpt] = useState<string | null>(null)
+  const [ravelSearch, setRavelSearch] = useState('')
   const [activeSection, setActiveSection] = useState('roster')
   const [scrollY, setScrollY] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  const montgomeryAvailableCount = montgomeryExcerptDownloads.filter(part => part.available).length
+  const ravelAvailableCount = ravelExcerptDownloads.filter(part => part.available).length
+  const hasMontgomeryDownloads = montgomeryAvailableCount > 0
+  const hasRavelDownloads = ravelAvailableCount > 0
+
+  const filteredRavelDownloads = ravelExcerptDownloads.filter(part =>
+    part.instrument.toLowerCase().includes(ravelSearch.trim().toLowerCase())
+  )
+
+  const excerptStatusMessage = (work: 'montgomery' | 'ravel') => {
+    if (work === 'montgomery') {
+      return hasMontgomeryDownloads ? `${montgomeryAvailableCount} downloads ready` : 'No files yet'
+    }
+
+    if (!hasRavelDownloads) {
+      return 'No files yet'
+    }
+
+    return `${ravelAvailableCount} instrument${ravelAvailableCount === 1 ? '' : 's'} ready`
+  }
 
   const totalNeeded = rosterData.reduce((sum, section) => sum + section.needed, 0)
   const totalConfirmed = rosterData.reduce((sum, section) => sum + section.confirmed, 0)
@@ -217,23 +246,24 @@ export default function BlackDiasporaSymphonyPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
+          className="relative left-1/2 -ml-[50vw] w-screen px-4 sm:px-6 lg:px-12"
         >
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+          <div className="max-w-7xl mx-auto bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
             <h2 className="text-3xl font-bold text-white mb-8 flex items-center">
               <Music className="w-8 h-8 mr-3 text-purple-400" />
               Orchestra Roster
             </h2>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-8 lg:h-[75vh]">
               {/* Roster Table */}
-              <div className="space-y-4">
+              <div className="space-y-4 lg:space-y-6 lg:overflow-y-auto lg:pr-6 lg:snap-y lg:snap-mandatory lg:h-full lg:max-h-[75vh]">
                 {rosterData.map((section, index) => (
                   <motion.div
                     key={section.instrument}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
-                    className="bg-white/5 rounded-lg p-4 border border-white/10"
+                    className="bg-white/5 rounded-lg p-4 border border-white/10 lg:snap-start"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-semibold text-white">{section.instrument}</h3>
@@ -282,7 +312,10 @@ export default function BlackDiasporaSymphonyPage() {
                             <div className="text-gray-400 text-xs">
                               <div className="flex items-center mb-1">
                                 <span className="mr-2">📧</span>
-                                {musician.email}
+                                <span className="relative inline-flex items-center">
+                                  <span className="blur-sm sm:blur select-none pointer-events-none">{musician.email}</span>
+                                  <span className="sr-only">Email hidden for privacy</span>
+                                </span>
                               </div>
                               <div className="flex items-center mb-1">
                                 <span className="mr-2">📅</span>
@@ -417,31 +450,75 @@ export default function BlackDiasporaSymphonyPage() {
                     <Play className="w-5 h-5 mr-2 text-purple-400" />
                     Required Excerpts
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                      <div>
-                        <p className="text-white font-medium">Montgomery Variations</p>
-                        <p className="text-gray-400 text-sm">Margaret Bonds - Movement I</p>
-                      </div>
-                      <button className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                        Download PDF
-                      </button>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                    <div>
+                      <p className="text-white font-medium">Montgomery Variations</p>
+                      <p className="text-gray-400 text-sm">Margaret Bonds - Movement I</p>
                     </div>
-                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                      <div>
-                        <p className="text-white font-medium">Le Tombeau de Couperin</p>
-                        <p className="text-gray-400 text-sm">Maurice Ravel - Parts</p>
-                      </div>
-                      <button 
-                        onClick={() => setShowRavelModal(true)}
-                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                    <div className="relative">
+                      <motion.button 
+                        type="button"
+                        onMouseEnter={() => setHoveredExcerpt('montgomery')}
+                        onMouseLeave={() => setHoveredExcerpt(null)}
+                        onFocus={() => setHoveredExcerpt('montgomery')}
+                        onBlur={() => setHoveredExcerpt(null)}
+                        disabled={!hasMontgomeryDownloads}
+                        className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasMontgomeryDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
+                        aria-disabled={!hasMontgomeryDownloads}
                       >
                         Download PDF
-                      </button>
+                      </motion.button>
+                      <AnimatePresence>
+                        {hoveredExcerpt === 'montgomery' && (
+                          <motion.span
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 6 }}
+                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
+                          >
+                            {excerptStatusMessage('montgomery')}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                    <div>
+                      <p className="text-white font-medium">Le Tombeau de Couperin</p>
+                      <p className="text-gray-400 text-sm">Maurice Ravel - Parts</p>
+                    </div>
+                    <div className="relative">
+                      <motion.button 
+                        type="button"
+                        onMouseEnter={() => setHoveredExcerpt('ravel')}
+                        onMouseLeave={() => setHoveredExcerpt(null)}
+                        onFocus={() => setHoveredExcerpt('ravel')}
+                        onBlur={() => setHoveredExcerpt(null)}
+                        onClick={() => hasRavelDownloads && setShowRavelModal(true)}
+                        disabled={!hasRavelDownloads}
+                        className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasRavelDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
+                        aria-disabled={!hasRavelDownloads}
+                      >
+                        Download PDF
+                      </motion.button>
+                      <AnimatePresence>
+                        {hoveredExcerpt === 'ravel' && (
+                          <motion.span
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 6 }}
+                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
+                          >
+                            {excerptStatusMessage('ravel')}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </motion.section>
@@ -662,11 +739,11 @@ export default function BlackDiasporaSymphonyPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.2 }}
-            className="relative bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-5"
+            className="relative bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg h-[45vh] max-h-[45vh] p-6 flex flex-col space-y-4 overflow-hidden"
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4 shrink-0">
               <div>
                 <h4 className="text-xl font-semibold text-white">Select Your Part</h4>
                 <p className="text-sm text-gray-300 mt-1">
@@ -681,39 +758,56 @@ export default function BlackDiasporaSymphonyPage() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              {ravelExcerptDownloads.map((part) => (
-                <div
-                  key={part.instrument}
-                  className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3"
-                >
-                  <div>
-                    <p className="text-white font-medium">{part.instrument}</p>
-                    {!part.available && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Download link coming soon
-                      </p>
+            <div className="shrink-0">
+              <label htmlFor="ravel-search" className="text-xs uppercase tracking-wide text-gray-400">
+                Search instruments
+              </label>
+              <input
+                id="ravel-search"
+                type="text"
+                placeholder="Start typing, e.g. flute"
+                value={ravelSearch}
+                onChange={(event) => setRavelSearch(event.target.value)}
+                className="mt-2 w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {filteredRavelDownloads.length > 0 ? (
+                filteredRavelDownloads.map((part) => (
+                  <div
+                    key={part.instrument}
+                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-white font-medium">{part.instrument}</p>
+                      {!part.available && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Download link coming soon
+                        </p>
+                      )}
+                    </div>
+                    {part.available ? (
+                      <a
+                        href={part.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download</span>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Pending</span>
                     )}
                   </div>
-                  {part.available ? (
-                    <a
-                      href={part.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Download</span>
-                    </a>
-                  ) : (
-                    <span className="text-xs text-gray-400 italic">Pending</span>
-                  )}
+                ))
+              ) : (
+                <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/5 px-4 text-xs text-gray-400">
+                  No matching instruments yet.
                 </div>
-              ))}
+              )}
             </div>
-            <p className="text-xs text-gray-500">
-              Need to add another part? Update the entries in <code>app/training/contract-projects/black-diaspora-symphony/data.ts</code>.
-            </p>
           </motion.div>
         </div>
       )}

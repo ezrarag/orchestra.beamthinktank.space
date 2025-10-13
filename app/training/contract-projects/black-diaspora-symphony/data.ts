@@ -160,16 +160,17 @@ export const rosterData = [
   }
 ]
 
-
 export const rehearsalSchedule = [
-  { date: '2025-01-15', time: '7:00 PM', duration: 3, location: 'BEAM Rehearsal Hall', type: 'Sectional - Strings' },
-  { date: '2025-01-18', time: '7:00 PM', duration: 3, location: 'BEAM Rehearsal Hall', type: 'Sectional - Winds' },
-  { date: '2025-01-22', time: '7:00 PM', duration: 4, location: 'BEAM Rehearsal Hall', type: 'Full Orchestra' },
-  { date: '2025-01-25', time: '7:00 PM', duration: 3, location: 'BEAM Rehearsal Hall', type: 'Sectional - Brass' },
-  { date: '2025-01-29', time: '7:00 PM', duration: 4, location: 'BEAM Rehearsal Hall', type: 'Full Orchestra' },
-  { date: '2025-02-01', time: '7:00 PM', duration: 4, location: 'Orlando Concert Hall', type: 'Dress Rehearsal' },
-  { date: '2025-02-02', time: '3:00 PM', duration: 2, location: 'Orlando Concert Hall', type: 'Concert' }
+  { date: '2025-12-02', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Strings' },
+  { date: '2025-12-04', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Winds' },
+  { date: '2025-12-06', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Brass' },
+  { date: '2025-12-09', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-12-11', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-12-13', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
+  { date: '2025-12-14', time: '5:00 PM', duration: 1.5, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert' }
 ]
+
+
 
 export const faqData = [
   {
@@ -198,6 +199,18 @@ export const faqData = [
   }
 ]
 
+export const montgomeryExcerptDownloads: Array<{
+  instrument: string
+  url: string
+  available: boolean
+}> = []
+
+export const griegExcerptDownloads: Array<{
+  instrument: string
+  url: string
+  available: boolean
+}> = []
+
 export const ravelExcerptDownloads = [
   {
     instrument: 'Flute',
@@ -206,42 +219,52 @@ export const ravelExcerptDownloads = [
   },
   {
     instrument: 'Oboe',
-    url: '',
-    available: false
+    url: 'https://link.storjshare.io/raw/jwzvdj2o5y6lop4wfb4pwi5dto3a/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48031-PMLP80671-Ravel-Tombeau.Oboe.pdf',
+    available: true
   },
   {
     instrument: 'Clarinet',
-    url: '',
-    available: false
+    url: 'https://link.storjshare.io/raw/jxh3fb6pafliq4mtb5jyzx26tonq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48032-PMLP80671-Ravel-Tombeau.Clarinet.pdf',
+    available: true
   },
   {
     instrument: 'Bassoon',
-    url: '',
-    available: false
+    url: 'https://link.storjshare.io/raw/jxtq73urpxfdltabbuj75hrp5rlq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48033-PMLP80671-Ravel-Tombeau.Bassoon.pdf',
+    available: true
   },
   {
     instrument: 'Horn',
-    url: '',
-    available: false
+    url: 'https://link.storjshare.io/raw/jujpckqtfqnosehcgv7rgqo7zbzq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48034-PMLP80671-Ravel-Tombeau.Horn.pdf',
+    available: true
   },
   {
     instrument: 'Trumpet',
-    url: '',
-    available: false
+    url: 'https://link.storjshare.io/raw/jvt6vwzy2flxqwjm3a6yggygkkya/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48035-PMLP80671-Ravel-Tombeau.Trumpet.pdf',
+    available: true
   },
   {
-    instrument: 'Trombone',
-    url: '',
-    available: false
+    instrument: 'Violin I',
+    url: 'https://link.storjshare.io/raw/july6owqra73ls3shvwlm5usf6eq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48037-PMLP80671-Ravel-Tombeau.Violin1.pdf',
+    available: true
   },
   {
-    instrument: 'Harp',
-    url: '',
-    available: false
+    instrument: 'Violin II',
+    url: 'https://link.storjshare.io/raw/juiagv7jgaz2bufup46uzzllqdeq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48038-PMLP80671-Ravel-Tombeau.Violin2.pdf',
+    available: true
   },
   {
-    instrument: 'Percussion',
-    url: '',
-    available: false
+    instrument: 'Viola',
+    url: 'https://link.storjshare.io/raw/jubfqnepydr37yq66bry4neezuwa/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48039-PMLP80671-Ravel-Tombeau.Viola.pdf',
+    available: true
+  },
+  {
+    instrument: 'Cello',
+    url: 'https://link.storjshare.io/raw/jurddjb3hrg42bsj2mh2zh4is5iq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP27980-PMLP04975-Ravel_Le_Tombeau_de_Couperin_cello.pdf',
+    available: true
+  },
+  {
+    instrument: 'Bass',
+    url: 'https://link.storjshare.io/raw/jugphxbozczni5tgluu6lgmxxtka/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48040-PMLP80671-Ravel-Tombeau.Bass.pdf',
+    available: true
   }
 ]
