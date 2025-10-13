@@ -197,3 +197,51 @@ export const faqData = [
     answer: "Yes, free parking is available at BEAM Rehearsal Hall. For the concert at Orlando Concert Hall, validated parking is provided in the adjacent garage."
   }
 ]
+
+export const ravelExcerptDownloads = [
+  {
+    instrument: 'Flute',
+    url: 'https://link.storjshare.io/raw/jww5gyz3vhm6jsg5xz5lkgmg3koa/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48030-PMLP80671-Ravel-Tombeau.Flute.pdf',
+    available: true
+  },
+  {
+    instrument: 'Oboe',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Clarinet',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Bassoon',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Horn',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Trumpet',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Trombone',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Harp',
+    url: '',
+    available: false
+  },
+  {
+    instrument: 'Percussion',
+    url: '',
+    available: false
+  }
+]

@@ -23,7 +23,7 @@ import {
   MapPin as Location
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { rosterData, rehearsalSchedule, faqData } from './data'
+import { rosterData, rehearsalSchedule, faqData, ravelExcerptDownloads } from './data'
 
 // Lazy load heavy components to reduce initial bundle size
 const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGallery'), {
@@ -43,6 +43,7 @@ export default function BlackDiasporaSymphonyPage() {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
   const [showAuditionForm, setShowAuditionForm] = useState(false)
   const [submittedAudition, setSubmittedAudition] = useState(false)
+  const [showRavelModal, setShowRavelModal] = useState(false)
   const [activeSection, setActiveSection] = useState('roster')
   const [scrollY, setScrollY] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -93,6 +94,20 @@ export default function BlackDiasporaSymphonyPage() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowRavelModal(false)
+      }
+    }
+
+    if (showRavelModal) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showRavelModal])
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -414,10 +429,13 @@ export default function BlackDiasporaSymphonyPage() {
                     </div>
                     <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
                       <div>
-                        <p className="text-white font-medium">Spiritual Suite</p>
-                        <p className="text-gray-400 text-sm">William Grant Still - Selected passages</p>
+                        <p className="text-white font-medium">Le Tombeau de Couperin</p>
+                        <p className="text-gray-400 text-sm">Maurice Ravel - Parts</p>
                       </div>
-                      <button className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                      <button 
+                        onClick={() => setShowRavelModal(true)}
+                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                      >
                         Download PDF
                       </button>
                     </div>
@@ -633,8 +651,75 @@ export default function BlackDiasporaSymphonyPage() {
         </motion.section>
       </div>
 
+      {showRavelModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={() => setShowRavelModal(false)}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="relative bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-5"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h4 className="text-xl font-semibold text-white">Select Your Part</h4>
+                <p className="text-sm text-gray-300 mt-1">
+                  Choose the instrument-specific download link for Ravel&apos;s <em>Le Tombeau de Couperin</em>.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRavelModal(false)}
+                className="text-sm text-gray-300 hover:text-white transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {ravelExcerptDownloads.map((part) => (
+                <div
+                  key={part.instrument}
+                  className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3"
+                >
+                  <div>
+                    <p className="text-white font-medium">{part.instrument}</p>
+                    {!part.available && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Download link coming soon
+                      </p>
+                    )}
+                  </div>
+                  {part.available ? (
+                    <a
+                      href={part.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download</span>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">Pending</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              Need to add another part? Update the entries in <code>app/training/contract-projects/black-diaspora-symphony/data.ts</code>.
+            </p>
+          </motion.div>
+        </div>
+      )}
+
       {/* Bottom Navigation - Portfolio Style */}
-      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-40">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
