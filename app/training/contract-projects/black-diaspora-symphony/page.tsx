@@ -20,7 +20,9 @@ import {
   Phone,
   Mail,
   Linkedin,
-  MapPin as Location
+  MapPin as Location,
+  Menu,
+  X
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
@@ -54,6 +56,8 @@ export default function BlackDiasporaSymphonyPage() {
   const [ravelSearch, setRavelSearch] = useState('')
   const [activeSection, setActiveSection] = useState('roster')
   const [scrollY, setScrollY] = useState(0)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [showBeamVideo, setShowBeamVideo] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const montgomeryAvailableCount = montgomeryExcerptDownloads.filter(part => part.available).length
@@ -89,6 +93,7 @@ export default function BlackDiasporaSymphonyPage() {
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId)
+    setMobileNavOpen(false)
     const element = document.getElementById(sectionId)
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
@@ -105,7 +110,7 @@ export default function BlackDiasporaSymphonyPage() {
           setScrollY(window.scrollY)
           
           const sections = navigationSections.map(section => section.id)
-          const scrollPosition = window.scrollY + window.innerHeight / 2
+          const scrollPosition = window.scrollY + 180
 
           for (let i = sections.length - 1; i >= 0; i--) {
             const section = document.getElementById(sections[i])
@@ -128,15 +133,18 @@ export default function BlackDiasporaSymphonyPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowRavelModal(false)
+        setShowBeamVideo(false)
+        setMobileNavOpen(false)
       }
     }
 
-    if (showRavelModal) {
+    if (showRavelModal || showBeamVideo || mobileNavOpen) {
       window.addEventListener('keydown', handleKeyDown)
+      return () => window.removeEventListener('keydown', handleKeyDown)
     }
 
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showRavelModal])
+    return () => {}
+  }, [showRavelModal, showBeamVideo, mobileNavOpen])
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -568,36 +576,45 @@ export default function BlackDiasporaSymphonyPage() {
                 </div>
               </div>
 
-              {/* BEAM Coin Rewards */}
+              {/* BEAM Coin Compensation */}
               <div className="bg-white/5 rounded-lg p-6 border border-white/10">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                   <Coins className="w-6 h-6 mr-2 text-yellow-400" />
-                  BEAM Coin Rewards
+                  BEAM Coin Payment Option
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Sectional Rehearsal</span>
-                    <span className="text-yellow-400 font-semibold">3 BEAM</span>
+                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-300">Full Orchestra</span>
-                    <span className="text-yellow-400 font-semibold">4 BEAM</span>
+                    <span className="text-gray-300">Full Orchestra Rehearsal</span>
+                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Dress Rehearsal</span>
-                    <span className="text-yellow-400 font-semibold">4 BEAM</span>
+                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-white/10 pt-4">
                     <span className="text-white font-semibold">Concert Performance</span>
                     <span className="text-yellow-400 font-bold text-lg">10 BEAM</span>
                   </div>
                 </div>
-                <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20 space-y-2">
                   <p className="text-yellow-200 text-sm">
-                    <strong>Total BEAM Rewards:</strong> Up to 21 BEAM Coins per musician
+                    <strong>Total BEAM Compensation:</strong> 25 BEAM Coins per musician
                   </p>
-                  <p className="text-yellow-200 text-xs mt-1">
-                    Redeemable for lessons, equipment, or transferable to other musicians
+                  <p className="text-yellow-200 text-xs">
+                    1 BEAM ≈ $1 (internal stable value); redeemable for cash, lessons, housing, or future BEAM FCU project staking.
+                  </p>
+                  <p
+                    className="text-sm text-orchestra-gold/80 cursor-pointer hover:text-orchestra-gold transition-colors"
+                    onClick={() => setShowBeamVideo(true)}
+                  >
+                    🎥 What is BEAM Coin? Watch a 1-minute explainer →
+                  </p>
+                  <p className="text-yellow-200 text-xs">
+                    Musicians may opt for partial or full BEAM payouts. Verified attendance required before release.
                   </p>
                 </div>
               </div>
@@ -812,30 +829,113 @@ export default function BlackDiasporaSymphonyPage() {
         </div>
       )}
 
+      {showBeamVideo && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={() => setShowBeamVideo(false)}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-2xl rounded-2xl bg-slate-900 border border-white/10 p-4 sm:p-6 space-y-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="relative w-full overflow-hidden rounded-xl bg-black aspect-video">
+              <iframe
+                className="absolute inset-0 h-full w-full"
+                src="https://www.youtube.com/embed/yourBeamVideoID"
+                title="What is BEAM Coin?"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+            <button
+              onClick={() => setShowBeamVideo(false)}
+              className="w-full inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-blue-600 transition-colors"
+            >
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
+
       {/* Bottom Navigation - Portfolio Style */}
-      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-40">
+      <div className="fixed bottom-6 inset-x-0 z-40 px-4 sm:px-6 md:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.2 }}
-          className="bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20"
+          className="hidden md:flex mx-auto max-w-4xl items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20"
         >
-          <div className="flex items-center space-x-8">
-            {navigationSections.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => scrollToSection(section.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                  activeSection === section.id
-                    ? 'bg-white text-black'
-                    : 'text-white hover:bg-white/10'
-                }`}
+          {navigationSections.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => scrollToSection(section.id)}
+              className={`mx-2 flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                activeSection === section.id
+                  ? 'bg-white text-black'
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              <section.icon className="w-4 h-4" />
+              <span className="text-sm font-medium">{section.label}</span>
+            </button>
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 1.2 }}
+          className="md:hidden mx-auto max-w-sm"
+        >
+          <button
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            className="w-full inline-flex items-center justify-center space-x-3 bg-white/10 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/20 text-white"
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-nav-menu"
+          >
+            {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <span className="text-sm font-semibold">
+              {mobileNavOpen ? 'Close Menu' : 'Open Menu'}
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {mobileNavOpen && (
+              <motion.div
+                id="mobile-nav-menu"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className="mt-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 divide-y divide-white/10 overflow-hidden"
               >
-                <section.icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{section.label}</span>
-              </button>
-            ))}
-          </div>
+                {navigationSections.map((section) => (
+                  <button
+                    key={section.id}
+                    onClick={() => scrollToSection(section.id)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
+                      activeSection === section.id
+                        ? 'bg-white/20 text-white'
+                        : 'text-gray-200 hover:bg-white/10'
+                    }`}
+                  >
+                    <span className="flex items-center space-x-3">
+                      <section.icon className="w-4 h-4" />
+                      <span className="font-medium">{section.label}</span>
+                    </span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </div>
