@@ -8,7 +8,17 @@ export const rosterData = [
     percentage: 13, 
     musicians: ['Yolanda Odufuwa'], 
     musicianDetails: [
-      { name: 'Yolanda Odufuwa', email: 'yolandaodufuwa@gmail.com', status: 'Pending', source: 'Email (Oct 1)', notes: 'Beginner violinist rejoining after lessons with Fatima.' }
+      { 
+        name: 'Yolanda Odufuwa', 
+        email: 'yolandaodufuwa@gmail.com', 
+        status: 'Pending', 
+        source: 'Email (Oct 1)', 
+        notes: 'Beginner violinist rejoining after lessons with Fatima.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -28,8 +38,39 @@ export const rosterData = [
     percentage: 33, 
     musicians: ['Nicole Gabriel', 'Anya Prakash'], 
     musicianDetails: [
-      { name: 'Nicole Gabriel', email: 'ngabriel.nicole@gmail.com', status: 'Confirmed', source: 'Email (Sep 22)', notes: 'Performed with BDSO in 2024 Juneteenth Concert “Cries from Our Soil.” Returning for Memorial Concert.' },
-      { name: 'Anya Prakash', email: 'anyavani.prakash@gmail.com', status: 'Interested', source: 'Email (Oct 1)', notes: 'Violist in MYSO Senior Symphony; interested in Annual Memorial Concert.' }
+      { 
+        name: 'Nicole Gabriel', 
+        email: 'ngabriel.nicole@gmail.com', 
+        status: 'Confirmed', 
+        source: 'Email (Sep 22)', 
+        notes: 'Performed with BDSO in 2024 Juneteenth Concert “Cries from Our Soil.” Returning for Memorial Concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      { 
+        name: 'Anya Prakash', 
+        email: 'anyavani.prakash@gmail.com', 
+        status: 'Interested', 
+        source: 'Email (Oct 1)', 
+        notes: 'Violist in MYSO Senior Symphony; interested in Annual Memorial Concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      { 
+        name: 'Ezra Haugabrooks', 
+        email: 'ezra.haugabrooks@gmail.com', 
+        status: 'Confirmed', 
+        source: 'n/a', 
+        notes: 'Violist this is my first year playing with Black Diaspora Symphony.',
+        bio: '',
+        headshotUrl: 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -58,7 +99,17 @@ export const rosterData = [
     percentage: 50, 
     musicians: ['Zack Munoz'], 
     musicianDetails: [
-      { name: 'Zack Munoz', email: 'zacklmunoz123@gmail.com', status: 'Confirmed', source: 'Email (Nov 20, 2023)', notes: 'MYSO Senior Symphony flutist; Cuban-Mexican-Puerto Rican heritage; played in 2023 BDSO concert.' }
+      { 
+        name: 'Zack Munoz', 
+        email: 'zacklmunoz123@gmail.com', 
+        status: 'Confirmed', 
+        source: 'Email (Nov 20, 2023)', 
+        notes: 'MYSO Senior Symphony flutist; Cuban-Mexican-Puerto Rican heritage; played in 2023 BDSO concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -96,8 +147,28 @@ export const rosterData = [
     percentage: 50, 
     musicians: ['Maya Schiek', 'Rachel Jacobson'], 
     musicianDetails: [
-      { name: 'Maya Schiek', email: 'MayaSchiek@outlook.com', status: 'Confirmed', source: 'Email (Oct 9)', notes: 'Experienced hornist with master’s degree; recently moved back to Milwaukee.' },
-      { name: 'Rachel Jacobson', email: 'rachel.jacobson.horn@gmail.com', status: 'Interested', source: 'Email (Sep 29)', notes: 'UWM graduate horn player; interested in December concert.' }
+      { 
+        name: 'Maya Schiek', 
+        email: 'MayaSchiek@outlook.com', 
+        status: 'Confirmed', 
+        source: 'Email (Oct 9)', 
+        notes: 'Experienced hornist with master’s degree; recently moved back to Milwaukee.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      { 
+        name: 'Rachel Jacobson', 
+        email: 'rachel.jacobson.horn@gmail.com', 
+        status: 'Interested', 
+        source: 'Email (Sep 29)', 
+        notes: 'UWM graduate horn player; interested in December concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -108,7 +179,17 @@ export const rosterData = [
     percentage: 33, 
     musicians: ['Katharine Wilhelm'], 
     musicianDetails: [
-      { name: 'Katharine Wilhelm', email: 'reyjynkgw@gmail.com', status: 'Interested', source: 'Email (Oct 7)', notes: 'High school senior, MYSO Senior Symphony trumpet player; interested in Annual Memorial Concert.' }
+      { 
+        name: 'Katharine Wilhelm', 
+        email: 'reyjynkgw@gmail.com', 
+        status: 'Interested', 
+        source: 'Email (Oct 7)', 
+        notes: 'High school senior, MYSO Senior Symphony trumpet player; interested in Annual Memorial Concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -137,7 +218,17 @@ export const rosterData = [
     percentage: 100, 
     musicians: ['Calvin Stokes'], 
     musicianDetails: [
-      { name: 'Calvin Stokes', email: 'theharper@aol.com', status: 'Confirmed', source: 'Faculty contact (Oct 7)', notes: 'Advisory / faculty participant for training orchestra.' }
+      { 
+        name: 'Calvin Stokes', 
+        email: 'theharper@aol.com', 
+        status: 'Confirmed', 
+        source: 'Faculty contact (Oct 7)', 
+        notes: 'Advisory / faculty participant for training orchestra.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
     ]
   },
   { 
@@ -157,6 +248,48 @@ export const rosterData = [
     percentage: 0, 
     musicians: [], 
     musicianDetails: []
+  },
+  {
+    instrument: 'Conductor',
+    needed: 1,
+    confirmed: 1,
+    remaining: 0,
+    percentage: 100,
+    musicians: ['Dayvin Hallmon'],
+    musicianDetails: [
+      {
+        name: 'Dayvin Hallmon',
+        email: 'hello@beamcenter.org',
+        status: 'Confirmed',
+        source: 'Founder / Artistic Director',
+        notes: 'Conductor for the 2025 Annual Memorial Concert.',
+        bio: 'Dayvin Hallmon is the founder and artistic director of the Black Diaspora Symphony Orchestra, focused on celebrating composers of the African diaspora.',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
+    ]
+  },
+  {
+    instrument: 'Assistant Conductor',
+    needed: 1,
+    confirmed: 0,
+    remaining: 1,
+    percentage: 0,
+    musicians: [],
+    musicianDetails: [
+      {
+        name: 'Assistant Conductor (TBD)',
+        email: '',
+        status: 'Open',
+        source: 'Staffing in progress',
+        notes: 'Looking for an assistant conductor to support rehearsals and community engagement.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
+    ]
   }
 ]
 
@@ -175,29 +308,36 @@ export const rehearsalSchedule = [
 export const faqData = [
   {
     question: "What is the rehearsal schedule?",
-    answer: "Rehearsals are held on Wednesday and Saturday evenings at BEAM Rehearsal Hall. Sectional rehearsals run 3 hours, full orchestra rehearsals run 4 hours. See the calendar below for specific dates and times."
+    answer:
+      "Rehearsals are scheduled in Milwaukee leading up to the December 14th concert at Central United Methodist Church. Sectional rehearsals typically run 3 hours, and full orchestra rehearsals run 4 hours. See the calendar below for confirmed dates and times."
   },
   {
     question: "How does payment work?",
-    answer: "Musicians receive both USD contract pay via BDO and BEAM Coin rewards. USD payments are processed after each rehearsal block, while BEAM Coin is automatically allocated based on attendance and participation."
+    answer:
+      "Musicians may choose between direct USD payment via the Black Diaspora Symphony Orchestra or BEAM Coin, a digital payment option redeemable for cash or community credits. USD payments are issued by BDSO after each rehearsal block."
   },
   {
     question: "What are BEAM Coins?",
-    answer: "BEAM Coins are digital tokens that can be redeemed for music lessons, equipment, or transferred to other musicians in the BEAM ecosystem. They're earned through participation and can be used across all BEAM projects."
+    answer:
+      "BEAM Coins are digital work credits redeemable for lessons, housing, equipment, or cash through the BEAM ecosystem. They are earned through verified participation and can be transferred between musicians or used across BEAM partner projects."
   },
   {
     question: "Where do I submit my audition?",
-    answer: "Use the audition submission form on this page. You can upload video files directly or provide a YouTube/Vimeo link. Include required excerpts from Montgomery Variations and other specified works."
+    answer:
+      "Use the audition submission form on this page. You can upload video files directly or provide a YouTube/Vimeo link. Please prepare required excerpts from Montgomery Variations, Ravel’s Daphnis et Chloé, and Grieg’s Funeral March for Rikard Nordraak."
   },
   {
     question: "What music will we be performing?",
-    answer: "The program features Margaret Bonds' Montgomery Variations alongside other works celebrating the Black musical tradition. Sheet music will be provided digitally through our platform."
+    answer:
+      "The 2025 Memorial Concert features three works: Margaret Bonds' The Montgomery Variations, Maurice Ravel's Daphnis et Chloé (selected movements), and Edvard Grieg's Funeral March for Rikard Nordraak."
   },
   {
     question: "Is parking available?",
-    answer: "Yes, free parking is available at BEAM Rehearsal Hall. For the concert at Orlando Concert Hall, validated parking is provided in the adjacent garage."
+    answer:
+      "Yes. Free parking is available at Central United Methodist Church, located at 639 North 25th Street, Milwaukee, WI. Street parking is also available nearby."
   }
 ]
+
 
 export const montgomeryExcerptDownloads: Array<{
   instrument: string

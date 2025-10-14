@@ -39,6 +39,9 @@ const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGalle
   ssr: false
 })
 
+type MusicianDetail = (typeof rosterData)[number]['musicianDetails'][number]
+type MusicianProfile = MusicianDetail & { instrument: string }
+
 const navigationSections = [
   { id: 'roster', label: 'Roster', icon: Users },
   { id: 'compensation', label: 'Compensation', icon: DollarSign },
@@ -58,6 +61,9 @@ export default function BlackDiasporaSymphonyPage() {
   const [scrollY, setScrollY] = useState(0)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [showBeamVideo, setShowBeamVideo] = useState(false)
+  const [showBeamCompensation, setShowBeamCompensation] = useState(false)
+  const [showMusicianModal, setShowMusicianModal] = useState(false)
+  const [selectedMusician, setSelectedMusician] = useState<MusicianProfile | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const montgomeryAvailableCount = montgomeryExcerptDownloads.filter(part => part.available).length
@@ -100,6 +106,57 @@ export default function BlackDiasporaSymphonyPage() {
     }
   }
 
+  const handleOpenMusicianProfile = (instrument: string, musician: MusicianDetail) => {
+    setSelectedMusician({ ...musician, instrument })
+    setShowMusicianModal(true)
+  }
+
+  const handleCloseMusicianProfile = () => {
+    setShowMusicianModal(false)
+    setSelectedMusician(null)
+  }
+
+  const getMusicianInitials = (name: string) => {
+    const initials = name
+      .split(' ')
+      .filter(Boolean)
+      .map(part => part[0]?.toUpperCase() ?? '')
+      .join('')
+    return initials.slice(0, 2) || 'BDSO'
+  }
+
+  const getSupportLabel = (name: string) => {
+    const part = name
+      .split(' ')
+      .map(segment => segment.trim())
+      .find(segment => segment.length > 0)
+    return part ?? 'This Artist'
+  }
+
+  const renderMusicianSource = (source: string): JSX.Element | string => {
+    if (!source) {
+      return 'n/a'
+    }
+
+    const detailStart = source.indexOf('(')
+    if (detailStart !== -1) {
+      const label = source.slice(0, detailStart).trimEnd()
+      const detail = source.slice(detailStart).trimStart()
+
+      return (
+        <>
+          {label}
+          <span className="relative inline-flex items-center">
+            <span className="ml-1 blur-sm sm:blur select-none pointer-events-none">{detail}</span>
+            <span className="sr-only">Date hidden for privacy</span>
+          </span>
+        </>
+      )
+    }
+
+    return source
+  }
+
   // Update active section and scroll position based on scroll - throttled for performance
   useEffect(() => {
     let ticking = false
@@ -135,16 +192,18 @@ export default function BlackDiasporaSymphonyPage() {
         setShowRavelModal(false)
         setShowBeamVideo(false)
         setMobileNavOpen(false)
+        setShowMusicianModal(false)
+        setSelectedMusician(null)
       }
     }
 
-    if (showRavelModal || showBeamVideo || mobileNavOpen) {
+    if (showRavelModal || showBeamVideo || mobileNavOpen || showMusicianModal) {
       window.addEventListener('keydown', handleKeyDown)
       return () => window.removeEventListener('keydown', handleKeyDown)
     }
 
     return () => {}
-  }, [showRavelModal, showBeamVideo, mobileNavOpen])
+  }, [showRavelModal, showBeamVideo, mobileNavOpen, showMusicianModal])
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -302,9 +361,16 @@ export default function BlackDiasporaSymphonyPage() {
                     {section.musicianDetails.length > 0 && (
                       <div className="mt-2 space-y-2">
                         {section.musicianDetails.map((musician, idx) => (
-                          <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleOpenMusicianProfile(section.instrument, musician)}
+                            className="group w-full text-left bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                          >
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-white font-medium text-sm">{musician.name}</span>
+                              <span className="text-white font-medium text-sm underline decoration-white/40 underline-offset-4 group-hover:decoration-white">
+                                {musician.name}
+                              </span>
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                 musician.status === 'Confirmed' 
                                   ? 'bg-green-500/20 text-green-300'
@@ -327,7 +393,9 @@ export default function BlackDiasporaSymphonyPage() {
                               </div>
                               <div className="flex items-center mb-1">
                                 <span className="mr-2">📅</span>
-                                {musician.source}
+                                <span className="text-gray-400">
+                                  {renderMusicianSource(musician.source)}
+                                </span>
                               </div>
                               {musician.notes && (
                                 <div className="text-gray-500 text-xs mt-1 italic">
@@ -335,7 +403,7 @@ export default function BlackDiasporaSymphonyPage() {
                                 </div>
                               )}
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -544,7 +612,7 @@ export default function BlackDiasporaSymphonyPage() {
               Compensation & Rewards
             </h2>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="flex flex-col gap-6">
               {/* USD Payments */}
               <div className="bg-white/5 rounded-lg p-6 border border-white/10">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
@@ -576,48 +644,74 @@ export default function BlackDiasporaSymphonyPage() {
                 </div>
               </div>
 
-              {/* BEAM Coin Compensation */}
-              <div className="bg-white/5 rounded-lg p-6 border border-white/10">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                  <Coins className="w-6 h-6 mr-2 text-yellow-400" />
-                  BEAM Coin Payment Option
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300">Sectional Rehearsal</span>
-                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300">Full Orchestra Rehearsal</span>
-                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300">Dress Rehearsal</span>
-                    <span className="text-yellow-400 font-semibold">5 BEAM</span>
-                  </div>
-                  <div className="flex justify-between items-center border-t border-white/10 pt-4">
-                    <span className="text-white font-semibold">Concert Performance</span>
-                    <span className="text-yellow-400 font-bold text-lg">10 BEAM</span>
-                  </div>
-                </div>
-                <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20 space-y-2">
-                  <p className="text-yellow-200 text-sm">
-                    <strong>Total BEAM Compensation:</strong> 25 BEAM Coins per musician
-                  </p>
-                  <p className="text-yellow-200 text-xs">
-                    1 BEAM ≈ $1 (internal stable value); redeemable for cash, lessons, housing, or future BEAM FCU project staking.
-                  </p>
-                  <p
-                    className="text-sm text-orchestra-gold/80 cursor-pointer hover:text-orchestra-gold transition-colors"
-                    onClick={() => setShowBeamVideo(true)}
+              <button
+                type="button"
+                onClick={() => setShowBeamCompensation(prev => !prev)}
+                className="inline-flex items-center self-start bg-yellow-500/10 border border-yellow-500/30 px-4 py-2 rounded-lg text-sm font-medium text-yellow-200 hover:bg-yellow-500/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+              >
+                <span className="mr-2">
+                  {showBeamCompensation ? 'Hide BEAM Coin payment option' : 'Interested in BEAM Coin payouts?'}
+                </span>
+                {showBeamCompensation ? (
+                  <ChevronUp className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                )}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showBeamCompensation && (
+                  <motion.div
+                    key="beam-compensation-card"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="bg-white/5 rounded-lg p-6 border border-white/10"
                   >
-                    🎥 What is BEAM Coin? Watch a 1-minute explainer →
-                  </p>
-                  <p className="text-yellow-200 text-xs">
-                    Musicians may opt for partial or full BEAM payouts. Verified attendance required before release.
-                  </p>
-                </div>
-              </div>
+                    {/* BEAM Coin Compensation */}
+                    <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+                      <Coins className="w-6 h-6 mr-2 text-yellow-400" />
+                      BEAM Coin Payment Option
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-300">Sectional Rehearsal</span>
+                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-300">Full Orchestra Rehearsal</span>
+                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-300">Dress Rehearsal</span>
+                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t border-white/10 pt-4">
+                        <span className="text-white font-semibold">Concert Performance</span>
+                        <span className="text-yellow-400 font-bold text-lg">10 BEAM</span>
+                      </div>
+                    </div>
+                    <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20 space-y-2">
+                      <p className="text-yellow-200 text-sm">
+                        <strong>Total BEAM Compensation:</strong> 25 BEAM Coins per musician
+                      </p>
+                      <p className="text-yellow-200 text-xs">
+                        1 BEAM ≈ $1 (internal stable value); redeemable for cash, lessons, housing, or future BEAM FCU project staking.
+                      </p>
+                      <p
+                        className="text-sm text-orchestra-gold/80 cursor-pointer hover:text-orchestra-gold transition-colors"
+                        onClick={() => setShowBeamVideo(true)}
+                      >
+                        🎥 What is BEAM Coin? Watch a 1-minute explainer →
+                      </p>
+                      <p className="text-yellow-200 text-xs">
+                        Musicians may opt for partial or full BEAM payouts. Verified attendance required before release.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.section>
@@ -744,6 +838,137 @@ export default function BlackDiasporaSymphonyPage() {
           <ProjectMediaGallery />
         </motion.section>
       </div>
+
+      {showMusicianModal && selectedMusician && (
+        <div className="fixed inset-0 z-[105] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={handleCloseMusicianProfile}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-3xl rounded-2xl bg-slate-900 border border-white/10 p-6 sm:p-8 space-y-6 overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              onClick={handleCloseMusicianProfile}
+              className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors"
+              aria-label="Close musician profile"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex flex-col gap-6 md:flex-row">
+              <div className="flex flex-col items-center md:w-56">
+                {selectedMusician.headshotUrl ? (
+                  <img
+                    src={selectedMusician.headshotUrl}
+                    alt={`${selectedMusician.name} headshot`}
+                    className="h-56 w-56 rounded-2xl object-cover border border-white/10"
+                  />
+                ) : (
+                  <div className="flex h-56 w-56 items-center justify-center rounded-2xl bg-white/10 border border-white/10 text-4xl font-semibold text-white">
+                    {getMusicianInitials(selectedMusician.name)}
+                  </div>
+                )}
+                <div className="mt-4 text-center">
+                  <p className="text-base font-semibold text-white">{selectedMusician.name}</p>
+                  <p className="text-sm text-purple-200">{selectedMusician.instrument}</p>
+                </div>
+                <span
+                  className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                    selectedMusician.status === 'Confirmed'
+                      ? 'bg-green-500/20 text-green-300'
+                      : selectedMusician.status === 'Interested'
+                      ? 'bg-blue-500/20 text-blue-300'
+                      : selectedMusician.status === 'Pending'
+                      ? 'bg-yellow-500/20 text-yellow-300'
+                      : 'bg-gray-500/20 text-gray-300'
+                  }`}
+                >
+                  {selectedMusician.status}
+                </span>
+              </div>
+              <div className="flex-1 space-y-5">
+                <div className="space-y-3">
+                  <h4 className="text-lg font-semibold text-white">About</h4>
+                  <p className="text-sm leading-relaxed text-gray-300">
+                    {selectedMusician.bio?.trim()
+                      ? selectedMusician.bio
+                      : 'Artist biography coming soon.'}
+                  </p>
+                </div>
+                <div className="space-y-2 text-xs text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/70">Email:</span>
+                    <span className="relative inline-flex items-center">
+                      <span className="blur-sm sm:blur select-none pointer-events-none">
+                        {selectedMusician.email || 'Not provided'}
+                      </span>
+                      <span className="sr-only">Email hidden for privacy</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/70">Source:</span>
+                    <span>{selectedMusician.source || 'Not provided'}</span>
+                  </div>
+                  {selectedMusician.notes && (
+                    <div>
+                      <span className="text-white/70">Notes:</span>
+                      <p className="mt-1 text-gray-400">{selectedMusician.notes}</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h5 className="text-sm font-semibold text-white">Featured Media</h5>
+                  {selectedMusician.mediaEmbedUrl ? (
+                    <div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                      <iframe
+                        src={selectedMusician.mediaEmbedUrl}
+                        title={`${selectedMusician.name} media`}
+                        className="h-full w-full"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-sm text-gray-400">
+                      Media uploads coming soon.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-gray-400">
+                Community members can show appreciation directly through the support link below.
+              </div>
+              {selectedMusician.supportLink ? (
+                <a
+                  href={selectedMusician.supportLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-600"
+                >
+                  Support {getSupportLabel(selectedMusician.name)}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex items-center justify-center rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-gray-400 cursor-not-allowed"
+                >
+                  Support link coming soon
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {showRavelModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
