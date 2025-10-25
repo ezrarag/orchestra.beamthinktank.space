@@ -32,6 +32,7 @@ import {
   ravelExcerptDownloads,
   montgomeryExcerptDownloads
 } from './data'
+import MusicianProfileModal from '@/components/MusicianProfileModal'
 
 // Lazy load heavy components to reduce initial bundle size
 const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGallery'), {
@@ -44,6 +45,7 @@ type MusicianProfile = MusicianDetail & { instrument: string }
 
 const navigationSections = [
   { id: 'roster', label: 'Roster', icon: Users },
+  { id: 'materials', label: 'Materials', icon: Upload },
   { id: 'compensation', label: 'Compensation', icon: DollarSign },
   { id: 'schedule', label: 'Rehearsals', icon: Calendar },
   { id: 'faq', label: 'FAQ', icon: Info },
@@ -64,6 +66,7 @@ export default function BlackDiasporaSymphonyPage() {
   const [showBeamCompensation, setShowBeamCompensation] = useState(false)
   const [showMusicianModal, setShowMusicianModal] = useState(false)
   const [selectedMusician, setSelectedMusician] = useState<MusicianProfile | null>(null)
+  const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set())
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const montgomeryAvailableCount = montgomeryExcerptDownloads.filter(part => part.available).length
@@ -114,6 +117,71 @@ export default function BlackDiasporaSymphonyPage() {
   const handleCloseMusicianProfile = () => {
     setShowMusicianModal(false)
     setSelectedMusician(null)
+  }
+
+  const handleDirectDownload = async (url: string, filename: string) => {
+    const downloadKey = `${url}-${filename}`
+    
+    try {
+      setDownloadingFiles(prev => new Set(prev).add(downloadKey))
+      
+      // Force download by modifying the URL to include download parameter
+      const downloadUrl = url.includes('?') 
+        ? `${url}&download=${encodeURIComponent(filename)}`
+        : `${url}?download=${encodeURIComponent(filename)}`
+      
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/pdf',
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const blob = await response.blob()
+      
+      // Create a temporary URL for the blob
+      const blobUrl = window.URL.createObjectURL(blob)
+      
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      
+      // Clean up
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      console.error('Download failed:', error)
+      // Fallback: try direct download with modified URL
+      try {
+        const fallbackUrl = url.replace('alt=media', 'alt=media&download=true')
+        const link = document.createElement('a')
+        link.href = fallbackUrl
+        link.download = filename
+        link.target = '_blank'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } catch (fallbackError) {
+        console.error('Fallback download failed:', fallbackError)
+        // Last resort: open in new tab
+        window.open(url, '_blank')
+      }
+    } finally {
+      setDownloadingFiles(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(downloadKey)
+        return newSet
+      })
+    }
   }
 
   const getMusicianInitials = (name: string) => {
@@ -167,15 +235,25 @@ export default function BlackDiasporaSymphonyPage() {
           setScrollY(window.scrollY)
           
           const sections = navigationSections.map(section => section.id)
-          const scrollPosition = window.scrollY + 180
+          const scrollPosition = window.scrollY + 100 // Offset for better detection
 
+          // Find the section that's currently most visible
+          let currentSection = sections[0] // Default to first section
+          
           for (let i = sections.length - 1; i >= 0; i--) {
             const section = document.getElementById(sections[i])
-            if (section && section.offsetTop <= scrollPosition) {
-              setActiveSection(sections[i])
-              break
+            if (section) {
+              const sectionTop = section.offsetTop
+              
+              // If we've scrolled past the start of this section, it's the current one
+              if (scrollPosition >= sectionTop) {
+                currentSection = sections[i]
+                break
+              }
             }
           }
+          
+          setActiveSection(currentSection)
           ticking = false
         })
         ticking = true
@@ -321,7 +399,6 @@ export default function BlackDiasporaSymphonyPage() {
               Orchestra Roster
             </h2>
             
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-8 lg:h-[75vh]">
               {/* Roster Table */}
               <div className="space-y-4 lg:space-y-6 lg:overflow-y-auto lg:pr-6 lg:snap-y lg:snap-mandatory lg:h-full lg:max-h-[75vh]">
                 {rosterData.map((section, index) => (
@@ -410,9 +487,24 @@ export default function BlackDiasporaSymphonyPage() {
                   </motion.div>
                 ))}
               </div>
+          </div>
+        </motion.section>
 
-              {/* Audition Submission Panel */}
-              <div className="space-y-6">
+        {/* Materials Section */}
+        <motion.section
+          id="materials"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+        >
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+            <h2 className="text-3xl font-bold text-white mb-8 flex items-center">
+              <Upload className="w-8 h-8 mr-3 text-purple-400" />
+              Materials
+            </h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Audition Submission */}
                 <div className="bg-white/5 rounded-lg p-6 border border-white/10">
                   <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                     <Upload className="w-6 h-6 mr-2 text-purple-400" />
@@ -524,7 +616,7 @@ export default function BlackDiasporaSymphonyPage() {
                 <div className="bg-white/5 rounded-lg p-6 border border-white/10">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                     <Play className="w-5 h-5 mr-2 text-purple-400" />
-                    Required Excerpts
+                    Memorial Concert Repertoire
                   </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
@@ -535,6 +627,7 @@ export default function BlackDiasporaSymphonyPage() {
                     <div className="relative">
                       <motion.button 
                         type="button"
+                        onClick={() => hasMontgomeryDownloads && montgomeryExcerptDownloads.length > 0 && handleDirectDownload(montgomeryExcerptDownloads[0].url, 'Montgomery-Variations.pdf')}
                         onMouseEnter={() => setHoveredExcerpt('montgomery')}
                         onMouseLeave={() => setHoveredExcerpt(null)}
                         onFocus={() => setHoveredExcerpt('montgomery')}
@@ -590,7 +683,6 @@ export default function BlackDiasporaSymphonyPage() {
                           </motion.span>
                         )}
                       </AnimatePresence>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -604,7 +696,7 @@ export default function BlackDiasporaSymphonyPage() {
           id="compensation"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
+          transition={{ duration: 0.8, delay: 0.5 }}
         >
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
             <h2 className="text-3xl font-bold text-white mb-8 flex items-center">
@@ -721,7 +813,7 @@ export default function BlackDiasporaSymphonyPage() {
           id="schedule"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
+          transition={{ duration: 0.8, delay: 0.7 }}
         >
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
             <h2 className="text-3xl font-bold text-white mb-8 flex items-center">
@@ -783,7 +875,7 @@ export default function BlackDiasporaSymphonyPage() {
           id="faq"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
+          transition={{ duration: 0.8, delay: 0.9 }}
         >
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
             <h2 className="text-3xl font-bold text-white mb-8 flex items-center">
@@ -833,142 +925,17 @@ export default function BlackDiasporaSymphonyPage() {
           id="media"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.0 }}
+          transition={{ duration: 0.8, delay: 1.1 }}
         >
           <ProjectMediaGallery />
         </motion.section>
       </div>
 
-      {showMusicianModal && selectedMusician && (
-        <div className="fixed inset-0 z-[105] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/80"
-            onClick={handleCloseMusicianProfile}
-            aria-hidden="true"
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            className="relative w-full max-w-3xl rounded-2xl bg-slate-900 border border-white/10 p-6 sm:p-8 space-y-6 overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-          >
-            <button
-              onClick={handleCloseMusicianProfile}
-              className="absolute right-4 top-4 text-gray-400 hover:text-white transition-colors"
-              aria-label="Close musician profile"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex flex-col gap-6 md:flex-row">
-              <div className="flex flex-col items-center md:w-56">
-                {selectedMusician.headshotUrl ? (
-                  <img
-                    src={selectedMusician.headshotUrl}
-                    alt={`${selectedMusician.name} headshot`}
-                    className="h-56 w-56 rounded-2xl object-cover border border-white/10"
-                  />
-                ) : (
-                  <div className="flex h-56 w-56 items-center justify-center rounded-2xl bg-white/10 border border-white/10 text-4xl font-semibold text-white">
-                    {getMusicianInitials(selectedMusician.name)}
-                  </div>
-                )}
-                <div className="mt-4 text-center">
-                  <p className="text-base font-semibold text-white">{selectedMusician.name}</p>
-                  <p className="text-sm text-purple-200">{selectedMusician.instrument}</p>
-                </div>
-                <span
-                  className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                    selectedMusician.status === 'Confirmed'
-                      ? 'bg-green-500/20 text-green-300'
-                      : selectedMusician.status === 'Interested'
-                      ? 'bg-blue-500/20 text-blue-300'
-                      : selectedMusician.status === 'Pending'
-                      ? 'bg-yellow-500/20 text-yellow-300'
-                      : 'bg-gray-500/20 text-gray-300'
-                  }`}
-                >
-                  {selectedMusician.status}
-                </span>
-              </div>
-              <div className="flex-1 space-y-5">
-                <div className="space-y-3">
-                  <h4 className="text-lg font-semibold text-white">About</h4>
-                  <p className="text-sm leading-relaxed text-gray-300">
-                    {selectedMusician.bio?.trim()
-                      ? selectedMusician.bio
-                      : 'Artist biography coming soon.'}
-                  </p>
-                </div>
-                <div className="space-y-2 text-xs text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/70">Email:</span>
-                    <span className="relative inline-flex items-center">
-                      <span className="blur-sm sm:blur select-none pointer-events-none">
-                        {selectedMusician.email || 'Not provided'}
-                      </span>
-                      <span className="sr-only">Email hidden for privacy</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/70">Source:</span>
-                    <span>{selectedMusician.source || 'Not provided'}</span>
-                  </div>
-                  {selectedMusician.notes && (
-                    <div>
-                      <span className="text-white/70">Notes:</span>
-                      <p className="mt-1 text-gray-400">{selectedMusician.notes}</p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h5 className="text-sm font-semibold text-white">Featured Media</h5>
-                  {selectedMusician.mediaEmbedUrl ? (
-                    <div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                      <iframe
-                        src={selectedMusician.mediaEmbedUrl}
-                        title={`${selectedMusician.name} media`}
-                        className="h-full w-full"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-3 flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/5 text-sm text-gray-400">
-                      Media uploads coming soon.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-gray-400">
-                Community members can show appreciation directly through the support link below.
-              </div>
-              {selectedMusician.supportLink ? (
-                <a
-                  href={selectedMusician.supportLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-600"
-                >
-                  Support {getSupportLabel(selectedMusician.name)}
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex items-center justify-center rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-gray-400 cursor-not-allowed"
-                >
-                  Support link coming soon
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <MusicianProfileModal
+        isOpen={showMusicianModal}
+        onClose={handleCloseMusicianProfile}
+        musician={selectedMusician}
+      />
 
       {showRavelModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
@@ -1030,15 +997,23 @@ export default function BlackDiasporaSymphonyPage() {
                       )}
                     </div>
                     {part.available ? (
-                      <a
-                        href={part.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+                      <button
+                        onClick={() => handleDirectDownload(part.url, `Ravel-Tombeau-${part.instrument}.pdf`)}
+                        disabled={downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`)}
+                        className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-400 disabled:cursor-not-allowed text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
                       >
-                        <Download className="w-4 h-4" />
-                        <span>Download</span>
-                      </a>
+                        {downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`) ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Downloading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4" />
+                            <span>Download</span>
+                          </>
+                        )}
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Pending</span>
                     )}

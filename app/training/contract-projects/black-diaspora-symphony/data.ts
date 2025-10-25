@@ -354,57 +354,62 @@ export const griegExcerptDownloads: Array<{
 export const ravelExcerptDownloads = [
   {
     instrument: 'Flute',
-    url: 'https://link.storjshare.io/raw/jww5gyz3vhm6jsg5xz5lkgmg3koa/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48030-PMLP80671-Ravel-Tombeau.Flute.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48030-PMLP80671-Ravel-Tombeau.Flute.pdf?alt=media&token=03ac5d9f-91f0-47e3-9a1a-d0ebfbd5cb41',
     available: true
   },
   {
     instrument: 'Oboe',
-    url: 'https://link.storjshare.io/raw/jwzvdj2o5y6lop4wfb4pwi5dto3a/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48031-PMLP80671-Ravel-Tombeau.Oboe.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48031-PMLP80671-Ravel-Tombeau.Oboe.pdf?alt=media&token=020f3dcf-4a71-4c2b-a337-8fb237944475',
     available: true
   },
   {
     instrument: 'Clarinet',
-    url: 'https://link.storjshare.io/raw/jxh3fb6pafliq4mtb5jyzx26tonq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48032-PMLP80671-Ravel-Tombeau.Clarinet.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48032-PMLP80671-Ravel-Tombeau.Clarinet.pdf?alt=media&token=37ae39a1-3771-4483-8e6d-563811c253b2',
     available: true
   },
   {
     instrument: 'Bassoon',
-    url: 'https://link.storjshare.io/raw/jxtq73urpxfdltabbuj75hrp5rlq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48033-PMLP80671-Ravel-Tombeau.Bassoon.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48033-PMLP80671-Ravel-Tombeau.Bassoon.pdf?alt=media&token=1d016567-9c58-418b-8d1b-76698b449c6b',
     available: true
   },
   {
     instrument: 'Horn',
-    url: 'https://link.storjshare.io/raw/jujpckqtfqnosehcgv7rgqo7zbzq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48034-PMLP80671-Ravel-Tombeau.Horn.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48034-PMLP80671-Ravel-Tombeau.Horn.pdf?alt=media&token=bd465274-8251-4db9-a204-6a07fe7cb10d',
     available: true
   },
   {
     instrument: 'Trumpet',
-    url: 'https://link.storjshare.io/raw/jvt6vwzy2flxqwjm3a6yggygkkya/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48035-PMLP80671-Ravel-Tombeau.Trumpet.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48035-PMLP80671-Ravel-Tombeau.Trumpet.pdf?alt=media&token=7970712c-e5f8-44d4-b0ba-85362804c10d',
+    available: true
+  },
+  {
+    instrument: 'Harp',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48036-PMLP80671-Ravel-Tombeau.Harp.pdf?alt=media&token=ba9f1da7-c9cf-43fa-8800-326be0d119b7',
     available: true
   },
   {
     instrument: 'Violin I',
-    url: 'https://link.storjshare.io/raw/july6owqra73ls3shvwlm5usf6eq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48037-PMLP80671-Ravel-Tombeau.Violin1.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48037-PMLP80671-Ravel-Tombeau.Violin1.pdf?alt=media&token=aab71a8a-860d-4cd7-bfeb-c486c128cc25',
     available: true
   },
   {
     instrument: 'Violin II',
-    url: 'https://link.storjshare.io/raw/juiagv7jgaz2bufup46uzzllqdeq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48038-PMLP80671-Ravel-Tombeau.Violin2.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48038-PMLP80671-Ravel-Tombeau.Violin2.pdf?alt=media&token=0ef9a765-6cee-488a-a71a-765094494253',
     available: true
   },
   {
     instrument: 'Viola',
-    url: 'https://link.storjshare.io/raw/jubfqnepydr37yq66bry4neezuwa/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48039-PMLP80671-Ravel-Tombeau.Viola.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48039-PMLP80671-Ravel-Tombeau.Viola.pdf?alt=media&token=dfa26a37-5c8c-4707-a908-6e6afefa20f0',
     available: true
   },
   {
     instrument: 'Cello',
-    url: 'https://link.storjshare.io/raw/jurddjb3hrg42bsj2mh2zh4is5iq/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP27980-PMLP04975-Ravel_Le_Tombeau_de_Couperin_cello.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP27980-PMLP04975-Ravel_Le_Tombeau_de_Couperin_cello.pdf?alt=media&token=ed1b18f9-1eac-4bb2-af6b-bbaea1014c12',
     available: true
   },
   {
     instrument: 'Bass',
-    url: 'https://link.storjshare.io/raw/jugphxbozczni5tgluu6lgmxxtka/orchestabeam/Music%2FRavel%20-%20Le%20Tombeau%20de%20Couperin/IMSLP48040-PMLP80671-Ravel-Tombeau.Bass.pdf',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2FDecember%202025%2FRavel%2FIMSLP48040-PMLP80671-Ravel-Tombeau.Bass.pdf?alt=media&token=9ecad6ba-31bc-4c69-9d93-abe649192d8a',
     available: true
   }
 ]

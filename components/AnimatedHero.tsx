@@ -183,8 +183,8 @@ export default function AnimatedHero() {
         </Link>
       </motion.div>
 
-      {/* Bottom Sticky Navigation */}
-      <motion.nav
+      {/* Bottom Sticky Navigation - COMMENTED OUT */}
+      {/* <motion.nav
         className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -210,7 +210,7 @@ export default function AnimatedHero() {
             ))}
           </div>
         </div>
-      </motion.nav>
+      </motion.nav> */}
     </section>
   )
 }

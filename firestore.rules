@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user has admin role
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'beam_admin';
+    }
+    
+    // Helper function to check if user has partner admin role
+    function isPartnerAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'partner_admin';
+    }
+    
+    // Helper function to check if user is a musician
+    function isMusician() {
+      return isAuthenticated() && request.auth.token.role == 'musician';
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Organizations - Only BEAM admins can read/write
+    match /organizations/{orgId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read their own organization
+      allow read: if isPartnerAdmin() && 
+        request.auth.token.organizationId == orgId;
+    }
+    
+    // Projects - Admins and organization admins can access
+    match /projects/{projectId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read/write projects for their organization
+      allow read, write: if isPartnerAdmin() && 
+        resource.data.organizationId == request.auth.token.organizationId;
+    }
+    
+    // Musicians - Admins and the musician themselves
+    match /musicians/{musicianId} {
+      allow read, write: if isAdmin();
+      
+      // Allow musicians to read/update their own profile
+      allow read, update: if isMusician() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Allow partner admins to read musicians in their projects
+      allow read: if isPartnerAdmin();
+    }
+    
+    // Project Musicians - Admins and organization admins
+    match /projectMusicians/{pmId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read/write project musicians for their projects
+      allow read, write: if isPartnerAdmin() && 
+        resource.data.projectId in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.organizationId == request.auth.token.organizationId;
+    }
+    
+    // Pulse Entries - Admins only
+    match /pulseEntries/{entryId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Beam Coin Transactions - Admins and musicians
+    match /beamCoinTransactions/{transactionId} {
+      allow read, write: if isAdmin();
+      
+      // Allow musicians to read their own transactions
+      allow read: if isMusician() && 
+        resource.data.musicianId == request.auth.uid;
+    }
+    
+    // Auditions - Admins and organization admins
+    match /auditions/{auditionId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read/write auditions for their projects
+      allow read, write: if isPartnerAdmin() && 
+        resource.data.projectId in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.organizationId == request.auth.token.organizationId;
+      
+      // Allow musicians to read their own auditions
+      allow read: if isMusician() && 
+        resource.data.musicianId == request.auth.uid;
+    }
+    
+    // Communications - Admins and organization admins
+    match /communications/{commId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read/write communications for their projects
+      allow read, write: if isPartnerAdmin() && 
+        resource.data.projectId in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.organizationId == request.auth.token.organizationId;
+    }
+    
+    // Rehearsals - Admins and organization admins
+    match /rehearsals/{rehearsalId} {
+      allow read, write: if isAdmin();
+      
+      // Allow partner admins to read/write rehearsals for their projects
+      allow read, write: if isPartnerAdmin() && 
+        resource.data.projectId in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.organizationId == request.auth.token.organizationId;
+      
+      // Allow musicians to read rehearsals for projects they're in
+      allow read: if isMusician() && 
+        exists(/databases/$(database)/documents/projectMusicians/$(request.auth.uid + '_' + resource.data.projectId));
+    }
+    
+    // Users collection (for custom user data)
+    match /users/{userId} {
+      allow read, write: if isAdmin();
+      
+      // Allow users to read/update their own data
+      allow read, update: if isOwner(userId);
+    }
+    
+    // Default deny rule for any unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
