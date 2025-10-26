@@ -22,7 +22,9 @@ import {
   Linkedin,
   MapPin as Location,
   Menu,
-  X
+  X,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
@@ -33,6 +35,11 @@ import {
   montgomeryExcerptDownloads
 } from './data'
 import MusicianProfileModal from '@/components/MusicianProfileModal'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import { db } from '@/lib/firebase'
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { storage } from '@/lib/firebase'
 
 // Lazy load heavy components to reduce initial bundle size
 const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGallery'), {
@@ -53,6 +60,7 @@ const navigationSections = [
 ]
 
 export default function BlackDiasporaSymphonyPage() {
+  const { user } = useUserRole()
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
   const [showAuditionForm, setShowAuditionForm] = useState(false)
   const [submittedAudition, setSubmittedAudition] = useState(false)
@@ -67,6 +75,20 @@ export default function BlackDiasporaSymphonyPage() {
   const [showMusicianModal, setShowMusicianModal] = useState(false)
   const [selectedMusician, setSelectedMusician] = useState<MusicianProfile | null>(null)
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set())
+  
+  // Verification state
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'uploading' | 'verifying' | 'success' | 'error'>('idle')
+  const [verificationMethod, setVerificationMethod] = useState<'document' | 'email' | null>(null)
+  const [schoolEmail, setSchoolEmail] = useState('')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState(false)
+  
+  // Documents state
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false)
+  const [documents, setDocuments] = useState<{[key: string]: any}>({})
+  const [uploadingDocuments, setUploadingDocuments] = useState<Set<string>>(new Set())
+  
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const montgomeryAvailableCount = montgomeryExcerptDownloads.filter(part => part.available).length
@@ -201,6 +223,161 @@ export default function BlackDiasporaSymphonyPage() {
     return part ?? 'This Artist'
   }
 
+  // Verification functions
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']
+      if (!allowedTypes.includes(file.type)) {
+        setVerificationError('Please upload a PDF, PNG, or JPG file')
+        return
+      }
+      
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (file.size > maxSize) {
+        setVerificationError('File size must be less than 10MB')
+        return
+      }
+      
+      setUploadedFile(file)
+      setVerificationError(null)
+      setVerificationMethod('document')
+    }
+  }
+
+  const handleEmailVerification = () => {
+    if (!schoolEmail.trim()) {
+      setVerificationError('Please enter your school email')
+      return
+    }
+    
+    if (!schoolEmail.endsWith('.edu')) {
+      setVerificationError('Please enter a valid .edu email address')
+      return
+    }
+    
+    setVerificationMethod('email')
+    setVerificationError(null)
+    submitVerification()
+  }
+
+  const submitVerification = async () => {
+    if (!user) {
+      setVerificationError('Please sign in to verify your status')
+      return
+    }
+
+    try {
+      setVerificationStatus('uploading')
+      
+      let documentUrl = ''
+      let institution = ''
+      
+      if (verificationMethod === 'document' && uploadedFile) {
+        // Upload file to Firebase Storage
+        const fileRef = ref(storage, `verifications/${user.uid}/${uploadedFile.name}`)
+        await uploadBytes(fileRef, uploadedFile)
+        documentUrl = await getDownloadURL(fileRef)
+        
+        // Extract institution from filename or use generic
+        institution = uploadedFile.name.split('.')[0] || 'Unknown Institution'
+      } else if (verificationMethod === 'email') {
+        // Extract institution from email domain
+        const domain = schoolEmail.split('@')[1]
+        institution = domain.replace('.edu', '').replace(/\./g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }
+
+      // Write to Firestore
+      const verificationData = {
+        email: verificationMethod === 'email' ? schoolEmail : user.email,
+        documentUrl: documentUrl,
+        institution: institution,
+        verified: false, // Will be manually verified by admin
+        verifiedAt: null,
+        submittedAt: serverTimestamp(),
+        method: verificationMethod
+      }
+
+      await setDoc(doc(db, 'verifications', user.uid), verificationData)
+      
+      setVerificationStatus('success')
+      setIsVerified(true)
+      setVerificationError(null)
+      
+    } catch (error) {
+      console.error('Verification submission failed:', error)
+      setVerificationStatus('error')
+      setVerificationError('Failed to submit verification. Please try again.')
+    }
+  }
+
+  // Document upload functions
+  const documentTypes = [
+    { id: 'W4', name: 'W-4 Form', description: 'Tax withholding form for payment processing' },
+    { id: 'MediaRelease', name: 'Media Release', description: 'Permission for photography and recording' },
+    { id: 'Agreement', name: 'Musician Agreement', description: 'Performance contract and terms' },
+    { id: 'ID', name: 'Proof of ID', description: 'Government-issued identification' }
+  ]
+
+  const handleDocumentUpload = async (docType: string, file: File) => {
+    if (!user) {
+      alert('Please sign in to upload documents')
+      return
+    }
+
+    try {
+      setUploadingDocuments(prev => new Set(prev).add(docType))
+      
+      // Upload to Firebase Storage
+      const fileRef = ref(storage, `documents/${user.uid}/${docType}/${file.name}`)
+      await uploadBytes(fileRef, file)
+      const downloadURL = await getDownloadURL(fileRef)
+      
+      // Save metadata to Firestore
+      const documentData = {
+        type: docType,
+        storagePath: `documents/${user.uid}/${docType}/${file.name}`,
+        downloadURL: downloadURL,
+        uploadedAt: serverTimestamp(),
+        verified: false,
+        fileName: file.name,
+        fileSize: file.size
+      }
+      
+      await setDoc(doc(db, 'documents', user.uid, 'documents', docType), documentData)
+      
+      // Update local state
+      setDocuments(prev => ({
+        ...prev,
+        [docType]: documentData
+      }))
+      
+    } catch (error) {
+      console.error('Document upload failed:', error)
+      alert('Failed to upload document. Please try again.')
+    } finally {
+      setUploadingDocuments(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(docType)
+        return newSet
+      })
+    }
+  }
+
+  const loadUserDocuments = async () => {
+    if (!user) return
+    
+    try {
+      const documentsSnapshot = await getDoc(doc(db, 'documents', user.uid))
+      if (documentsSnapshot.exists()) {
+        const docsData = documentsSnapshot.data()
+        setDocuments(docsData)
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error)
+    }
+  }
+
   const renderMusicianSource = (source: string): JSX.Element | string => {
     if (!source) {
       return 'n/a'
@@ -224,6 +401,42 @@ export default function BlackDiasporaSymphonyPage() {
 
     return source
   }
+
+  // Check verification status and load documents on component mount
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      if (user) {
+        try {
+          const verificationDoc = await getDoc(doc(db, 'verifications', user.uid))
+          if (verificationDoc.exists()) {
+            const verificationData = verificationDoc.data()
+            if (verificationData.submittedAt) {
+              setIsVerified(true)
+            }
+          }
+        } catch (error) {
+          console.error('Error checking verification status:', error)
+        }
+      }
+    }
+
+    const loadDocuments = async () => {
+      if (user) {
+        try {
+          const documentsSnapshot = await getDoc(doc(db, 'documents', user.uid))
+          if (documentsSnapshot.exists()) {
+            const docsData = documentsSnapshot.data()
+            setDocuments(docsData)
+          }
+        } catch (error) {
+          console.error('Error loading documents:', error)
+        }
+      }
+    }
+
+    checkVerificationStatus()
+    loadDocuments()
+  }, [user])
 
   // Update active section and scroll position based on scroll - throttled for performance
   useEffect(() => {
@@ -504,112 +717,138 @@ export default function BlackDiasporaSymphonyPage() {
             </h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Audition Submission */}
+              {/* Student/Alumni Verification */}
                 <div className="bg-white/5 rounded-lg p-6 border border-white/10">
                   <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                     <Upload className="w-6 h-6 mr-2 text-purple-400" />
-                    Submit Your Audition
+                    Verify Student or Alumni Status
                   </h3>
                   
-                  {!submittedAudition ? (
+                  {!isVerified ? (
                     <div className="space-y-4">
                       <p className="text-gray-300 text-sm">
-                        Upload your audition video or provide a link to showcase your musical abilities.
+                        If you are currently enrolled or an alumnus of a college or university, you can verify your status here to join the BEAM Participant Program and earn in BEAM Coin.
                       </p>
                       
-                      <button
-                        onClick={() => setShowAuditionForm(!showAuditionForm)}
-                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
-                      >
-                        <Upload className="w-5 h-5 mr-2" />
-                        {showAuditionForm ? 'Hide Form' : 'Submit Audition'}
-                      </button>
+                      {verificationError && (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center">
+                          <AlertCircle className="w-4 h-4 text-red-400 mr-2" />
+                          <p className="text-red-200 text-sm">{verificationError}</p>
+                        </div>
+                      )}
                       
-                      {showAuditionForm && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-4"
-                        >
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Full Name
-                            </label>
+                      <div className="space-y-3">
+                        {/* Option A: Document Upload */}
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <h4 className="text-white font-medium mb-2 flex items-center">
+                            <Upload className="w-4 h-4 mr-2 text-purple-400" />
+                            Option A: Upload Document
+                          </h4>
+                          <p className="text-gray-400 text-xs mb-3">
+                            Upload school ID or transcript (PDF, PNG, JPG)
+                          </p>
+                          <div className="space-y-3">
                             <input
-                              type="text"
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              placeholder="Enter your full name"
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              id="document-upload"
                             />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Instrument
+                            <label
+                              htmlFor="document-upload"
+                              className="border-2 border-dashed border-white/20 rounded-lg p-4 text-center hover:border-purple-400 transition-colors cursor-pointer block"
+                            >
+                              <Upload className="w-6 h-6 mx-auto text-gray-400 mb-2" />
+                              <p className="text-gray-300 text-sm">Click to upload or drag and drop</p>
+                              <p className="text-gray-500 text-xs mt-1">PDF, PNG, JPG files accepted</p>
                             </label>
-                            <select className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                              <option value="">Select your instrument</option>
-                              {rosterData.map(section => (
-                                <option key={section.instrument} value={section.instrument}>
-                                  {section.instrument}
-                                </option>
-                              ))}
-                            </select>
+                            {uploadedFile && (
+                              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 flex items-center">
+                                <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                                <p className="text-green-200 text-sm">{uploadedFile.name}</p>
+                              </div>
+                            )}
+                            {verificationMethod === 'document' && uploadedFile && (
+                              <button
+                                onClick={submitVerification}
+                                disabled={verificationStatus === 'uploading'}
+                                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm"
+                              >
+                                {verificationStatus === 'uploading' ? 'Uploading...' : 'Submit Verification'}
+                              </button>
+                            )}
                           </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Email Address
-                            </label>
+                        </div>
+                        
+                        {/* Option B: Email Verification */}
+                        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <h4 className="text-white font-medium mb-2 flex items-center">
+                            <Mail className="w-4 h-4 mr-2 text-purple-400" />
+                            Option B: Email Verification
+                          </h4>
+                          <p className="text-gray-400 text-xs mb-3">
+                            Enter your official school email (ends with .edu)
+                          </p>
+                          <div className="space-y-3">
                             <input
                               type="email"
+                              value={schoolEmail}
+                              onChange={(e) => setSchoolEmail(e.target.value)}
                               className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              placeholder="your.email@example.com"
+                              placeholder="your.name@university.edu"
                             />
+                            <button
+                              onClick={handleEmailVerification}
+                              disabled={verificationStatus === 'verifying'}
+                              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm"
+                            >
+                              {verificationStatus === 'verifying' ? 'Verifying...' : 'Verify Email'}
+                            </button>
                           </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Phone Number
-                            </label>
-                            <input
-                              type="tel"
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              placeholder="(555) 123-4567"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Audition Video
-                            </label>
-                            <div className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-purple-400 transition-colors cursor-pointer">
-                              <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                              <p className="text-gray-300 text-sm">Click to upload or drag and drop</p>
-                              <p className="text-gray-500 text-xs mt-1">MP4, MOV, or provide YouTube/Vimeo link</p>
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => setSubmittedAudition(true)}
-                            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
-                          >
-                            Submit Audition
-                          </button>
-                        </motion.div>
-                      )}
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Award className="w-8 h-8 text-green-400" />
+                        <CheckCircle className="w-8 h-8 text-green-400" />
                       </div>
-                      <h4 className="text-lg font-semibold text-white mb-2">Audition Submitted!</h4>
+                      <h4 className="text-lg font-semibold text-white mb-2">Verification Submitted!</h4>
                       <p className="text-gray-300 text-sm">
-                        Thank you for your submission. We'll review your audition and contact you within 48 hours.
+                        Thank you for your submission. We'll review your verification and contact you within 48 hours to confirm your BEAM Participant Program status.
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Documents Submission */}
+                <div className="bg-white/5 rounded-lg p-6 border border-white/10">
+                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
+                    <Upload className="w-6 h-6 mr-2 text-purple-400" />
+                    Required Documents
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <p className="text-gray-300 text-sm">
+                      Complete all required forms and documents to participate in the BEAM Orchestra project.
+                    </p>
+                    
+                    <button
+                      onClick={() => {
+                        if (!user) {
+                          alert('Please sign in to access document uploads')
+                          return
+                        }
+                        setShowDocumentsModal(true)
+                        loadUserDocuments()
+                      }}
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
+                    >
+                      <Upload className="w-5 h-5 mr-2" />
+                      Complete Required Forms
+                    </button>
+                  </div>
                 </div>
 
                 {/* Required Excerpts */}
@@ -936,6 +1175,197 @@ export default function BlackDiasporaSymphonyPage() {
         onClose={handleCloseMusicianProfile}
         musician={selectedMusician}
       />
+
+      {/* Documents Modal */}
+      {showDocumentsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={() => setShowDocumentsModal(false)}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="relative bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Setup Guide</h2>
+                  <p className="text-gray-300 text-sm">
+                    Complete your required documents to participate in the BEAM Orchestra project.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDocumentsModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              {/* User Info */}
+              {user && (
+                <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Name:</span>
+                      <span className="text-white ml-2">{user.displayName || 'Not provided'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Email:</span>
+                      <span className="text-white ml-2">{user.email}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Verification:</span>
+                      <span className={`ml-2 ${isVerified ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {isVerified ? 'Verified Student/Alumni' : 'Pending Verification'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">BEAM Coin:</span>
+                      <span className={`ml-2 ${isVerified ? 'text-green-400' : 'text-gray-400'}`}>
+                        {isVerified ? 'Eligible' : 'Not Eligible'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="space-y-6">
+                {/* Verify Identity Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                    <CheckCircle className={`w-5 h-5 mr-2 ${isVerified ? 'text-green-400' : 'text-gray-400'}`} />
+                    Verify Identity
+                  </h3>
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <p className="text-gray-300 text-sm">
+                      {isVerified 
+                        ? '✅ Your student/alumni status has been verified. You are eligible for BEAM Coin rewards.'
+                        : 'Complete student/alumni verification above to unlock BEAM Coin eligibility.'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Complete Documents Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                    <Upload className="w-5 h-5 mr-2 text-purple-400" />
+                    Complete Documents
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {documentTypes.map((docType) => {
+                      const isUploaded = documents[docType.id]
+                      const isUploading = uploadingDocuments.has(docType.id)
+                      
+                      return (
+                        <div key={docType.id} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center">
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-3 ${
+                                isUploaded ? 'border-green-400 bg-green-400' : 'border-gray-400'
+                              }`}>
+                                {isUploaded && <CheckCircle className="w-4 h-4 text-white" />}
+                              </div>
+                              <div>
+                                <h4 className="text-white font-medium">{docType.name}</h4>
+                                <p className="text-gray-400 text-xs">{docType.description}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                isUploaded ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'
+                              }`}>
+                                {isUploaded ? 'Uploaded' : 'Pending'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {isUploaded ? (
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+                                  <span className="text-green-200 text-sm">{isUploaded.fileName}</span>
+                                </div>
+                                <span className="text-green-200 text-xs">
+                                  Uploaded {isUploaded.uploadedAt && new Date(isUploaded.uploadedAt.seconds * 1000).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <input
+                                type="file"
+                                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file) {
+                                    handleDocumentUpload(docType.id, file)
+                                  }
+                                }}
+                                className="hidden"
+                                id={`upload-${docType.id}`}
+                              />
+                              <label
+                                htmlFor={`upload-${docType.id}`}
+                                className={`block w-full text-center py-3 px-4 rounded-lg border-2 border-dashed transition-colors cursor-pointer ${
+                                  isUploading 
+                                    ? 'border-purple-400 bg-purple-500/10' 
+                                    : 'border-white/20 hover:border-purple-400'
+                                }`}
+                              >
+                                {isUploading ? (
+                                  <div className="flex items-center justify-center">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    <span className="text-white text-sm">Uploading...</span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Upload className="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                                    <span className="text-gray-300 text-sm">Click to upload</span>
+                                    <p className="text-gray-500 text-xs mt-1">PDF, PNG, JPG, DOC files accepted</p>
+                                  </div>
+                                )}
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 bg-white/5">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  Progress: {Object.keys(documents).length} of {documentTypes.length} documents uploaded
+                </div>
+                <button
+                  onClick={() => setShowDocumentsModal(false)}
+                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200"
+                >
+                  Save Progress
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {showRavelModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
