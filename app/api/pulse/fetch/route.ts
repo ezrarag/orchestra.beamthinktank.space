@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
           { instrument: 'Bass', needed: 3, confirmed: 0, priority: 'medium' }
         ],
         upcomingEvents: [
-          { date: '2025-12-02', type: 'Sectional - Strings', musicians: 8, needed: 25 },
-          { date: '2025-12-04', type: 'Sectional - Winds', musicians: 3, needed: 12 }
+          { date: '2025-11-09', type: 'Sectional - Strings', musicians: 8, needed: 25 },
+          { date: '2025-11-16', type: 'Sectional - Winds', musicians: 3, needed: 12 }
         ],
         unreadEmails: [
           { from: 'yolandaodufuwa@gmail.com', subject: 'Violin I Audition', priority: 'high' },

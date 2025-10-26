@@ -1229,7 +1229,7 @@ export default function BlackDiasporaSymphonyPage() {
                   <div className="flex items-center mb-3">
                     <Calendar className="w-5 h-5 text-blue-400 mr-2" />
                     <span className="text-white font-semibold">
-                      {new Date(rehearsal.date).toLocaleDateString('en-US', { 
+                      {new Date(rehearsal.date + 'T00:00:00').toLocaleDateString('en-US', { 
                         month: 'short', 
                         day: 'numeric' 
                       })}
