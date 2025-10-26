@@ -354,10 +354,10 @@ export const rosterData = [
 
 export const rehearsalSchedule = [
   { date: '2025-11-09', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-11-16', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-11-22', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-16', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-22', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
   { date: '2025-12-06', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
-  { date: '2025-12-13', time: '5:00 PM', duration: 1.5, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert Performance' }
+  { date: '2025-12-13', time: '5:00 PM', duration: 2, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert Performance' }
 ]
 
 
