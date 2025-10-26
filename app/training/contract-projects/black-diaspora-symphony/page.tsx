@@ -1419,7 +1419,7 @@ export default function BlackDiasporaSymphonyPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <span className="text-gray-400 text-sm">Rehearsals:</span>
-                          <p className="text-white font-medium">12 rehearsal sessions</p>
+                          <p className="text-white font-medium">4 rehearsal sessions</p>
                         </div>
                         <div>
                           <span className="text-gray-400 text-sm">Compensation:</span>

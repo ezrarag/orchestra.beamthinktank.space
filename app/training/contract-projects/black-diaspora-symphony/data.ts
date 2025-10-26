@@ -355,9 +355,9 @@ export const rosterData = [
 export const rehearsalSchedule = [
   { date: '2025-11-09', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
   { date: '2025-11-16', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-11-23', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-12-07', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
-  { date: '2025-12-14', time: '5:00 PM', duration: 1.5, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert' }
+  { date: '2025-11-22', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-12-06', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
+  { date: '2025-12-13', time: '5:00 PM', duration: 1.5, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert Performance' }
 ]
 
 
@@ -366,7 +366,7 @@ export const faqData = [
   {
     question: "What is the rehearsal schedule?",
     answer:
-      "Rehearsals are scheduled in Milwaukee leading up to the December 14th concert at Central United Methodist Church. Sectional rehearsals typically run 3 hours, and full orchestra rehearsals run 4 hours. See the calendar below for confirmed dates and times."
+      "Rehearsals are scheduled in Milwaukee leading up to the December 13th concert at Central United Methodist Church. Sectional rehearsals typically run 3 hours, and full orchestra rehearsals run 4 hours. See the calendar below for confirmed dates and times."
   },
   {
     question: "How does payment work?",
