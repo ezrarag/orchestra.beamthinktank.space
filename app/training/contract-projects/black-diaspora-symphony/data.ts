@@ -2,7 +2,7 @@
 export const rosterData = [
   { 
     instrument: 'Violin I', 
-    needed: 8, 
+    needed: 6, 
     confirmed: 1, 
     remaining: 7, 
     percentage: 13, 
@@ -18,7 +18,18 @@ export const rosterData = [
         headshotUrl: '',
         mediaEmbedUrl: '',
         supportLink: ''
-      }
+      },
+      {
+        name: 'Churchill Caruthers Jr',
+        email: 'churchillcaruthers@gmail.com',
+        status: 'Interested',
+        source: 'Email (Oct 23)',
+        notes: 'Violinist located in Milwaukee; interested in playing in the December concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
     ]
   },
   { 
@@ -28,7 +39,20 @@ export const rosterData = [
     remaining: 6, 
     percentage: 0, 
     musicians: [], 
-    musicianDetails: []
+    musicianDetails: [
+      {
+        name: 'Dave Rasmussen',
+        email: 'damtalldave@gmail.com',
+        status: 'Interested',
+        source: 'Email (Oct 23)',
+        notes: 'Prefers Violin I but can also play Violin II or Viola; responding to Dayvin’s message.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      
+    ]
   },
   { 
     instrument: 'Viola', 
@@ -70,7 +94,18 @@ export const rosterData = [
         headshotUrl: 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg',
         mediaEmbedUrl: '',
         supportLink: ''
-      }
+      },
+      {
+        name: 'Korinthia Klein',
+        email: 'kory@korinthianviolins.com',
+        status: 'Confirmed',
+        source: 'Email (Oct 23)',
+        notes: 'Owner of Korinthian Violins; confirmed to play viola in the December 2025 BDSO concert.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
     ]
   },
   { 
@@ -89,7 +124,19 @@ export const rosterData = [
     remaining: 3, 
     percentage: 0, 
     musicians: [], 
-    musicianDetails: []
+    musicianDetails: [
+      {
+        name: 'Autumn Maria Reed',
+        email: 'amreed8@gmail.com',
+        status: 'Confirmed',
+        source: 'Email (Oct 23)',
+        notes: 'Double bassist for BDSO; also performs cello with Black String Triage Ensemble.',
+        bio: 'Performer, educator, and composer based in Madison, WI. Website: amreed8.com',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: 'http://amreed8.com'
+      },
+    ]
   },
   { 
     instrument: 'Flute', 
@@ -119,7 +166,19 @@ export const rosterData = [
     remaining: 2, 
     percentage: 0, 
     musicians: [], 
-    musicianDetails: []
+    musicianDetails: [
+      {
+        name: 'Skylar Lynn Kelley',
+        email: 'skylarlynnk@gmail.com',
+        status: 'Interested',
+        source: 'Forwarded by Dayvin (Oct 22)',
+        notes: 'Concord Chamber Orchestra oboist; invited by Dayvin to play with BDSO.',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+    ]
   },
   { 
     instrument: 'Clarinet', 
@@ -294,12 +353,10 @@ export const rosterData = [
 ]
 
 export const rehearsalSchedule = [
-  { date: '2025-12-02', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Strings' },
-  { date: '2025-12-04', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Winds' },
-  { date: '2025-12-06', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Sectional - Brass' },
-  { date: '2025-12-09', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-12-11', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-12-13', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
+  { date: '2025-11-09', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-16', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-23', time: '7:00 PM', duration: 4, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-12-07', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
   { date: '2025-12-14', time: '5:00 PM', duration: 1.5, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert' }
 ]
 
