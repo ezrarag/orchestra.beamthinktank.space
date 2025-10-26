@@ -848,6 +848,32 @@ export default function BlackDiasporaSymphonyPage() {
                       <Upload className="w-5 h-5 mr-2" />
                       Complete Required Forms
                     </button>
+                    
+                    {/* Required Documents List */}
+                    <div className="mt-4 space-y-2">
+                      <h4 className="text-white font-medium text-sm mb-3">Required Documents:</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                          <span>W-4 Form (Tax withholding)</span>
+                        </div>
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                          <span>Media Release (Photography permission)</span>
+                        </div>
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                          <span>Musician Agreement (Performance contract)</span>
+                        </div>
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                          <span>Proof of ID (Government identification)</span>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-xs mt-3 italic">
+                        All documents must be uploaded as PDF, PNG, JPG, or DOC files.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
