@@ -12,6 +12,8 @@ import {
   Play,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Clock,
   Award,
@@ -88,6 +90,22 @@ export default function BlackDiasporaSymphonyPage() {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [documents, setDocuments] = useState<{[key: string]: any}>({})
   const [uploadingDocuments, setUploadingDocuments] = useState<Set<string>>(new Set())
+  
+  // Project details modal state
+  const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false)
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0)
+  const [activeTab, setActiveTab] = useState<'overview' | 'join' | 'media'>('overview')
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
+  
+  // Musician profile state
+  const [musicianProfile, setMusicianProfile] = useState({
+    name: '',
+    instrument: '',
+    email: '',
+    bio: '',
+    headshotUrl: '',
+    status: 'Interested' as 'Interested' | 'Confirmed'
+  })
   
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -222,6 +240,102 @@ export default function BlackDiasporaSymphonyPage() {
       .find(segment => segment.length > 0)
     return part ?? 'This Artist'
   }
+
+  // Project details carousel content
+  const projectCarouselContent = [
+    {
+      type: 'video',
+      title: '2025 Memorial Concert - Behind the Scenes',
+      url: 'https://link.storjshare.io/raw/ju2fwbvsloifiuwlrnp7jmwurlqa/orchestabeam/1011.mp4',
+      description: 'A glimpse into the preparation and dedication behind the Black Diaspora Symphony Orchestra performance.'
+    },
+    {
+      type: 'image',
+      title: 'Margaret Bonds - Montgomery Variations',
+      url: 'https://example.com/concert-poster.jpg',
+      description: 'The featured composition for this year\'s memorial concert.'
+    },
+    {
+      type: 'pdf',
+      title: 'Concert Program',
+      url: 'https://example.com/program.pdf',
+      description: 'Download the full concert program with artist biographies and repertoire details.'
+    },
+    {
+      type: 'video',
+      title: 'Rehearsal Highlights',
+      url: 'https://example.com/rehearsal-video.mp4',
+      description: 'Watch our musicians prepare for this special performance.'
+    }
+  ]
+
+  const nextCarouselSlide = () => {
+    setCurrentCarouselIndex((prev) => (prev + 1) % projectCarouselContent.length)
+  }
+
+  const prevCarouselSlide = () => {
+    setCurrentCarouselIndex((prev) => (prev - 1 + projectCarouselContent.length) % projectCarouselContent.length)
+  }
+
+  // Musician profile submission
+  const handleMusicianProfileSubmit = async () => {
+    if (!user) {
+      alert('Please sign in to join this project')
+      return
+    }
+
+    try {
+      const profileData = {
+        ...musicianProfile,
+        email: musicianProfile.email || user.email || '',
+        verified: false,
+        joinedAt: serverTimestamp()
+      }
+
+      await setDoc(doc(db, 'musicians', user.uid), profileData)
+      
+      // Show success animation
+      setShowSuccessAnimation(true)
+      setTimeout(() => setShowSuccessAnimation(false), 3000)
+      
+      // Reset form after brief delay
+      setTimeout(() => {
+        setActiveTab('overview')
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Error submitting musician profile:', error)
+      alert('Failed to submit profile. Please try again.')
+    }
+  }
+
+  // Load existing musician profile
+  useEffect(() => {
+    const loadMusicianProfile = async () => {
+      if (user) {
+        try {
+          const profileDoc = await getDoc(doc(db, 'musicians', user.uid))
+          if (profileDoc.exists()) {
+            const profileData = profileDoc.data()
+            setMusicianProfile({
+              name: profileData.name || '',
+              instrument: profileData.instrument || '',
+              email: profileData.email || user.email || '',
+              bio: profileData.bio || '',
+              headshotUrl: profileData.headshotUrl || '',
+              status: profileData.status || 'Interested'
+            })
+          } else if (user.email) {
+            setMusicianProfile(prev => ({ ...prev, email: user.email || '' }))
+          }
+        } catch (error) {
+          console.error('Error loading musician profile:', error)
+        }
+      }
+    }
+    
+    loadMusicianProfile()
+  }, [user])
 
   // Verification functions
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,15 +695,32 @@ export default function BlackDiasporaSymphonyPage() {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => scrollToSection('roster')}
-                className="bg-yellow-400 text-black font-semibold px-8 py-3 rounded-lg hover:bg-yellow-300 transition-colors"
-              >
-                View Project Details
-              </motion.button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setShowProjectDetailsModal(true)
+                    setActiveTab('overview')
+                  }}
+                  className="bg-yellow-400 text-black font-semibold px-8 py-3 rounded-lg hover:bg-yellow-300 transition-colors"
+                >
+                  View Project Details
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setShowProjectDetailsModal(true)
+                    setActiveTab('join')
+                  }}
+                  className="bg-white/10 text-white font-semibold px-8 py-3 rounded-lg border border-white/20 hover:bg-white/20 transition-colors flex items-center justify-center"
+                >
+                  <Music className="w-5 h-5 mr-2" />
+                  Play in This Project
+                </motion.button>
+              </div>
             </motion.div>
 
           </div>
@@ -1201,6 +1332,319 @@ export default function BlackDiasporaSymphonyPage() {
         onClose={handleCloseMusicianProfile}
         musician={selectedMusician}
       />
+
+      {/* Project Details Full-Screen Modal */}
+      {showProjectDetailsModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Success Animation */}
+            {showSuccessAnimation && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute inset-0 flex items-center justify-center z-[300] pointer-events-none"
+              >
+                <div className="bg-green-500/20 backdrop-blur-lg border-2 border-green-400 rounded-2xl p-12 text-center">
+                  <CheckCircle className="w-24 h-24 text-green-400 mx-auto mb-4 animate-bounce" />
+                  <h3 className="text-3xl font-bold text-white mb-2">Profile Submitted!</h3>
+                  <p className="text-gray-200">You'll be notified when your profile is approved.</p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowProjectDetailsModal(false)
+                setActiveTab('overview')
+              }}
+              className="absolute top-6 right-6 z-10 text-white hover:text-yellow-400 transition-colors"
+            >
+              <X className="w-8 h-8" />
+            </button>
+
+            {/* Tab Navigation */}
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'overview'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('join')}
+                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'join'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Join / Update
+              </button>
+              <button
+                onClick={() => setActiveTab('media')}
+                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'media'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                Media
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 flex items-center justify-center p-6 mt-20">
+              <AnimatePresence mode="wait">
+                {activeTab === 'overview' && (
+                  <motion.div
+                    key="overview"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full max-w-4xl space-y-6"
+                  >
+                    <h2 className="text-4xl font-bold text-white mb-6">Black Diaspora Symphony Orchestra</h2>
+                    <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-4">
+                      <div>
+                        <h3 className="text-xl font-semibold text-white mb-2">About the Project</h3>
+                        <p className="text-gray-300">Join us for the 2025 Annual Memorial Concert featuring Margaret Bonds' Montgomery Variations and Maurice Ravel's Le Tombeau de Couperin.</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-gray-400 text-sm">Rehearsals:</span>
+                          <p className="text-white font-medium">12 rehearsal sessions</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 text-sm">Compensation:</span>
+                          <p className="text-white font-medium">Up to $250 USD or 25 BEAM Coins</p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'join' && (
+                  <motion.div
+                    key="join"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full max-w-2xl space-y-6"
+                  >
+                    <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                      <h2 className="text-2xl font-bold text-white mb-6">Join or Update Your Profile</h2>
+                      
+                      {!user ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-300 mb-4">Please sign in to join this project</p>
+                          <button
+                            onClick={() => {
+                              // Redirect to login
+                              alert('Please sign in first')
+                            }}
+                            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                          >
+                            Sign In
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Name</label>
+                            <input
+                              type="text"
+                              value={musicianProfile.name}
+                              onChange={(e) => setMusicianProfile({ ...musicianProfile, name: e.target.value })}
+                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Instrument</label>
+                            <select
+                              value={musicianProfile.instrument}
+                              onChange={(e) => setMusicianProfile({ ...musicianProfile, instrument: e.target.value })}
+                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="">Select your instrument</option>
+                              {rosterData.map(section => (
+                                <option key={section.instrument} value={section.instrument}>
+                                  {section.instrument}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                            <input
+                              type="email"
+                              value={musicianProfile.email}
+                              disabled
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-gray-400"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Bio</label>
+                            <textarea
+                              value={musicianProfile.bio}
+                              onChange={(e) => setMusicianProfile({ ...musicianProfile, bio: e.target.value })}
+                              rows={4}
+                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              placeholder="Tell us about your musical background..."
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                            <select
+                              value={musicianProfile.status}
+                              onChange={(e) => setMusicianProfile({ ...musicianProfile, status: e.target.value as 'Interested' | 'Confirmed' })}
+                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="Interested">Interested</option>
+                              <option value="Confirmed">Confirmed</option>
+                            </select>
+                          </div>
+                          
+                          <button
+                            onClick={handleMusicianProfileSubmit}
+                            className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                          >
+                            Submit Profile
+                          </button>
+                          
+                          <p className="text-gray-400 text-sm text-center mt-4">
+                            Already listed in the roster? Log in to update your information.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'media' && (
+                  <motion.div
+                    key="media"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="w-full max-w-6xl h-full flex flex-col items-center justify-center space-y-6"
+                  >
+                    <motion.div
+                      key={currentCarouselIndex}
+                      initial={{ opacity: 0, x: 100 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -100 }}
+                      transition={{ duration: 0.3 }}
+                      className="w-full max-w-6xl h-full flex flex-col items-center justify-center space-y-6"
+                    >
+                      {projectCarouselContent[currentCarouselIndex].type === 'video' && (
+                        <div className="w-full aspect-video bg-black rounded-xl overflow-hidden">
+                          <video
+                            src={projectCarouselContent[currentCarouselIndex].url}
+                            controls
+                            className="w-full h-full"
+                            autoPlay
+                          />
+                        </div>
+                      )}
+                      
+                      {projectCarouselContent[currentCarouselIndex].type === 'image' && (
+                        <div className="w-full aspect-video bg-white/5 rounded-xl overflow-hidden">
+                          <img
+                            src={projectCarouselContent[currentCarouselIndex].url}
+                            alt={projectCarouselContent[currentCarouselIndex].title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      
+                      {projectCarouselContent[currentCarouselIndex].type === 'pdf' && (
+                        <div className="w-full aspect-video bg-white/5 rounded-xl flex items-center justify-center">
+                          <a
+                            href={projectCarouselContent[currentCarouselIndex].url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col items-center space-y-4 text-white hover:text-yellow-400 transition-colors"
+                          >
+                            <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center">
+                              <Download className="w-12 h-12" />
+                            </div>
+                            <span className="text-xl font-semibold">Download PDF</span>
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Content Info */}
+                      <div className="text-center space-y-2">
+                        <h3 className="text-3xl font-bold text-white">
+                          {projectCarouselContent[currentCarouselIndex].title}
+                        </h3>
+                        <p className="text-gray-300 text-lg max-w-2xl mx-auto">
+                          {projectCarouselContent[currentCarouselIndex].description}
+                        </p>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Navigation Buttons - Only show on Media tab */}
+            {activeTab === 'media' && (
+              <>
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
+                  <button
+                    onClick={prevCarouselSlide}
+                    className="p-4 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6 text-white" />
+                  </button>
+                </div>
+                
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10">
+                  <button
+                    onClick={nextCarouselSlide}
+                    className="p-4 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                  >
+                    <ChevronRight className="w-6 h-6 text-white" />
+                  </button>
+                </div>
+
+                {/* Carousel Indicators */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex space-x-2">
+                  {projectCarouselContent.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentCarouselIndex(index)}
+                      className={`w-3 h-3 rounded-full transition-colors ${
+                        currentCarouselIndex === index ? 'bg-yellow-400' : 'bg-white/30'
+                      }`}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Slide Counter */}
+                <div className="absolute bottom-6 right-6 z-10 text-white/50 text-sm">
+                  {currentCarouselIndex + 1} / {projectCarouselContent.length}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Documents Modal */}
       {showDocumentsModal && (
