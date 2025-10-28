@@ -19,6 +19,13 @@ export function useUserRole(): UserWithRole {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Check if auth is initialized
+    if (!auth || !db) {
+      console.warn('Firebase auth is not initialized. Please check your environment variables.')
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
       

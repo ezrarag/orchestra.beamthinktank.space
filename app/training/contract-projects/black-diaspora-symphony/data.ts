@@ -30,6 +30,18 @@ export const rosterData = [
         mediaEmbedUrl: '',
         supportLink: ''
       },
+      {
+      name: 'Jane Han',
+      instrument: 'Violin',
+      email: '',
+      status: 'Confirmed',
+      source: 'Facebook Messenger (Oct 27)',
+      notes: '',
+      bio: '',
+      headshotUrl: '',
+      mediaEmbedUrl: '',
+      supportLink: ''
+    },
     ]
   },
   { 
