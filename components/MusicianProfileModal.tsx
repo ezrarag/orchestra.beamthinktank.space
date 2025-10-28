@@ -15,8 +15,9 @@ import {
   Coins
 } from 'lucide-react'
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
-import { auth, db } from '@/lib/firebase'
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore'
+import { auth, db, storage } from '@/lib/firebase'
+import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import DocumentSigner from './DocumentSigner'
 import DonationModal from './DonationModal'
 
@@ -53,26 +54,19 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
   const [showCamera, setShowCamera] = useState(false)
   const [showDocumentSigner, setShowDocumentSigner] = useState(false)
   const [documentType, setDocumentType] = useState<'w9' | 'contract' | 'mediaRelease'>('w9')
-  const [donations, setDonations] = useState<typeof mockDonations>([])
+  const [donations, setDonations] = useState<Array<{donor: string, amount: number, date: string, message?: string}>>([])
   const [loadingDonations, setLoadingDonations] = useState(false)
   const [showDonationModal, setShowDonationModal] = useState(false)
 
-  // Mock data for payments and donations
+  // Payment information for reference (not available for withdrawal yet)
   const mockPayments = {
-    usdBalance: 150,
-    beamCoins: 25,
+    usdBalance: 0, // Will be calculated based on attendance
+    beamCoins: 0, // Will be calculated based on attendance
     recentTransactions: [
-      { date: '2025-01-15', description: 'Sectional Rehearsal', amount: 50, type: 'USD' },
-      { date: '2025-01-10', description: 'Full Orchestra', amount: 5, type: 'BEAM' },
-      { date: '2025-01-05', description: 'Dress Rehearsal', amount: 5, type: 'BEAM' }
+      { date: 'TBD', description: 'Rehearsal Payment', amount: 25, type: 'USD' },
+      { date: 'TBD', description: 'Performance Payment', amount: 50, type: 'USD' },
     ]
   }
-
-  const mockDonations = [
-    { donor: 'Sarah Johnson', amount: 25, date: '2025-01-14', message: 'Amazing performance!' },
-    { donor: 'Michael Chen', amount: 50, date: '2025-01-12', message: 'Keep up the great work!' },
-    { donor: 'Anonymous', amount: 15, date: '2025-01-10', message: 'Thank you for sharing your talent.' }
-  ]
 
   // Fetch donations from Firebase
   useEffect(() => {
@@ -83,7 +77,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
 
   const fetchDonations = async () => {
     if (!db) {
-      setDonations(mockDonations)
+      setDonations([])
       return
     }
     
@@ -101,8 +95,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
       const querySnapshot = await getDocs(q)
       
       if (querySnapshot.empty) {
-        // Fall back to mock data if no donations found
-        setDonations(mockDonations)
+        setDonations([])
       } else {
         const fetchedDonations = querySnapshot.docs.map(doc => ({
           donor: doc.data().donor_name || 'Anonymous',
@@ -114,7 +107,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
       }
     } catch (error) {
       console.error('Error fetching donations:', error)
-      setDonations(mockDonations)
+      setDonations([])
     } finally {
       setLoadingDonations(false)
     }
@@ -180,33 +173,95 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
     }
   }
 
-  const capturePhoto = () => {
-    if (cameraRef.current) {
-      const canvas = document.createElement('canvas')
-      const context = canvas.getContext('2d')
-      canvas.width = cameraRef.current.videoWidth
-      canvas.height = cameraRef.current.videoHeight
+  const capturePhoto = async () => {
+    if (!cameraRef.current || !storage || !user || !musician) return
+    
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    canvas.width = cameraRef.current.videoWidth
+    canvas.height = cameraRef.current.videoHeight
+    
+    if (context) {
+      context.drawImage(cameraRef.current, 0, 0)
       
-      if (context) {
-        context.drawImage(cameraRef.current, 0, 0)
-        const imageData = canvas.toDataURL('image/png')
-        // Here you would typically upload the image to Firebase Storage
-        console.log('Photo captured:', imageData)
-        setShowCamera(false)
-        // Stop the camera stream
-        const stream = cameraRef.current.srcObject as MediaStream
-        stream.getTracks().forEach(track => track.stop())
-      }
+      // Stop the camera stream first
+      const stream = cameraRef.current.srcObject as MediaStream
+      stream.getTracks().forEach(track => track.stop())
+      setShowCamera(false)
+      
+      // Convert canvas to blob
+      canvas.toBlob(async (blob) => {
+        if (!blob) return
+        
+        try {
+          setIsUploadingImage(true)
+          
+          // Create a unique filename
+          const filename = `profile_${user.uid}_${Date.now()}.png`
+          const storageRef = ref(storage, `musician-profiles/${filename}`)
+          
+          // Upload to Firebase Storage
+          await uploadBytes(storageRef, blob)
+          
+          // Get download URL
+          const downloadURL = await getDownloadURL(storageRef)
+          
+          // Save to Firestore
+          if (db) {
+            const userDocRef = doc(db, 'users', user.uid)
+            await updateDoc(userDocRef, {
+              headshotUrl: downloadURL,
+              updatedAt: new Date()
+            })
+          }
+          
+          console.log('Photo uploaded successfully:', downloadURL)
+          // You could show a success message here
+          
+        } catch (error) {
+          console.error('Error uploading photo:', error)
+          alert('Failed to upload photo. Please try again.')
+        } finally {
+          setIsUploadingImage(false)
+        }
+      }, 'image/png', 0.95)
     }
   }
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
+    if (!file || !storage || !user || !musician) return
+    
+    try {
       setIsUploadingImage(true)
-      // Here you would typically upload to Firebase Storage
-      console.log('Uploading image:', file)
-      setTimeout(() => setIsUploadingImage(false), 2000) // Simulate upload
+      
+      // Create a unique filename
+      const filename = `profile_${user.uid}_${Date.now()}.${file.name.split('.').pop()}`
+      const storageRef = ref(storage, `musician-profiles/${filename}`)
+      
+      // Upload to Firebase Storage
+      await uploadBytes(storageRef, file)
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef)
+      
+      // Save to Firestore
+      if (db) {
+        const userDocRef = doc(db, 'users', user.uid)
+        await updateDoc(userDocRef, {
+          headshotUrl: downloadURL,
+          updatedAt: new Date()
+        })
+      }
+      
+      console.log('Image uploaded successfully:', downloadURL)
+      // You could show a success message here
+      
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('Failed to upload image. Please try again.')
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -238,7 +293,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl bg-slate-900/95 backdrop-blur-md border border-white/10 overflow-hidden shadow-2xl"
+        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 overflow-hidden shadow-2xl"
         role="dialog"
         aria-modal="true"
       >
@@ -567,7 +622,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
                       <h4 className="text-white font-semibold">USD Balance</h4>
                     </div>
                     <p className="text-2xl font-bold text-green-400">${mockPayments.usdBalance}</p>
-                    <p className="text-sm text-gray-400">Available for withdrawal</p>
+                    <p className="text-sm text-gray-400">Earned: $0 (not yet available for withdrawal)</p>
                   </div>
                   
                   <div className="bg-white/5 rounded-lg p-4 border border-white/10">
@@ -576,12 +631,13 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
                       <h4 className="text-white font-semibold">BEAM Coins</h4>
                     </div>
                     <p className="text-2xl font-bold text-yellow-400">{mockPayments.beamCoins} BEAM</p>
-                    <p className="text-sm text-gray-400">Digital work credits</p>
+                    <p className="text-sm text-gray-400">Digital work credits (not yet earned)</p>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-md font-semibold text-white mb-4">Recent Transactions</h4>
+                  <h4 className="text-md font-semibold text-white mb-2">Payment Schedule (Reference Only)</h4>
+                  <p className="text-xs text-gray-400 mb-4 italic">Payments not yet available - awaiting attendance confirmation</p>
                   <div className="space-y-3">
                     {mockPayments.recentTransactions.map((transaction, index) => (
                       <div key={index} className="bg-white/5 rounded-lg p-3 border border-white/10">
