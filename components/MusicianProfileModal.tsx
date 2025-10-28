@@ -228,7 +228,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
   return (
     <div className="fixed inset-0 z-[105] flex items-center justify-center px-4">
       <div
-        className="absolute inset-0 bg-black/80"
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -238,7 +238,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl bg-slate-900 border border-white/10 overflow-hidden"
+        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl bg-slate-900/95 backdrop-blur-md border border-white/10 overflow-hidden shadow-2xl"
         role="dialog"
         aria-modal="true"
       >

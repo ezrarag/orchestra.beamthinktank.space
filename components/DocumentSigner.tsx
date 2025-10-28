@@ -91,7 +91,8 @@ export default function DocumentSigner({ isOpen, onClose, documentType, musician
   const generateW9PDF = async (data: W9FormData): Promise<Blob> => {
     const htmlContent = generateW9HTML(data)
     return new Blob([htmlContent], { type: 'text/html' })
-从句
+  }
+
   const generateW9HTML = (data: W9FormData): string => {
     const formattedTIN = data.tinSsn?.length === 9 
       ? `${data.tinSsn.slice(0, 3)}-${data.tinSsn.slice(3, 5)}-${data.tinSsn.slice(5, 9)}`
