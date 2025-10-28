@@ -52,7 +52,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
   const cameraRef = useRef<HTMLVideoElement>(null)
   const [showCamera, setShowCamera] = useState(false)
   const [showDocumentSigner, setShowDocumentSigner] = useState(false)
-  const [documentType, setDocumentType] = useState<'w4' | 'contract' | 'mediaRelease'>('w4')
+  const [documentType, setDocumentType] = useState<'w9' | 'contract' | 'mediaRelease'>('w9')
   const [donations, setDonations] = useState<typeof mockDonations>([])
   const [loadingDonations, setLoadingDonations] = useState(false)
   const [showDonationModal, setShowDonationModal] = useState(false)
@@ -120,7 +120,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
     }
   }
 
-  const handleDocumentClick = (type: 'w4' | 'contract' | 'mediaRelease') => {
+  const handleDocumentClick = (type: 'w9' | 'contract' | 'mediaRelease') => {
     setDocumentType(type)
     setShowDocumentSigner(true)
   }
@@ -508,15 +508,15 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
                 
                 <div className="space-y-4">
                   <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    <h5 className="text-white font-medium mb-2">W-4 Form</h5>
-                    <p className="text-sm text-gray-400 mb-3">Tax withholding form for payment processing</p>
+                    <h5 className="text-white font-medium mb-2">W-9 / Contractor Information Form</h5>
+                    <p className="text-sm text-gray-400 mb-3">Taxpayer identification form for contractor payments</p>
                     <div className="flex space-x-2">
                       <button 
-                        onClick={() => handleDocumentClick('w4')}
+                        onClick={() => handleDocumentClick('w9')}
                         className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
                       >
                         <FileText className="w-4 h-4" />
-                        <span>Fill Out & Sign</span>
+                        <span>Fill Out & Sign W-9</span>
                       </button>
                     </div>
                   </div>
@@ -530,7 +530,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
                         className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
                       >
                         <FileText className="w-4 h-4" />
-                        <span>Fill Out & Sign</span>
+                        <span>Fill Out & Sign W-9</span>
                       </button>
                     </div>
                   </div>
@@ -544,7 +544,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
                         className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
                       >
                         <FileText className="w-4 h-4" />
-                        <span>Fill Out & Sign</span>
+                        <span>Fill Out & Sign W-9</span>
                       </button>
                     </div>
                   </div>

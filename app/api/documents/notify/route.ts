@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     ]
 
     const documentTypeNames = {
-      w4: 'W-4 Employee Withholding Certificate',
+      w9: 'W-9 Contractor Information Form',
       contract: 'Performance Contract',
       mediaRelease: 'Media Release Agreement'
     }

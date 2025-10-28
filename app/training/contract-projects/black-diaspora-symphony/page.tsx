@@ -1335,8 +1335,8 @@ export default function BlackDiasporaSymphonyPage() {
 
       {/* Project Details Full-Screen Modal */}
       {showProjectDetailsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95">
-          <div className="relative w-full h-full flex flex-col">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-6xl max-h-[90vh] bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
             {/* Success Animation */}
             {showSuccessAnimation && (
               <motion.div
@@ -1399,7 +1399,7 @@ export default function BlackDiasporaSymphonyPage() {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 flex items-center justify-center p-6 mt-20">
+            <div className="flex-1 flex items-center justify-center p-6 pb-6 overflow-y-auto">
               <AnimatePresence mode="wait">
                 {activeTab === 'overview' && (
                   <motion.div
