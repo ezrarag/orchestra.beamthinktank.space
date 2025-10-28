@@ -76,7 +76,7 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
   }, [activeTab, musician])
 
   const fetchDonations = async () => {
-    if (!db) {
+    if (!db || !musician) {
       setDonations([])
       return
     }
