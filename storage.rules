@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Musician profile photos
+    match /musician-profiles/{fileName} {
+      // Allow authenticated users to upload photos with their user ID in the filename
+      allow write: if request.auth != null 
+        && fileName.matches('profile_' + request.auth.uid + '_.*');
+      
+      // Allow public read access to profile photos
+      allow read: if true;
+    }
+    
+    // Default deny rule for any unmatched paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

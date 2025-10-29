@@ -18,8 +18,13 @@ service cloud.firestore {
     }
     
     // Helper function to check if user is a musician
+    // This checks both custom claims and allows authenticated users
+    // (since role might be in user document, not just custom claims)
     function isMusician() {
-      return isAuthenticated() && request.auth.token.role == 'musician';
+      return isAuthenticated() && (
+        request.auth.token.role == 'musician' || 
+        request.auth.token.role == null // Allow authenticated users without role claim
+      );
     }
     
     // Helper function to check if user owns the resource
@@ -49,9 +54,11 @@ service cloud.firestore {
     match /musicians/{musicianId} {
       allow read, write: if isAdmin();
       
-      // Allow musicians to read/update their own profile
-      allow read, update: if isMusician() && 
-        resource.data.userId == request.auth.uid;
+      // Allow musicians to read/update their own profile (document ID is their uid)
+      allow read, update: if isAuthenticated() && musicianId == request.auth.uid;
+      
+      // Allow musicians to create their own profile
+      allow create: if isAuthenticated() && musicianId == request.auth.uid;
       
       // Allow partner admins to read musicians in their projects
       allow read: if isPartnerAdmin();
@@ -119,8 +126,33 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if isAdmin();
       
-      // Allow users to read/update their own data
-      allow read, update: if isOwner(userId);
+      // Allow users to read/update/create their own data
+      allow read, update, create: if isOwner(userId);
+    }
+    
+    // Documents collection (for user documents like W9, contracts, etc.)
+    match /documents/{documentId} {
+      allow read, write: if isAdmin();
+      
+      // Allow users to read/update/create their own documents
+      allow read, update, create: if isAuthenticated() && documentId == request.auth.uid;
+    }
+    
+    // Verifications collection (for user verification status)
+    match /verifications/{verificationId} {
+      allow read, write: if isAdmin();
+      
+      // Allow users to read/create their own verification records
+      allow read, create: if isAuthenticated() && verificationId == request.auth.uid;
+      
+      // Allow users to update their own verification records
+      allow update: if isAuthenticated() && verificationId == request.auth.uid;
+    }
+    
+    // Donations collection (public read, admin write)
+    match /donations/{donationId} {
+      allow read: if true; // Allow public read access for donation listings
+      allow write: if isAdmin(); // Only admins can write donations (usually via API/webhook)
     }
     
     // Default deny rule for any unmatched paths
