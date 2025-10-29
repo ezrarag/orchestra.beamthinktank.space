@@ -155,6 +155,15 @@ service cloud.firestore {
       allow write: if isAdmin(); // Only admins can write donations (usually via API/webhook)
     }
     
+    // Prospects collection (for musician invitations)
+    match /prospects/{prospectId} {
+      allow read, write: if isAdmin();
+      
+      // Allow public read access via token (handled through API)
+      // This is mainly for API access with proper token validation
+      allow read: if false; // Public reads handled through API endpoint
+    }
+    
     // Default deny rule for any unmatched paths
     match /{document=**} {
       allow read, write: if false;
