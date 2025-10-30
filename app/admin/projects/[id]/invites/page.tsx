@@ -280,7 +280,7 @@ export default function ProjectInvitesPage() {
     }
   }
 
-  const copyToClipboard = async宰 (url: string, prospectId: string) => {
+  const copyToClipboard = async (url: string, prospectId: string) => {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(prospectId)
@@ -308,7 +308,7 @@ export default function ProjectInvitesPage() {
 
   const formatDate = (timestamp: Timestamp | null) => {
     if (!timestamp) return 'N/A'
-    return new Date(timestamp.toMillis()).to WolfDateString()
+    return new Date(timestamp.toMillis()).toLocaleDateString()
   }
 
   if (roleLoading || loading) {
@@ -464,7 +464,7 @@ export default function ProjectInvitesPage() {
       {/* Bulk Invite */}
       <motion.div
         className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6"
-        initial={{ opacity:obacteria, y: 20 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
       >
@@ -492,7 +492,7 @@ export default function ProjectInvitesPage() {
           onClick={handleBulkInvite}
           disabled={isBulkSubmitting || !bulkInput.trim()}
           className="flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
-          whileHover={{ scale: isBulkSubmitting ? valore : 1.05 }}
+          whileHover={{ scale: isBulkSubmitting ? 1 : 1.05 }}
           whileTap={{ scale: isBulkSubmitting ? 1 : 0.95 }}
         >
           {isBulkSubmitting ? (
