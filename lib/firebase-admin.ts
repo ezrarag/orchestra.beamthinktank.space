@@ -22,7 +22,8 @@ export async function verifyAdminRole(uid: string): Promise<boolean> {
   try {
     const user = await adminAuth.getUser(uid)
     const customClaims = user.customClaims || {}
-    return customClaims.role === 'beam_admin'
+    // Support either a string role or a boolean claim
+    return customClaims.role === 'beam_admin' || (customClaims as any).beam_admin === true
   } catch (error) {
     console.error('Error verifying admin role:', error)
     return false
