@@ -257,7 +257,7 @@ export default function BlackDiasporaSymphonyPage() {
     }
   }
 
-  const handleOpenMusicianProfile = (instrument: string, musician: MusicianDetail) => {
+  const handleOpenMusicianProfile = (instrument: string | undefined, musician: MusicianDetail) => {
     // Convert to MusicianProfileModal's expected format
     const profile = {
       name: musician.name,
@@ -269,7 +269,7 @@ export default function BlackDiasporaSymphonyPage() {
       headshotUrl: musician.headshotUrl || undefined,
       mediaEmbedUrl: musician.mediaEmbedUrl || undefined,
       supportLink: musician.supportLink || undefined,
-      instrument: instrument || musician.instrument || '',
+      instrument: (instrument || musician.instrument || '') as string,
     }
     setSelectedMusician(profile as any) // Type assertion to handle modal's type
     setShowMusicianModal(true)
@@ -999,7 +999,7 @@ export default function BlackDiasporaSymphonyPage() {
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => handleOpenMusicianProfile(section.instrument, musician)}
+                            onClick={() => handleOpenMusicianProfile(section.instrument || '', musician)}
                             className="group w-full text-left bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                           >
                             <div className="flex items-center justify-between mb-1">
@@ -1636,7 +1636,7 @@ export default function BlackDiasporaSymphonyPage() {
       <MusicianProfileModal
         isOpen={showMusicianModal}
         onClose={handleCloseMusicianProfile}
-        musician={selectedMusician}
+        musician={selectedMusician as any}
       />
 
       {/* Project Details Full-Screen Modal */}
