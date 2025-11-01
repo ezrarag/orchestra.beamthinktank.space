@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+// Lazy initialization to avoid build-time errors when API key is missing
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return new OpenAI({ apiKey })
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +17,25 @@ export async function GET(req: NextRequest) {
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
       console.warn('OPENAI_API_KEY not configured, returning mock data')
+      return NextResponse.json({
+        success: true,
+        items: [
+          {
+            title: 'Black Diaspora Symphony Orchestra - 2024 Juneteenth Concert',
+            description: 'Performance highlights from the 2024 Juneteenth Concert featuring works celebrating Black musical tradition.',
+            url: 'https://www.youtube.com/watch?v=example',
+            source: 'YouTube',
+            thumbnail: null,
+            type: 'video',
+            mediaType: 'video'
+          }
+        ]
+      })
+    }
+
+    const openai = getOpenAIClient()
+    if (!openai) {
+      // Return mock data if OpenAI is not configured
       return NextResponse.json({
         success: true,
         items: [

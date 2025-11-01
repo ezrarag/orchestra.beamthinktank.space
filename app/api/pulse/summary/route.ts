@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Lazy initialization to avoid build-time errors when API key is missing
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return new OpenAI({ apiKey })
+}
 
 // Email transporter (same config as document emails)
 const transporter = nodemailer.createTransport({
@@ -119,8 +126,11 @@ ${mockProspects.filter(p => p.status === 'pending').slice(0, 5).map(p => `  - ${
 Create a concise, professional daily summary email (2-3 paragraphs) highlighting key action items and progress.`
 
     let aiSummary = ''
-    try {
-      const completion = await openai.chat.completions.create({
+    const openai = getOpenAIClient()
+    
+    if (openai) {
+      try {
+        const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
