@@ -44,17 +44,22 @@ import { storage } from '@/lib/firebase'
 
 // Define types for Firestore roster data
 type MusicianDetail = {
+  id?: string
   name: string
-  email?: string
-  phone?: string
-  status: 'Pending' | 'Interested' | 'Confirmed' | 'Open'
+  email?: string | null
+  phone?: string | null
+  status: 'Pending' | 'Interested' | 'Confirmed' | 'Open' | 'pending' | 'interested' | 'confirmed' | 'open'
   source?: string
-  notes?: string
-  bio?: string
-  headshotUrl?: string
-  mediaEmbedUrl?: string
-  supportLink?: string
+  notes?: string | null
+  bio?: string | null
+  headshotUrl?: string | null
+  mediaEmbedUrl?: string | null
+  supportLink?: string | null
   instrument?: string
+  role?: string
+  projectId?: string
+  joinedAt?: any
+  updatedAt?: any
 }
 
 type MusicianProfile = MusicianDetail & { instrument: string }
@@ -178,7 +183,7 @@ export default function BlackDiasporaSymphonyPage() {
   const [showBeamVideo, setShowBeamVideo] = useState(false)
   const [showBeamCompensation, setShowBeamCompensation] = useState(false)
   const [showMusicianModal, setShowMusicianModal] = useState(false)
-  const [selectedMusician, setSelectedMusician] = useState<MusicianProfile | null>(null)
+  const [selectedMusician, setSelectedMusician] = useState<any>(null) // Type matches MusicianProfileModal's expected format
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set())
   
   // Verification state
@@ -253,7 +258,20 @@ export default function BlackDiasporaSymphonyPage() {
   }
 
   const handleOpenMusicianProfile = (instrument: string, musician: MusicianDetail) => {
-    setSelectedMusician({ ...musician, instrument })
+    // Convert to MusicianProfileModal's expected format
+    const profile = {
+      name: musician.name,
+      email: musician.email || '',
+      status: typeof musician.status === 'string' ? musician.status : 'Pending',
+      source: musician.source || '',
+      notes: musician.notes || undefined,
+      bio: musician.bio || undefined,
+      headshotUrl: musician.headshotUrl || undefined,
+      mediaEmbedUrl: musician.mediaEmbedUrl || undefined,
+      supportLink: musician.supportLink || undefined,
+      instrument: instrument || musician.instrument || '',
+    }
+    setSelectedMusician(profile as any) // Type assertion to handle modal's type
     setShowMusicianModal(true)
   }
 
@@ -429,18 +447,41 @@ export default function BlackDiasporaSymphonyPage() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const musicians = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+        const musicians: MusicianDetail[] = snapshot.docs.map((doc) => {
+          const data = doc.data()
+          // Normalize status to handle both lowercase (Firestore) and capitalized (legacy) values
+          const rawStatus = data.status || 'pending'
+          const normalizedStatus = typeof rawStatus === 'string' 
+            ? rawStatus.toLowerCase() as 'pending' | 'interested' | 'confirmed' | 'open'
+            : 'pending'
+          
+          return {
+            id: doc.id,
+            name: data.name || '',
+            email: data.email || null,
+            phone: data.phone || null,
+            instrument: data.instrument || '',
+            status: normalizedStatus,
+            role: data.role || 'musician',
+            notes: data.notes || null,
+            bio: data.bio || null,
+            headshotUrl: data.headshotUrl || null,
+            mediaEmbedUrl: data.mediaEmbedUrl || null,
+            supportLink: data.supportLink || null,
+            source: data.source || '',
+            projectId: data.projectId || '',
+            joinedAt: data.joinedAt || null,
+            updatedAt: data.updatedAt || null,
+          }
+        })
         
         console.log('🎻 Loaded musicians:', musicians.length)
         console.log('📊 Roster snapshot:', {
           total: musicians.length,
           byStatus: {
-            confirmed: musicians.filter(m => m.status === 'confirmed').length,
-            pending: musicians.filter(m => m.status === 'pending').length,
-            interested: musicians.filter(m => m.status === 'interested').length
+            confirmed: musicians.filter(m => m.status === 'confirmed' || m.status === 'Confirmed').length,
+            pending: musicians.filter(m => m.status === 'pending' || m.status === 'Pending').length,
+            interested: musicians.filter(m => m.status === 'interested' || m.status === 'Interested').length
           }
         })
         
