@@ -12,7 +12,9 @@ interface DonationModalProps {
   musicianEmail: string
 }
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null
 
 export default function DonationModal({ isOpen, onClose, musicianName, musicianEmail }: DonationModalProps) {
   const [donorName, setDonorName] = useState('')
@@ -71,6 +73,11 @@ export default function DonationModal({ isOpen, onClose, musicianName, musicianE
       const { sessionId } = await response.json()
 
       // Redirect to Stripe Checkout
+      if (!stripePromise) {
+        alert('Stripe is not configured. Please contact support.')
+        return
+      }
+      
       const stripe = await stripePromise
       if (stripe) {
         const result = await stripe.redirectToCheckout({ sessionId })

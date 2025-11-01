@@ -419,10 +419,11 @@ export default function BlackDiasporaSymphonyPage() {
       return
     }
 
+    // Use simpler query without orderBy to avoid requiring a composite index
+    // Can add orderBy later if needed, but for now just filter by projectId
     const q = query(
       collection(db, 'projectMusicians'),
-      where('projectId', '==', 'black-diaspora-symphony'),
-      orderBy('joinedAt', 'desc')
+      where('projectId', '==', 'black-diaspora-symphony')
     )
 
     const unsubscribe = onSnapshot(
@@ -433,12 +434,22 @@ export default function BlackDiasporaSymphonyPage() {
           ...doc.data(),
         }))
         
+        console.log('🎻 Loaded musicians:', musicians.length)
+        console.log('📊 Roster snapshot:', {
+          total: musicians.length,
+          byStatus: {
+            confirmed: musicians.filter(m => m.status === 'confirmed').length,
+            pending: musicians.filter(m => m.status === 'pending').length,
+            interested: musicians.filter(m => m.status === 'interested').length
+          }
+        })
+        
         const grouped = groupByInstrument(musicians)
         setRosterData(grouped)
         setRosterLoading(false)
       },
       (error) => {
-        console.error('Error loading roster:', error)
+        console.error('❌ Error loading roster:', error)
         setRosterLoading(false)
         // Fallback: set empty roster or keep existing
       }

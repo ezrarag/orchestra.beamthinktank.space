@@ -12,7 +12,8 @@ const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville']
 const navigationItems = [
   { label: 'Performances', href: '/performances', icon: Music },
   { label: 'Rehearsals', href: '/rehearsals', icon: Calendar },
-  { label: 'Training', href: '/training', icon: GraduationCap },
+  { label: 'Training Modules', href: '/modules', icon: GraduationCap },
+  { label: 'Cities', href: '/cities', icon: MapPin },
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Donate', href: '/donate', icon: Heart },
   { label: 'Scholarship', href: '/scholarship', icon: DollarSign },

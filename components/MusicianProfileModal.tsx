@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { auth, db, storage } from '@/lib/firebase'
-import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import DocumentSigner from './DocumentSigner'
 import DonationModal from './DonationModal'
@@ -206,13 +206,39 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
           // Get download URL
           const downloadURL = await getDownloadURL(storageRef)
           
-          // Save to Firestore
-          if (db) {
+          // Save to Firestore - users collection
+          if (db && user) {
             const userDocRef = doc(db, 'users', user.uid)
             await updateDoc(userDocRef, {
               headshotUrl: downloadURL,
               updatedAt: new Date()
+            }).catch(() => {
+              // If document doesn't exist, create it
+              return setDoc(userDocRef, {
+                uid: user.uid,
+                name: musician.name,
+                email: musician.email || user.email,
+                headshotUrl: downloadURL,
+                updatedAt: new Date(),
+                createdAt: new Date()
+              })
             })
+            
+            // Also update projectMusicians if musician has email/instrument
+            if (musician.email || musician.instrument) {
+              const projectMusicianQuery = query(
+                collection(db, 'projectMusicians'),
+                where('email', '==', musician.email || user.email)
+              )
+              const querySnapshot = await getDocs(projectMusicianQuery)
+              
+              querySnapshot.docs.forEach(async (docSnapshot) => {
+                await updateDoc(docSnapshot.ref, {
+                  headshotUrl: downloadURL,
+                  updatedAt: new Date()
+                })
+              })
+            }
           }
           
           console.log('Photo uploaded successfully:', downloadURL)
@@ -245,13 +271,39 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
       // Get download URL
       const downloadURL = await getDownloadURL(storageRef)
       
-      // Save to Firestore
-      if (db) {
+      // Save to Firestore - users collection
+      if (db && user) {
         const userDocRef = doc(db, 'users', user.uid)
         await updateDoc(userDocRef, {
           headshotUrl: downloadURL,
           updatedAt: new Date()
+        }).catch(() => {
+          // If document doesn't exist, create it
+          return setDoc(userDocRef, {
+            uid: user.uid,
+            name: musician.name,
+            email: musician.email || user.email,
+            headshotUrl: downloadURL,
+            updatedAt: new Date(),
+            createdAt: new Date()
+          })
         })
+        
+        // Also update projectMusicians if musician has email/instrument
+        if (musician.email || musician.instrument) {
+          const projectMusicianQuery = query(
+            collection(db, 'projectMusicians'),
+            where('email', '==', musician.email || user.email)
+          )
+          const querySnapshot = await getDocs(projectMusicianQuery)
+          
+          querySnapshot.docs.forEach(async (docSnapshot) => {
+            await updateDoc(docSnapshot.ref, {
+              headshotUrl: downloadURL,
+              updatedAt: new Date()
+            })
+          })
+        }
       }
       
       console.log('Image uploaded successfully:', downloadURL)
@@ -265,10 +317,52 @@ export default function MusicianProfileModal({ isOpen, onClose, musician }: Musi
     }
   }
 
-  const saveBio = () => {
-    setIsEditingBio(false)
-    // Here you would typically save to Firebase
-    console.log('Saving bio:', bioText)
+  const saveBio = async () => {
+    if (!user || !db || !musician) return
+    
+    try {
+      setIsEditingBio(false)
+      
+      // Save to users collection
+      const userDocRef = doc(db, 'users', user.uid)
+      await updateDoc(userDocRef, {
+        bio: bioText,
+        updatedAt: new Date()
+      }).catch(() => {
+        // If document doesn't exist, create it
+        return setDoc(userDocRef, {
+          uid: user.uid,
+          name: musician.name,
+          email: musician.email || user.email,
+          bio: bioText,
+          headshotUrl: musician.headshotUrl || null,
+          updatedAt: new Date(),
+          createdAt: new Date()
+        })
+      })
+      
+      // Also update projectMusicians if this is for a project
+      if (musician.instrument) {
+        const projectMusicianQuery = query(
+          collection(db, 'projectMusicians'),
+          where('email', '==', musician.email || user.email)
+        )
+        const querySnapshot = await getDocs(projectMusicianQuery)
+        
+        querySnapshot.docs.forEach(async (docSnapshot) => {
+          await updateDoc(docSnapshot.ref, {
+            bio: bioText,
+            updatedAt: new Date()
+          })
+        })
+      }
+      
+      console.log('✅ Bio saved successfully')
+    } catch (error) {
+      console.error('Error saving bio:', error)
+      alert('Failed to save bio. Please try again.')
+      setIsEditingBio(true)
+    }
   }
 
   const tabs = [

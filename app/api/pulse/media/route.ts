@@ -14,7 +14,17 @@ export async function GET(req: NextRequest) {
       console.warn('OPENAI_API_KEY not configured, returning mock data')
       return NextResponse.json({
         success: true,
-        items: []
+        items: [
+          {
+            title: 'Black Diaspora Symphony Orchestra - 2024 Juneteenth Concert',
+            description: 'Performance highlights from the 2024 Juneteenth Concert featuring works celebrating Black musical tradition.',
+            url: 'https://www.youtube.com/watch?v=example',
+            source: 'YouTube',
+            thumbnail: null,
+            type: 'video',
+            mediaType: 'video'
+          }
+        ]
       })
     }
 

@@ -34,7 +34,8 @@ const mockData = {
       currentMusicians: 45,
       neededMusicians: 60,
       budgetUsd: 25000,
-      beamCoinsTotal: 1260
+      beamCoinsTotal: 1260,
+      subscriptionActive: true
     },
     { 
       id: 'atlanta-spring-concert', 
@@ -45,7 +46,8 @@ const mockData = {
       currentMusicians: 12,
       neededMusicians: 45,
       budgetUsd: 15000,
-      beamCoinsTotal: 900
+      beamCoinsTotal: 900,
+      subscriptionActive: false
     },
   ],
   musicians: [
@@ -195,6 +197,15 @@ export default function AdminDashboard() {
           </div>
         </td>
         <td className="px-6 py-4">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+            project.subscriptionActive 
+              ? 'bg-green-500/20 text-green-400' 
+              : 'bg-gray-500/20 text-gray-400'
+          }`}>
+            {project.subscriptionActive ? 'Active' : 'Inactive'}
+          </span>
+        </td>
+        <td className="px-6 py-4">
           <Link
             href={`/admin/projects/${projectId}/invites`}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-medium rounded-lg transition-colors text-sm"
@@ -288,8 +299,9 @@ export default function AdminDashboard() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Project</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">City</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Musicians</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Participants</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Budget</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Subscription</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>

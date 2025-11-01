@@ -15,7 +15,9 @@ import {
   Settings,
   BarChart3,
   FileText,
-  Mail
+  Mail,
+  ExternalLink,
+  Zap
 } from 'lucide-react'
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -196,14 +198,28 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Invite Button */}
-          <Link
-            href={`/admin/projects/${projectId}/invites`}
-            className="flex items-center space-x-2 px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-all shadow-lg hover:shadow-orchestra-gold/20"
-          >
-            <UserPlus className="h-5 w-5" />
-            <span>Manage Invites</span>
-          </Link>
+          <div className="flex items-center space-x-3">
+            {/* Invite Button */}
+            <Link
+              href={`/admin/projects/${projectId}/invites`}
+              className="flex items-center space-x-2 px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-all shadow-lg hover:shadow-orchestra-gold/20"
+            >
+              <UserPlus className="h-5 w-5" />
+              <span>Manage Invites</span>
+            </Link>
+
+            {/* Readyaimgo Subscription Button */}
+            <a
+              href={`https://readyaimgo.biz/onboard?project=${projectId}&return=${encodeURIComponent(process.env.NEXT_PUBLIC_BASE_URL || 'https://orchestra.beamthinktank.space')}/admin/dashboard`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-all shadow-lg hover:shadow-purple-600/20"
+            >
+              <Zap className="h-5 w-5" />
+              <span>Activate Readyaimgo</span>
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </motion.div>
 

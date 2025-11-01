@@ -64,13 +64,20 @@ service cloud.firestore {
       allow read: if isPartnerAdmin();
     }
     
-    // Project Musicians - Admins and organization admins
+    // Project Musicians - Public read for project pages, write requires admin
     match /projectMusicians/{pmId} {
-      allow read, write: if isAdmin();
+      // Allow public read access (for roster pages)
+      allow read: if true;
       
-      // Allow partner admins to read/write project musicians for their projects
-      allow read, write: if isPartnerAdmin() && 
+      // Admins can write
+      allow write: if isAdmin();
+      
+      // Allow partner admins to write project musicians for their projects
+      allow write: if isPartnerAdmin() && 
         resource.data.projectId in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.organizationId == request.auth.token.organizationId;
+      
+      // Allow musicians to update their own project musician entry
+      allow update: if isAuthenticated() && resource.data.musicianId == request.auth.uid;
     }
     
     // Pulse Entries - Admins only

@@ -54,6 +54,8 @@ export default function ProjectInvitesPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [instrument, setInstrument] = useState('')
+  const [carrier, setCarrier] = useState<string>('')
+  const [inviteMethod, setInviteMethod] = useState<'email' | 'sms'>('email')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Bulk invite state
@@ -194,22 +196,62 @@ export default function ProjectInvitesPage() {
       return
     }
 
+    // For SMS, carrier is required
+    if (inviteMethod === 'sms' && !carrier) {
+      showToast('error', 'Please select a carrier for SMS invite')
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      await handleInvite({
+      const inviteData = {
         name: name.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         instrument: instrument.trim() || undefined,
-      })
+      }
 
-      showToast('success', `Invite sent to ${email.trim() || phone.trim()}`)
+      const result = await handleInvite(inviteData)
+
+      // If SMS invite and we have phone + carrier
+      if (inviteMethod === 'sms' && phone.trim() && carrier && result?.confirmationUrl) {
+        try {
+          const smsResponse = await fetch('/api/send-text-invite', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${await getAuthToken()}`,
+            },
+            body: JSON.stringify({
+              phone: phone.trim(),
+              carrier,
+              link: result.confirmationUrl,
+              projectName: projectId,
+              musicianName: name.trim(),
+            }),
+          })
+
+          if (smsResponse.ok) {
+            showToast('success', `SMS invite sent to ${phone.trim()}`)
+          } else {
+            // Fallback: invite was created, just SMS failed
+            showToast('info', `Invite created. SMS failed - use email invite instead.`)
+          }
+        } catch (smsError) {
+          console.error('SMS send error:', smsError)
+          showToast('info', `Invite created but SMS failed. Use copy link button to send manually.`)
+        }
+      } else {
+        showToast('success', `Invite sent to ${email.trim() || phone.trim()}`)
+      }
       
       // Reset form
       setName('')
       setEmail('')
       setPhone('')
       setInstrument('')
+      setCarrier('')
+      setInviteMethod('email')
     } catch (error: any) {
       showToast('error', error.message || 'Could not send invite')
     } finally {
@@ -379,6 +421,39 @@ export default function ProjectInvitesPage() {
           Quick Invite
         </h2>
         
+        {/* Invite Method Selector */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-orchestra-cream mb-2">
+            Invite Method
+          </label>
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={() => setInviteMethod('email')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                inviteMethod === 'email'
+                  ? 'bg-orchestra-gold text-orchestra-dark'
+                  : 'bg-orchestra-dark/50 text-orchestra-cream border border-orchestra-gold/30'
+              }`}
+            >
+              <Mail className="h-4 w-4" />
+              <span>Email</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInviteMethod('sms')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                inviteMethod === 'sms'
+                  ? 'bg-orchestra-gold text-orchestra-dark'
+                  : 'bg-orchestra-dark/50 text-orchestra-cream border border-orchestra-gold/30'
+              }`}
+            >
+              <Phone className="h-4 w-4" />
+              <span>SMS (Text)</span>
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-orchestra-cream mb-2">
@@ -406,33 +481,60 @@ export default function ProjectInvitesPage() {
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
-              <Mail className="h-4 w-4 mr-1" />
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-              placeholder="john@example.com"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
-              <Phone className="h-4 w-4 mr-1" />
-              Phone
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-              placeholder="+1 (555) 123-4567"
-            />
-          </div>
+          {inviteMethod === 'email' ? (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
+                <Mail className="h-4 w-4 mr-1" />
+                Email *
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+                placeholder="john@example.com"
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
+                  <Phone className="h-4 w-4 mr-1" />
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+                  placeholder="4145551234"
+                />
+                <p className="text-xs text-orchestra-cream/60 mt-1">Enter 10-digit phone number</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-orchestra-cream mb-2">
+                  Carrier *
+                </label>
+                <select
+                  value={carrier}
+                  onChange={(e) => setCarrier(e.target.value)}
+                  className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+                >
+                  <option value="">Select carrier...</option>
+                  <option value="att">AT&T</option>
+                  <option value="tmobile">T-Mobile</option>
+                  <option value="verizon">Verizon</option>
+                  <option value="sprint">Sprint</option>
+                  <option value="googlefi">Google Fi</option>
+                  <option value="uscellular">US Cellular</option>
+                  <option value="cricket">Cricket</option>
+                  <option value="boost">Boost Mobile</option>
+                  <option value="metropcs">MetroPCS</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
         
         <div className="mt-4">
