@@ -30,7 +30,6 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
-  rosterData, 
   rehearsalSchedule, 
   faqData, 
   ravelExcerptDownloads,
@@ -39,18 +38,36 @@ import {
 import MusicianProfileModal from '@/components/MusicianProfileModal'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { db } from '@/lib/firebase'
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/lib/firebase'
 
-// Lazy load heavy components to reduce initial bundle size
-const ProjectMediaGallery = dynamic(() => import('@/components/ProjectMediaGallery'), {
-  loading: () => <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 animate-pulse h-96" />,
-  ssr: false
-})
+// Define types for Firestore roster data
+type MusicianDetail = {
+  name: string
+  email?: string
+  phone?: string
+  status: 'Pending' | 'Interested' | 'Confirmed' | 'Open'
+  source?: string
+  notes?: string
+  bio?: string
+  headshotUrl?: string
+  mediaEmbedUrl?: string
+  supportLink?: string
+  instrument?: string
+}
 
-type MusicianDetail = (typeof rosterData)[number]['musicianDetails'][number]
 type MusicianProfile = MusicianDetail & { instrument: string }
+
+type RosterSection = {
+  instrument: string
+  needed: number
+  confirmed: number
+  remaining: number
+  percentage: number
+  musicians: string[]
+  musicianDetails: MusicianDetail[]
+}
 
 const navigationSections = [
   { id: 'roster', label: 'Roster', icon: Users },
@@ -61,8 +78,94 @@ const navigationSections = [
   { id: 'media', label: 'Media', icon: Play }
 ]
 
+// Helper function to group musicians by instrument
+function groupByInstrument(musicians: any[]): RosterSection[] {
+  // Define instrument requirements (can be moved to Firestore later)
+  const instrumentRequirements: Record<string, number> = {
+    'Violin I': 6,
+    'Violin II': 6,
+    'Viola': 6,
+    'Cello': 4,
+    'Bass': 3,
+    'Flute': 2,
+    'Oboe': 2,
+    'Clarinet': 2,
+    'Bassoon': 2,
+    'Horn': 4,
+    'Trumpet': 3,
+    'Trombone': 3,
+    'Tuba': 1,
+    'Harp': 1,
+    'Timpani': 1,
+    'Percussion': 2,
+    'Conductor': 1,
+    'Assistant Conductor': 1,
+  }
+
+  const map: Record<string, any[]> = {}
+  
+  musicians.forEach((m) => {
+    const instrument = m.instrument || 'Other'
+    if (!map[instrument]) {
+      map[instrument] = []
+    }
+    
+    // Map Firestore status to UI status
+    let status: 'Pending' | 'Interested' | 'Confirmed' | 'Open' = 'Interested'
+    if (m.status === 'confirmed') {
+      status = 'Confirmed'
+    } else if (m.status === 'pending') {
+      status = 'Pending'
+    } else if (m.status === 'open') {
+      status = 'Open'
+    }
+    
+    map[instrument].push({
+      name: m.name || 'Unknown',
+      email: m.email || null,
+      phone: m.phone || null,
+      status: status,
+      source: m.source || 'Unknown',
+      notes: m.notes || '',
+      bio: m.bio || '',
+      headshotUrl: m.headshotUrl || '',
+      mediaEmbedUrl: m.mediaEmbedUrl || '',
+      supportLink: m.supportLink || '',
+      instrument: instrument,
+    })
+  })
+
+  // Get all instruments from requirements and map
+  const allInstruments = new Set([
+    ...Object.keys(instrumentRequirements),
+    ...Object.keys(map),
+  ])
+
+  return Array.from(allInstruments).map((instrument) => {
+    const details = map[instrument] || []
+    const confirmed = details.filter((m) => m.status === 'Confirmed').length
+    const needed = instrumentRequirements[instrument] || 0
+    const remaining = Math.max(0, needed - confirmed)
+    const percentage = needed > 0 ? Math.round((confirmed / needed) * 100) : 0
+
+    return {
+      instrument,
+      needed,
+      confirmed,
+      remaining,
+      percentage,
+      musicians: details.filter((m) => m.status === 'Confirmed').map((m) => m.name),
+      musicianDetails: details,
+    }
+  })
+}
+
 export default function BlackDiasporaSymphonyPage() {
   const { user } = useUserRole()
+  const [rosterData, setRosterData] = useState<RosterSection[]>([])
+  const [rosterLoading, setRosterLoading] = useState(true)
+  const [mediaItems, setMediaItems] = useState<any[]>([])
+  const [mediaLoading, setMediaLoading] = useState(true)
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null)
   const [showAuditionForm, setShowAuditionForm] = useState(false)
   const [submittedAudition, setSubmittedAudition] = useState(false)
@@ -308,6 +411,55 @@ export default function BlackDiasporaSymphonyPage() {
       alert('Failed to submit profile. Please try again.')
     }
   }
+
+  // Load roster from Firestore
+  useEffect(() => {
+    if (!db) {
+      setRosterLoading(false)
+      return
+    }
+
+    const q = query(
+      collection(db, 'projectMusicians'),
+      where('projectId', '==', 'black-diaspora-symphony'),
+      orderBy('joinedAt', 'desc')
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const musicians = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        
+        const grouped = groupByInstrument(musicians)
+        setRosterData(grouped)
+        setRosterLoading(false)
+      },
+      (error) => {
+        console.error('Error loading roster:', error)
+        setRosterLoading(false)
+        // Fallback: set empty roster or keep existing
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
+  // Load media from Pulse API
+  useEffect(() => {
+    fetch('/api/pulse/media?projectId=black-diaspora-symphony')
+      .then((res) => res.json())
+      .then((data) => {
+        setMediaItems(data.items || [])
+        setMediaLoading(false)
+      })
+      .catch((err) => {
+        console.error('Failed to load media:', err)
+        setMediaLoading(false)
+      })
+  }, [])
 
   // Load existing musician profile
   useEffect(() => {
@@ -745,14 +897,24 @@ export default function BlackDiasporaSymphonyPage() {
             
               {/* Roster Table */}
               <div className="space-y-4 lg:space-y-6 lg:overflow-y-auto lg:pr-6 lg:snap-y lg:snap-mandatory lg:h-full lg:max-h-[75vh]">
-                {rosterData.map((section, index) => (
-                  <motion.div
-                    key={section.instrument}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    className="bg-white/5 rounded-lg p-4 border border-white/10 lg:snap-start"
-                  >
+                {rosterLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+                    <span className="ml-4 text-gray-300">Loading roster...</span>
+                  </div>
+                ) : rosterData.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                    <p>No musicians registered yet.</p>
+                  </div>
+                ) : (
+                  rosterData.map((section, index) => (
+                    <motion.div
+                      key={section.instrument}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      className="bg-white/5 rounded-lg p-4 border border-white/10 lg:snap-start"
+                    >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-semibold text-white">{section.instrument}</h3>
                       <div className="text-sm text-gray-300">
@@ -829,7 +991,8 @@ export default function BlackDiasporaSymphonyPage() {
                       </div>
                     )}
                   </motion.div>
-                ))}
+                  ))
+                )}
               </div>
           </div>
         </motion.section>
@@ -1323,7 +1486,98 @@ export default function BlackDiasporaSymphonyPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.1 }}
         >
-          <ProjectMediaGallery />
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold text-white flex items-center">
+                <Play className="w-8 h-8 mr-3 text-purple-400" />
+                Media & Coverage
+              </h2>
+              <button
+                onClick={() => {
+                  setMediaLoading(true)
+                  fetch('/api/pulse/media?projectId=black-diaspora-symphony')
+                    .then((res) => res.json())
+                    .then((data) => {
+                      setMediaItems(data.items || [])
+                      setMediaLoading(false)
+                    })
+                    .catch((err) => {
+                      console.error('Failed to refresh media:', err)
+                      setMediaLoading(false)
+                    })
+                }}
+                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-lg transition-colors text-sm"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {mediaLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white/5 rounded-xl p-4 border border-white/10 animate-pulse h-64" />
+                ))}
+              </div>
+            ) : mediaItems.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <p>No media content available at this time.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {mediaItems.map((item: any, index: number) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden hover:border-purple-400/50 transition-all"
+                  >
+                    {item.mediaType === 'video' || item.type === 'video' ? (
+                      <div className="aspect-video">
+                        {item.url?.includes('youtube.com') || item.url?.includes('youtu.be') ? (
+                          <iframe
+                            src={item.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                            className="w-full h-full"
+                            allowFullScreen
+                            title={item.title}
+                          />
+                        ) : (
+                          <video
+                            src={item.url}
+                            className="w-full h-full object-cover"
+                            controls
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-6">
+                        {item.thumbnail && (
+                          <img
+                            src={item.thumbnail}
+                            alt={item.title}
+                            className="w-full h-40 object-cover rounded-lg mb-4"
+                          />
+                        )}
+                        <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
+                        <p className="text-gray-300 mb-4 line-clamp-3">{item.description}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">{item.source}</span>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+                          >
+                            Read More →
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
         </motion.section>
       </div>
 

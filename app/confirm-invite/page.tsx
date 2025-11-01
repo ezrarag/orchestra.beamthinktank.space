@@ -112,6 +112,25 @@ export default function ConfirmInvitePage() {
 
       await setDoc(doc(db, 'musicians', user.uid), musicianData, { merge: true })
 
+      // Create/update projectMusicians document for the roster
+      const projectId = prospect.projectId || 'black-diaspora-symphony'
+      const projectMusicianData = {
+        projectId,
+        musicianId: user.uid,
+        instrument: prospect.instrument || '',
+        role: 'musician',
+        status: 'confirmed',
+        source: 'Invite Link',
+        name: prospect.name || user.displayName,
+        email: prospect.email || user.email,
+        phone: prospect.phone || null,
+        notes: prospect.notes || null,
+        joinedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+
+      await setDoc(doc(db, 'projectMusicians', `${user.uid}_${projectId}`), projectMusicianData, { merge: true })
+
       // Also update users collection
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,

@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app'
+import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 import { getStorage } from 'firebase/storage'
@@ -22,18 +22,22 @@ let storage: any = null
 
 if (isFirebaseConfigured) {
   try {
-    // Initialize Firebase
-    app = initializeApp(firebaseConfig)
+    // Initialize Firebase (avoid duplicate initialization)
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
     
     // Initialize Firebase services
     db = getFirestore(app)
     auth = getAuth(app)
     storage = getStorage(app)
   } catch (error) {
-    console.warn('Firebase initialization failed:', error)
+    console.error('Firebase initialization failed:', error)
   }
 } else {
   console.warn('Firebase configuration incomplete. Please check your environment variables.')
+  console.warn('Missing variables:', Object.entries(firebaseConfig)
+    .filter(([_, value]) => !value || value === 'undefined')
+    .map(([key]) => key)
+  )
 }
 
 export { db, auth, storage }

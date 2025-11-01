@@ -2,7 +2,11 @@ import { initializeApp, applicationDefault } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 
 // Initializes using your local ADC (gcloud, service account env, etc.)
-initializeApp({ credential: applicationDefault() })
+// Explicitly set projectId to avoid ADC lookup issues
+initializeApp({
+  credential: applicationDefault(),
+  projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+})
 
 async function setAdmin() {
   try {

@@ -2,13 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Music, Menu, X, MapPin } from 'lucide-react'
-
-const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville']
+import { Music, Menu, X } from 'lucide-react'
+import UserMenu from './UserMenu'
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [selectedCity, setSelectedCity] = useState('Orlando')
 
   return (
     <header className="bg-orchestra-dark/90 backdrop-blur-md border-b border-orchestra-gold/30 sticky top-0 z-50">
@@ -22,23 +20,7 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* City Selector */}
-          <div className="hidden md:flex items-center space-x-2">
-            <MapPin className="h-5 w-5 text-orchestra-gold" />
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="bg-transparent text-orchestra-cream border border-orchestra-gold/30 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-            >
-              {cities.map((city) => (
-                <option key={city} value={city} className="bg-orchestra-dark text-orchestra-cream">
-                  {city}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - All links in header */}
           <nav className="hidden md:flex items-center space-x-8">
             <Link href="/performances" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Performances
@@ -60,33 +42,24 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden text-orchestra-cream hover:text-orchestra-gold"
-          >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* Right Side: User Menu */}
+          <div className="flex items-center space-x-4">
+            <UserMenu />
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="md:hidden text-orchestra-cream hover:text-orchestra-gold"
+            >
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <div className="md:hidden pb-4">
-            <div className="flex flex-col space-y-4">
-              <div className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-orchestra-gold" />
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="bg-transparent text-orchestra-cream border border-orchestra-gold/30 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-                >
-                  {cities.map((city) => (
-                    <option key={city} value={city} className="bg-orchestra-dark text-orchestra-cream">
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <nav className="flex flex-col space-y-4">
               <Link href="/performances" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Performances
               </Link>
@@ -105,7 +78,7 @@ export default function Header() {
               <Link href="/scholarship" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Scholarship
               </Link>
-            </div>
+            </nav>
           </div>
         )}
       </div>

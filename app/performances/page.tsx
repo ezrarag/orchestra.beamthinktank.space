@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from 'lucide-react'
 // Removed Supabase import for deployment
@@ -119,7 +118,6 @@ export default function PerformancesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-pattern">
-        <Header />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-orchestra-gold text-xl">Loading performances...</div>
         </div>
@@ -130,7 +128,6 @@ export default function PerformancesPage() {
 
   return (
     <div className="min-h-screen bg-pattern">
-      <Header />
       
       {/* Page Header */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">

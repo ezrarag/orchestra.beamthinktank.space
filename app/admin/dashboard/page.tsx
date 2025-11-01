@@ -10,8 +10,10 @@ import {
   Plus,
   TrendingUp,
   Calendar,
-  MapPin
+  MapPin,
+  UserPlus
 } from 'lucide-react'
+import Link from 'next/link'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -24,23 +26,23 @@ const mockData = {
   ],
   projects: [
     { 
-      id: '1', 
+      id: 'black-diaspora-symphony', 
       organizationId: '1', 
-      name: '2025 Annual Memorial Concert', 
+      name: 'Black Diaspora Symphony Orchestra', 
       city: 'Milwaukee', 
       status: 'active',
-      currentMusicians: 8,
+      currentMusicians: 45,
       neededMusicians: 60,
       budgetUsd: 25000,
       beamCoinsTotal: 1260
     },
     { 
-      id: '2', 
+      id: 'atlanta-spring-concert', 
       organizationId: '2', 
       name: 'Spring Community Concert', 
       city: 'Atlanta', 
       status: 'planning',
-      currentMusicians: 0,
+      currentMusicians: 12,
       neededMusicians: 45,
       budgetUsd: 15000,
       beamCoinsTotal: 900
@@ -133,58 +135,77 @@ export default function AdminDashboard() {
     </motion.div>
   )
 
-  const ProjectRow = ({ project }: { project: any }) => (
-    <motion.tr
-      className="border-b border-orchestra-gold/10 hover:bg-orchestra-gold/5"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      <td className="px-6 py-4">
-        <div className="flex items-center">
-          <Building2 className="h-5 w-5 text-orchestra-gold mr-3" />
-          <div>
-            <div className="font-medium text-orchestra-cream">{project.name}</div>
-            <div className="text-sm text-orchestra-cream/70">{mockData.organizations.find(org => org.id === project.organizationId)?.name}</div>
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center text-orchestra-cream/70">
-          <MapPin className="h-4 w-4 mr-2" />
-          {project.city}
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          project.status === 'active' 
-            ? 'bg-green-500/20 text-green-400' 
-            : 'bg-yellow-500/20 text-yellow-400'
-        }`}>
-          {project.status}
-        </span>
-      </td>
-      <td className="px-6 py-4 text-orchestra-cream">
-        <div className="flex items-center">
-          <Users className="h-4 w-4 mr-2 text-orchestra-gold" />
-          <span className="font-medium">{project.currentMusicians}</span>
-          <span className="text-orchestra-cream/50 mx-1">/</span>
-          <span className="text-orchestra-cream/70">{project.neededMusicians}</span>
-        </div>
-      </td>
-      <td className="px-6 py-4 text-orchestra-cream">
-        <div className="space-y-1">
+  const ProjectRow = ({ project }: { project: any }) => {
+    // Determine project ID - use actual ID if available, or generate from name
+    const projectId = project.id || project.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
+    
+    return (
+      <motion.tr
+        className="border-b border-orchestra-gold/10 hover:bg-orchestra-gold/5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <td className="px-6 py-4">
           <div className="flex items-center">
-            <span className="text-green-400 font-medium">${project.budgetUsd.toLocaleString()}</span>
+            <Building2 className="h-5 w-5 text-orchestra-gold mr-3" />
+            <div>
+              <Link 
+                href={`/admin/projects/${projectId}`}
+                className="font-medium text-orchestra-cream hover:text-orchestra-gold transition-colors"
+              >
+                {project.name}
+              </Link>
+              <div className="text-sm text-orchestra-cream/70">{mockData.organizations.find(org => org.id === project.organizationId)?.name}</div>
+            </div>
           </div>
-          <div className="flex items-center text-sm text-orchestra-gold">
-            <Coins className="h-3 w-3 mr-1" />
-            {project.beamCoinsTotal} BEAM
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center text-orchestra-cream/70">
+            <MapPin className="h-4 w-4 mr-2" />
+            {project.city}
           </div>
-        </div>
-      </td>
-    </motion.tr>
-  )
+        </td>
+        <td className="px-6 py-4">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+            project.status === 'active' 
+              ? 'bg-green-500/20 text-green-400' 
+              : 'bg-yellow-500/20 text-yellow-400'
+          }`}>
+            {project.status}
+          </span>
+        </td>
+        <td className="px-6 py-4 text-orchestra-cream">
+          <div className="flex items-center">
+            <Users className="h-4 w-4 mr-2 text-orchestra-gold" />
+            <span className="font-medium">{project.currentMusicians}</span>
+            <span className="text-orchestra-cream/50 mx-1">/</span>
+            <span className="text-orchestra-cream/70">{project.neededMusicians}</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-orchestra-cream">
+          <div className="space-y-1">
+            <div className="flex items-center">
+              <span className="text-green-400 font-medium">${project.budgetUsd.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center text-sm text-orchestra-gold">
+              <Coins className="h-3 w-3 mr-1" />
+              {project.beamCoinsTotal} BEAM
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <Link
+            href={`/admin/projects/${projectId}/invites`}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-medium rounded-lg transition-colors text-sm"
+          >
+            <Users className="h-4 w-4" />
+            <span>Invites</span>
+          </Link>
+        </td>
+      </motion.tr>
+    )
+  }
 
   if (loading) {
     return (
@@ -269,6 +290,7 @@ export default function AdminDashboard() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Musicians</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Budget</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-orchestra-gold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-orchestra-gold/10">

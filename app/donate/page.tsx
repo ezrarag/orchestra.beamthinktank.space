@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { Heart, DollarSign, Users, Target, Filter } from 'lucide-react'
 // Removed Supabase import for deployment
@@ -143,7 +142,6 @@ export default function DonatePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-pattern">
-        <Header />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-orchestra-gold text-xl">Loading donations...</div>
         </div>
@@ -154,7 +152,6 @@ export default function DonatePage() {
 
   return (
     <div className="min-h-screen bg-pattern">
-      <Header />
       {/* the rest of your component remains unchanged */}
       {/* ... */}
       <Footer />

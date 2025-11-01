@@ -31,7 +31,25 @@ export function useUserRole(): UserWithRole {
       
       if (user) {
         try {
-          // Get user role from custom claims or user document
+          // First, check custom claims (for admin roles set via Firebase Admin SDK)
+          const tokenResult = await user.getIdTokenResult()
+          const claims = tokenResult.claims
+          
+          // Check for admin claim in custom claims
+          if (claims.beam_admin === true || claims.role === 'beam_admin') {
+            setRole('beam_admin')
+            setLoading(false)
+            return
+          }
+          
+          // Check for partner_admin claim
+          if (claims.role === 'partner_admin' || claims.partner_admin === true) {
+            setRole('partner_admin')
+            setLoading(false)
+            return
+          }
+          
+          // Fall back to Firestore user document
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()

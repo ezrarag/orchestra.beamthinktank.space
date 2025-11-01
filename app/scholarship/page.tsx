@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { GraduationCap, Target, Users, Award, Filter, BookOpen } from 'lucide-react'
 // Removed Supabase import for deployment
@@ -110,7 +109,6 @@ export default function ScholarshipPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-pattern">
-        <Header />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-orchestra-gold text-xl">Loading scholarship information...</div>
         </div>
@@ -121,7 +119,6 @@ export default function ScholarshipPage() {
 
   return (
     <div className="min-h-screen bg-pattern">
-      <Header />
       
       {/* Page Header */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
