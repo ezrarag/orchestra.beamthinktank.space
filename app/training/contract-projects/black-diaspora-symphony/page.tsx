@@ -1029,7 +1029,7 @@ export default function BlackDiasporaSymphonyPage() {
                               <div className="flex items-center mb-1">
                                 <span className="mr-2">📅</span>
                                 <span className="text-gray-400">
-                                  {renderMusicianSource(musician.source)}
+                                  {renderMusicianSource(musician.source || '')}
                                 </span>
                               </div>
                               {musician.notes && (
