@@ -146,9 +146,24 @@ Create a concise, professional daily summary email (2-3 paragraphs) highlighting
       })
 
       aiSummary = completion.choices[0].message.content || 'Summary generation failed.'
-    } catch (error) {
-      console.error('OpenAI API error:', error)
-      // Fallback summary
+      } catch (error) {
+        console.error('OpenAI API error:', error)
+        // Fallback summary
+        aiSummary = `Daily Summary for ${projectId}:
+
+Current Status:
+- ${mockMusicians.filter(m => m.status === 'confirmed').length} confirmed musicians out of target roster
+- ${missingInstruments.length} instrument sections need more musicians
+
+Upcoming Rehearsals:
+${mockRehearsals.map(r => `- ${r.date} at ${r.time}: ${r.type}`).join('\n')}
+
+Action Items:
+- ${mockProspects.filter(p => p.status === 'pending').length} pending invites need follow-up
+- Priority instruments to fill: ${missingInstruments.slice(0, 3).map(m => m.instrument).join(', ')}`
+      }
+    } else {
+      // Fallback summary when OpenAI is not configured
       aiSummary = `Daily Summary for ${projectId}:
 
 Current Status:
