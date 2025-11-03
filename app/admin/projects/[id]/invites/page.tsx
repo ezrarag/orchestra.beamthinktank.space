@@ -8,7 +8,6 @@ import {
   Copy, 
   Check, 
   Mail, 
-  Phone,
   Users,
   ArrowLeft,
   Loader2,
@@ -17,7 +16,7 @@ import {
   FileText
 } from 'lucide-react'
 import { db, auth } from '@/lib/firebase'
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore'
 import { useRequireRole } from '@/lib/hooks/useUserRole'
 import Link from 'next/link'
 
@@ -52,10 +51,7 @@ export default function ProjectInvitesPage() {
   // Form state
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
   const [instrument, setInstrument] = useState('')
-  const [carrier, setCarrier] = useState<string>('')
-  const [inviteMethod, setInviteMethod] = useState<'email' | 'sms'>('email')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Bulk invite state
@@ -85,10 +81,11 @@ export default function ProjectInvitesPage() {
   useEffect(() => {
     if (!projectId || !db) return
 
+    // Query without orderBy to avoid requiring composite index
+    // Results will be sorted client-side if needed
     const q = query(
       collection(db, 'prospects'),
-      where('projectId', '==', projectId),
-      orderBy('createdAt', 'desc')
+      where('projectId', '==', projectId)
     )
 
     const unsubscribe = onSnapshot(
@@ -116,6 +113,13 @@ export default function ProjectInvitesPage() {
           }
           
           return prospect
+        })
+        
+        // Sort by createdAt descending (client-side to avoid index requirement)
+        prospectsWithUrls.sort((a, b) => {
+          const aTime = a.createdAt?.toMillis() || a.invitedAt?.toMillis() || 0
+          const bTime = b.createdAt?.toMillis() || b.invitedAt?.toMillis() || 0
+          return bTime - aTime
         })
         
         setProspects(prospectsWithUrls)
@@ -191,14 +195,8 @@ export default function ProjectInvitesPage() {
   }
 
   const handleQuickInvite = async () => {
-    if (!name.trim() || (!email.trim() && !phone.trim())) {
-      showToast('error', 'Name and either email or phone are required')
-      return
-    }
-
-    // For SMS, carrier is required
-    if (inviteMethod === 'sms' && !carrier) {
-      showToast('error', 'Please select a carrier for SMS invite')
+    if (!name.trim() || !email.trim()) {
+      showToast('error', 'Name and email are required')
       return
     }
 
@@ -206,52 +204,17 @@ export default function ProjectInvitesPage() {
     try {
       const inviteData = {
         name: name.trim(),
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
+        email: email.trim(),
         instrument: instrument.trim() || undefined,
       }
 
-      const result = await handleInvite(inviteData)
-
-      // If SMS invite and we have phone + carrier
-      if (inviteMethod === 'sms' && phone.trim() && carrier && result?.confirmationUrl) {
-        try {
-          const smsResponse = await fetch('/api/send-text-invite', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${await getAuthToken()}`,
-            },
-            body: JSON.stringify({
-              phone: phone.trim(),
-              carrier,
-              link: result.confirmationUrl,
-              projectName: projectId,
-              musicianName: name.trim(),
-            }),
-          })
-
-          if (smsResponse.ok) {
-            showToast('success', `SMS invite sent to ${phone.trim()}`)
-          } else {
-            // Fallback: invite was created, just SMS failed
-            showToast('info', `Invite created. SMS failed - use email invite instead.`)
-          }
-        } catch (smsError) {
-          console.error('SMS send error:', smsError)
-          showToast('info', `Invite created but SMS failed. Use copy link button to send manually.`)
-        }
-      } else {
-        showToast('success', `Invite sent to ${email.trim() || phone.trim()}`)
-      }
+      await handleInvite(inviteData)
+      showToast('success', `Invite sent to ${email.trim()}`)
       
       // Reset form
       setName('')
       setEmail('')
-      setPhone('')
       setInstrument('')
-      setCarrier('')
-      setInviteMethod('email')
     } catch (error: any) {
       showToast('error', error.message || 'Could not send invite')
     } finally {
@@ -420,39 +383,6 @@ export default function ProjectInvitesPage() {
           <Send className="h-5 w-5 mr-2" />
           Quick Invite
         </h2>
-        
-        {/* Invite Method Selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-orchestra-cream mb-2">
-            Invite Method
-          </label>
-          <div className="flex space-x-4">
-            <button
-              type="button"
-              onClick={() => setInviteMethod('email')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                inviteMethod === 'email'
-                  ? 'bg-orchestra-gold text-orchestra-dark'
-                  : 'bg-orchestra-dark/50 text-orchestra-cream border border-orchestra-gold/30'
-              }`}
-            >
-              <Mail className="h-4 w-4" />
-              <span>Email</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setInviteMethod('sms')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                inviteMethod === 'sms'
-                  ? 'bg-orchestra-gold text-orchestra-dark'
-                  : 'bg-orchestra-dark/50 text-orchestra-cream border border-orchestra-gold/30'
-              }`}
-            >
-              <Phone className="h-4 w-4" />
-              <span>SMS (Text)</span>
-            </button>
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -481,69 +411,25 @@ export default function ProjectInvitesPage() {
             />
           </div>
           
-          {inviteMethod === 'email' ? (
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
-                <Mail className="h-4 w-4 mr-1" />
-                Email *
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-                placeholder="john@example.com"
-              />
-            </div>
-          ) : (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
-                  <Phone className="h-4 w-4 mr-1" />
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-                  placeholder="4145551234"
-                />
-                <p className="text-xs text-orchestra-cream/60 mt-1">Enter 10-digit phone number</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-orchestra-cream mb-2">
-                  Carrier *
-                </label>
-                <select
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value)}
-                  className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
-                >
-                  <option value="">Select carrier...</option>
-                  <option value="att">AT&T</option>
-                  <option value="tmobile">T-Mobile</option>
-                  <option value="verizon">Verizon</option>
-                  <option value="sprint">Sprint</option>
-                  <option value="googlefi">Google Fi</option>
-                  <option value="uscellular">US Cellular</option>
-                  <option value="cricket">Cricket</option>
-                  <option value="boost">Boost Mobile</option>
-                  <option value="metropcs">MetroPCS</option>
-                </select>
-              </div>
-            </>
-          )}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-orchestra-cream mb-2 flex items-center">
+              <Mail className="h-4 w-4 mr-1" />
+              Email *
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+              placeholder="john@example.com"
+            />
+          </div>
         </div>
         
         <div className="mt-4">
-          <p className="text-xs text-orchestra-cream/60 mb-3">
-            * At least email or phone is required
-          </p>
           <motion.button
             onClick={handleQuickInvite}
-            disabled={isSubmitting || !name.trim() || (!email.trim() && !phone.trim())}
+            disabled={isSubmitting || !name.trim() || !email.trim()}
             className="flex items-center space-x-2 px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:bg-orchestra-gold/50 disabled:cursor-not-allowed text-orchestra-dark font-bold rounded-lg transition-colors"
             whileHover={{ scale: isSubmitting ? 1 : 1.05 }}
             whileTap={{ scale: isSubmitting ? 1 : 0.95 }}

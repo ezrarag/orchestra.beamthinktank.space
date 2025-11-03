@@ -75,10 +75,26 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error creating invite:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    // Log detailed error information
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      projectId: body?.projectId,
+      name: body?.name,
+      hasEmail: !!body?.email,
+      hasPhone: !!body?.phone,
+    })
+    
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined
+        details: process.env.NODE_ENV === 'development' 
+          ? errorMessage 
+          : 'An error occurred while creating the invite. Please check the server logs for details.',
+        ...(process.env.NODE_ENV === 'development' && errorStack ? { stack: errorStack } : {})
       },
       { status: 500 }
     )

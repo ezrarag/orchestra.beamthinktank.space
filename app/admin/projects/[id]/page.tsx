@@ -349,9 +349,12 @@ export default function ProjectDetailPage() {
               ))}
             </div>
             {musicians.length > 9 && (
-              <p className="text-center text-orchestra-cream/70 text-sm mt-4">
+              <Link
+                href={`/admin/projects/${projectId}/invites`}
+                className="block text-center text-orchestra-gold hover:text-orchestra-gold/80 text-sm mt-4 transition-colors cursor-pointer"
+              >
                 + {musicians.length - 9} more musician{musicians.length - 9 !== 1 ? 's' : ''}
-              </p>
+              </Link>
             )}
           </div>
         </motion.div>
