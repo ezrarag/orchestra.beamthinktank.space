@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, verifyAdminRole } from '@/lib/firebase-admin'
+import { adminAuth, verifyAdminRole, adminDb } from '@/lib/firebase-admin'
 import { searchGmail, extractMusicianInfo } from '@/lib/googleUtils'
-import { collection, query, where, getDocs } from 'firebase-admin/firestore'
-import { adminDb } from '@/lib/firebase-admin'
 
 /**
  * Scan Gmail for musician-related emails
@@ -53,17 +51,26 @@ export async function POST(request: NextRequest) {
     const existingEmails = new Set<string>()
     if (candidates.length > 0) {
       const emailAddresses = candidates.map(c => c.email.toLowerCase())
-      const existingQuery = query(
-        collection(adminDb, 'projectMusicians'),
-        where('email', 'in', emailAddresses.slice(0, 10)) // Firestore 'in' query limit is 10
-      )
-      const existingSnapshot = await getDocs(existingQuery)
-      existingSnapshot.docs.forEach(doc => {
-        const data = doc.data()
-        if (data.email) {
-          existingEmails.add(data.email.toLowerCase())
-        }
-      })
+      // Firestore 'in' query limit is 10, so we need to batch if there are more
+      const emailBatches = []
+      for (let i = 0; i < emailAddresses.length; i += 10) {
+        emailBatches.push(emailAddresses.slice(i, i + 10))
+      }
+      
+      // Query each batch
+      for (const batch of emailBatches) {
+        const existingSnapshot = await adminDb
+          .collection('projectMusicians')
+          .where('email', 'in', batch)
+          .get()
+        
+        existingSnapshot.docs.forEach(doc => {
+          const data = doc.data()
+          if (data.email) {
+            existingEmails.add(data.email.toLowerCase())
+          }
+        })
+      }
     }
 
     // Mark which candidates are new vs existing
