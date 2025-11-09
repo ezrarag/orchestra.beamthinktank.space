@@ -176,8 +176,12 @@ export default function BlackDiasporaSymphonyPage() {
   const [showAuditionForm, setShowAuditionForm] = useState(false)
   const [submittedAudition, setSubmittedAudition] = useState(false)
   const [showRavelModal, setShowRavelModal] = useState(false)
+  const [showMontgomeryModal, setShowMontgomeryModal] = useState(false)
   const [hoveredExcerpt, setHoveredExcerpt] = useState<string | null>(null)
   const [ravelSearch, setRavelSearch] = useState('')
+  const [montgomerySearch, setMontgomerySearch] = useState('')
+  const [isVerificationExpanded, setIsVerificationExpanded] = useState(false)
+  const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false)
   const [activeSection, setActiveSection] = useState('roster')
   const [scrollY, setScrollY] = useState(0)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -225,6 +229,10 @@ export default function BlackDiasporaSymphonyPage() {
 
   const filteredRavelDownloads = ravelExcerptDownloads.filter(part =>
     part.instrument.toLowerCase().includes(ravelSearch.trim().toLowerCase())
+  )
+
+  const filteredMontgomeryDownloads = montgomeryExcerptDownloads.filter(part =>
+    part.instrument.toLowerCase().includes(montgomerySearch.trim().toLowerCase())
   )
 
   const excerptStatusMessage = (work: 'montgomery' | 'ravel') => {
@@ -287,16 +295,10 @@ export default function BlackDiasporaSymphonyPage() {
     try {
       setDownloadingFiles(prev => new Set(prev).add(downloadKey))
       
-      // Force download by modifying the URL to include download parameter
-      const downloadUrl = url.includes('?') 
-        ? `${url}&download=${encodeURIComponent(filename)}`
-        : `${url}?download=${encodeURIComponent(filename)}`
-      
-      const response = await fetch(downloadUrl, {
+      // For Firebase Storage URLs, fetch the blob and force download
+      const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/pdf',
-        }
+        mode: 'cors',
       })
       
       if (!response.ok) {
@@ -316,27 +318,15 @@ export default function BlackDiasporaSymphonyPage() {
       document.body.appendChild(link)
       link.click()
       
-      // Clean up
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(blobUrl)
+      // Clean up after a short delay to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
     } catch (error) {
       console.error('Download failed:', error)
-      // Fallback: try direct download with modified URL
-      try {
-        const fallbackUrl = url.replace('alt=media', 'alt=media&download=true')
-        const link = document.createElement('a')
-        link.href = fallbackUrl
-        link.download = filename
-        link.target = '_blank'
-        link.style.display = 'none'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } catch (fallbackError) {
-        console.error('Fallback download failed:', fallbackError)
-        // Last resort: open in new tab
-        window.open(url, '_blank')
-      }
+      // Fallback: try opening in new tab
+      window.open(url, '_blank')
     } finally {
       setDownloadingFiles(prev => {
         const newSet = new Set(prev)
@@ -820,6 +810,7 @@ export default function BlackDiasporaSymphonyPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowRavelModal(false)
+        setShowMontgomeryModal(false)
         setShowBeamVideo(false)
         setMobileNavOpen(false)
         setShowMusicianModal(false)
@@ -829,13 +820,13 @@ export default function BlackDiasporaSymphonyPage() {
       }
     }
 
-    if (showRavelModal || showBeamVideo || mobileNavOpen || showMusicianModal || showProjectDetailsModal) {
+    if (showRavelModal || showMontgomeryModal || showBeamVideo || mobileNavOpen || showMusicianModal || showProjectDetailsModal) {
       window.addEventListener('keydown', handleKeyDown)
       return () => window.removeEventListener('keydown', handleKeyDown)
     }
 
     return () => {}
-  }, [showRavelModal, showBeamVideo, mobileNavOpen, showMusicianModal, showProjectDetailsModal])
+  }, [showRavelModal, showMontgomeryModal, showBeamVideo, mobileNavOpen, showMusicianModal, showProjectDetailsModal])
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -1085,15 +1076,127 @@ export default function BlackDiasporaSymphonyPage() {
               Materials
             </h2>
             
+            {/* Memorial Concert Repertoire - Moved to top */}
+            <div className="bg-white/5 rounded-lg p-6 border border-white/10 mb-8">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <Play className="w-5 h-5 mr-2 text-purple-400" />
+                Memorial Concert Repertoire
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                  <div>
+                    <p className="text-white font-medium">Montgomery Variations</p>
+                    <p className="text-gray-400 text-sm">Margaret Bonds - Movement I</p>
+                  </div>
+                  <div className="relative">
+                    <motion.button 
+                      type="button"
+                      onClick={() => hasMontgomeryDownloads && setShowMontgomeryModal(true)}
+                      onMouseEnter={() => setHoveredExcerpt('montgomery')}
+                      onMouseLeave={() => setHoveredExcerpt(null)}
+                      onFocus={() => setHoveredExcerpt('montgomery')}
+                      onBlur={() => setHoveredExcerpt(null)}
+                      disabled={!hasMontgomeryDownloads}
+                      className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasMontgomeryDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
+                      aria-disabled={!hasMontgomeryDownloads}
+                    >
+                      Download PDF
+                    </motion.button>
+                    <AnimatePresence>
+                      {hoveredExcerpt === 'montgomery' && (
+                        <motion.span
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
+                        >
+                          {excerptStatusMessage('montgomery')}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
+                  <div>
+                    <p className="text-white font-medium">Le Tombeau de Couperin</p>
+                    <p className="text-gray-400 text-sm">Maurice Ravel - Parts</p>
+                  </div>
+                  <div className="relative">
+                    <motion.button 
+                      type="button"
+                      onMouseEnter={() => setHoveredExcerpt('ravel')}
+                      onMouseLeave={() => setHoveredExcerpt(null)}
+                      onFocus={() => setHoveredExcerpt('ravel')}
+                      onBlur={() => setHoveredExcerpt(null)}
+                      onClick={() => hasRavelDownloads && setShowRavelModal(true)}
+                      disabled={!hasRavelDownloads}
+                      className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasRavelDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
+                      aria-disabled={!hasRavelDownloads}
+                    >
+                      Download PDF
+                    </motion.button>
+                    <AnimatePresence>
+                      {hoveredExcerpt === 'ravel' && (
+                        <motion.span
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
+                        >
+                          {excerptStatusMessage('ravel')}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Student/Alumni Verification */}
                 <div className="bg-white/5 rounded-lg p-6 border border-white/10">
-                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                    <Upload className="w-6 h-6 mr-2 text-purple-400" />
-                    Verify Student or Alumni Status
-                  </h3>
+                  <button
+                    onClick={() => setIsVerificationExpanded(!isVerificationExpanded)}
+                    className="w-full flex items-center justify-between mb-4"
+                  >
+                    <h3 className="text-xl font-semibold text-white flex items-center">
+                      <Upload className="w-6 h-6 mr-2 text-purple-400" />
+                      Verify Student or Alumni Status
+                    </h3>
+                    {isVerificationExpanded ? (
+                      <ChevronUp className="w-5 h-5 text-purple-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
                   
-                  {!isVerified ? (
+                  <AnimatePresence initial={false}>
+                    {isVerificationExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                  
+                  {!user ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-300 mb-4">Please sign in to verify your student or alumni status</p>
+                      <button
+                        onClick={handleGoogleSignIn}
+                        className="bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold px-8 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 mx-auto"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                          <path fill="#1a1a1a" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#1a1a1a" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#1a1a1a" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="#1a1a1a" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        <span>Sign In with Google</span>
+                      </button>
+                    </div>
+                  ) : !isVerified ? (
                     <div className="space-y-4">
                       <p className="text-gray-300 text-sm">
                         If you are currently enrolled or an alumnus of a college or university, you can verify your status here to join the BEAM Participant Program and earn in BEAM Coin.
@@ -1189,138 +1292,102 @@ export default function BlackDiasporaSymphonyPage() {
                       </p>
                     </div>
                   )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Documents Submission */}
                 <div className="bg-white/5 rounded-lg p-6 border border-white/10">
-                  <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                    <Upload className="w-6 h-6 mr-2 text-purple-400" />
-                    Required Documents
-                  </h3>
+                  <button
+                    onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
+                    className="w-full flex items-center justify-between mb-4"
+                  >
+                    <h3 className="text-xl font-semibold text-white flex items-center">
+                      <Upload className="w-6 h-6 mr-2 text-purple-400" />
+                      Required Documents
+                    </h3>
+                    {isDocumentsExpanded ? (
+                      <ChevronUp className="w-5 h-5 text-purple-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
                   
-                  <div className="space-y-4">
-                    <p className="text-gray-300 text-sm">
-                      Complete all required forms and documents to participate in the BEAM Orchestra project.
-                    </p>
-                    
-                    <button
-                      onClick={() => {
-                        if (!user) {
-                          alert('Please sign in to access document uploads')
-                          return
-                        }
-                        setShowDocumentsModal(true)
-                        loadUserDocuments()
-                      }}
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
-                    >
-                      <Upload className="w-5 h-5 mr-2" />
-                      Complete Required Forms
-                    </button>
-                    
-                    {/* Required Documents List */}
-                    <div className="mt-4 space-y-2">
-                      <h4 className="text-white font-medium text-sm mb-3">Required Documents:</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center text-gray-300 text-sm">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
-                          <span>W-4 Form (Tax withholding)</span>
-                        </div>
-                        <div className="flex items-center text-gray-300 text-sm">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
-                          <span>Media Release (Photography permission)</span>
-                        </div>
-                        <div className="flex items-center text-gray-300 text-sm">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
-                          <span>Musician Agreement (Performance contract)</span>
-                        </div>
-                        <div className="flex items-center text-gray-300 text-sm">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
-                          <span>Proof of ID (Government identification)</span>
-                        </div>
-                      </div>
-                      <p className="text-gray-400 text-xs mt-3 italic">
-                        All documents must be uploaded as PDF, PNG, JPG, or DOC files.
+                  <AnimatePresence initial={false}>
+                    {isDocumentsExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                  
+                  {!user ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-300 mb-4">Please sign in to access required documents</p>
+                      <button
+                        onClick={handleGoogleSignIn}
+                        className="bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold px-8 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 mx-auto"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                          <path fill="#1a1a1a" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#1a1a1a" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#1a1a1a" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="#1a1a1a" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        <span>Sign In with Google</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-gray-300 text-sm">
+                        Complete all required forms and documents to participate in the BEAM Orchestra project.
                       </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Required Excerpts */}
-                <div className="bg-white/5 rounded-lg p-6 border border-white/10">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <Play className="w-5 h-5 mr-2 text-purple-400" />
-                    Memorial Concert Repertoire
-                  </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                    <div>
-                      <p className="text-white font-medium">Montgomery Variations</p>
-                      <p className="text-gray-400 text-sm">Margaret Bonds - Movement I</p>
-                    </div>
-                    <div className="relative">
-                      <motion.button 
-                        type="button"
-                        onClick={() => hasMontgomeryDownloads && montgomeryExcerptDownloads.length > 0 && handleDirectDownload(montgomeryExcerptDownloads[0].url, 'Montgomery-Variations.pdf')}
-                        onMouseEnter={() => setHoveredExcerpt('montgomery')}
-                        onMouseLeave={() => setHoveredExcerpt(null)}
-                        onFocus={() => setHoveredExcerpt('montgomery')}
-                        onBlur={() => setHoveredExcerpt(null)}
-                        disabled={!hasMontgomeryDownloads}
-                        className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasMontgomeryDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
-                        aria-disabled={!hasMontgomeryDownloads}
+                      
+                      <button
+                        onClick={() => {
+                          setShowDocumentsModal(true)
+                          loadUserDocuments()
+                        }}
+                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center"
                       >
-                        Download PDF
-                      </motion.button>
-                      <AnimatePresence>
-                        {hoveredExcerpt === 'montgomery' && (
-                          <motion.span
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 6 }}
-                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
-                          >
-                            {excerptStatusMessage('montgomery')}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
+                        <Upload className="w-5 h-5 mr-2" />
+                        Complete Required Forms
+                      </button>
+                      
+                      {/* Required Documents List */}
+                      <div className="mt-4 space-y-2">
+                        <h4 className="text-white font-medium text-sm mb-3">Required Documents:</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center text-gray-300 text-sm">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                            <span>W-4 Form (Tax withholding)</span>
+                          </div>
+                          <div className="flex items-center text-gray-300 text-sm">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                            <span>Media Release (Photography permission)</span>
+                          </div>
+                          <div className="flex items-center text-gray-300 text-sm">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                            <span>Musician Agreement (Performance contract)</span>
+                          </div>
+                          <div className="flex items-center text-gray-300 text-sm">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                            <span>Proof of ID (Government identification)</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-400 text-xs mt-3 italic">
+                          All documents must be uploaded as PDF, PNG, JPG, or DOC files.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                    <div>
-                      <p className="text-white font-medium">Le Tombeau de Couperin</p>
-                      <p className="text-gray-400 text-sm">Maurice Ravel - Parts</p>
-                    </div>
-                    <div className="relative">
-                      <motion.button 
-                        type="button"
-                        onMouseEnter={() => setHoveredExcerpt('ravel')}
-                        onMouseLeave={() => setHoveredExcerpt(null)}
-                        onFocus={() => setHoveredExcerpt('ravel')}
-                        onBlur={() => setHoveredExcerpt(null)}
-                        onClick={() => hasRavelDownloads && setShowRavelModal(true)}
-                        disabled={!hasRavelDownloads}
-                        className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasRavelDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
-                        aria-disabled={!hasRavelDownloads}
-                      >
-                        Download PDF
-                      </motion.button>
-                      <AnimatePresence>
-                        {hoveredExcerpt === 'ravel' && (
-                          <motion.span
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 6 }}
-                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-xs text-gray-200 border border-white/10 backdrop-blur-md"
-                          >
-                            {excerptStatusMessage('ravel')}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                  </div>
+                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            </div>
             </div>
           </div>
         </motion.section>
@@ -2191,97 +2258,213 @@ export default function BlackDiasporaSymphonyPage() {
         </div>
       )}
 
-      {showRavelModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/80"
-            onClick={() => setShowRavelModal(false)}
-            aria-hidden="true"
-          />
+      {/* Ravel Modal */}
+      <AnimatePresence>
+        {showRavelModal && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="relative bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg h-[45vh] max-h-[45vh] p-6 flex flex-col space-y-4 overflow-hidden"
-            role="dialog"
-            aria-modal="true"
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowRavelModal(false)
+              }
+            }}
           >
-            <div className="flex items-start justify-between gap-4 shrink-0">
-              <div>
-                <h4 className="text-xl font-semibold text-white">Select Your Part</h4>
-                <p className="text-sm text-gray-300 mt-1">
-                  Choose the instrument-specific download link for Ravel&apos;s <em>Le Tombeau de Couperin</em>.
-                </p>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+              className="relative bg-orchestra-cream/80 backdrop-blur-lg rounded-2xl border-2 border-orchestra-gold/50 w-full max-w-lg max-h-[70vh] p-6 flex flex-col space-y-4 overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-start justify-between gap-4 shrink-0">
+                <div>
+                  <h4 className="text-2xl font-bold text-orchestra-dark">Select Your Part</h4>
+                  <p className="text-sm text-orchestra-brown/80 mt-1">
+                    Choose the instrument-specific download link for Ravel&apos;s <em>Le Tombeau de Couperin</em>.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowRavelModal(false)}
+                  className="text-orchestra-dark hover:text-orchestra-gold transition-colors bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setShowRavelModal(false)}
-                className="text-sm text-gray-300 hover:text-white transition-colors"
-              >
-                Close
-              </button>
-            </div>
 
-            <div className="shrink-0">
-              <label htmlFor="ravel-search" className="text-xs uppercase tracking-wide text-gray-400">
-                Search instruments
-              </label>
-              <input
-                id="ravel-search"
-                type="text"
-                placeholder="Start typing, e.g. flute"
-                value={ravelSearch}
-                onChange={(event) => setRavelSearch(event.target.value)}
-                className="mt-2 w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+              <div className="shrink-0">
+                <label htmlFor="ravel-search" className="text-xs uppercase tracking-wide text-orchestra-brown/70 font-medium">
+                  Search instruments
+                </label>
+                <input
+                  id="ravel-search"
+                  type="text"
+                  placeholder="Start typing, e.g. flute"
+                  value={ravelSearch}
+                  onChange={(event) => setRavelSearch(event.target.value)}
+                  className="mt-2 w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-sm text-orchestra-dark placeholder-orchestra-brown/50 focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
+                />
+              </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {filteredRavelDownloads.length > 0 ? (
-                filteredRavelDownloads.map((part) => (
-                  <div
-                    key={part.instrument}
-                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-white font-medium">{part.instrument}</p>
-                      {!part.available && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          Download link coming soon
-                        </p>
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {filteredRavelDownloads.length > 0 ? (
+                  filteredRavelDownloads.map((part) => (
+                    <div
+                      key={part.instrument}
+                      className="flex items-center justify-between bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-3 shadow-sm"
+                    >
+                      <div>
+                        <p className="text-orchestra-dark font-medium">{part.instrument}</p>
+                        {!part.available && (
+                          <p className="text-xs text-orchestra-brown/70 mt-1">
+                            Download link coming soon
+                          </p>
+                        )}
+                      </div>
+                      {part.available ? (
+                        <button
+                          onClick={() => handleDirectDownload(part.url, `Ravel-Tombeau-${part.instrument}.pdf`)}
+                          disabled={downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`)}
+                          className="inline-flex items-center space-x-2 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:bg-orchestra-gold/50 disabled:cursor-not-allowed text-orchestra-dark text-sm font-bold px-4 py-2 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
+                        >
+                          {downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`) ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-orchestra-dark border-t-transparent rounded-full animate-spin" />
+                              <span>Downloading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              <span>Download</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-orchestra-brown/70 italic">Pending</span>
                       )}
                     </div>
-                    {part.available ? (
-                      <button
-                        onClick={() => handleDirectDownload(part.url, `Ravel-Tombeau-${part.instrument}.pdf`)}
-                        disabled={downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`)}
-                        className="inline-flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-400 disabled:cursor-not-allowed text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
-                      >
-                        {downloadingFiles.has(`${part.url}-Ravel-Tombeau-${part.instrument}.pdf`) ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Downloading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-4 h-4" />
-                            <span>Download</span>
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">Pending</span>
-                    )}
+                  ))
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-orchestra-gold/30 bg-white/50 px-4 text-sm text-orchestra-brown/70">
+                    No matching instruments found.
                   </div>
-                ))
-              ) : (
-                <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/5 px-4 text-xs text-gray-400">
-                  No matching instruments yet.
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      {/* Montgomery Modal */}
+      <AnimatePresence>
+        {showMontgomeryModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowMontgomeryModal(false)
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+              className="relative bg-orchestra-cream/80 backdrop-blur-lg rounded-2xl border-2 border-orchestra-gold/50 w-full max-w-lg max-h-[70vh] p-6 flex flex-col space-y-4 overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-start justify-between gap-4 shrink-0">
+                <div>
+                  <h4 className="text-2xl font-bold text-orchestra-dark">Select Your Part</h4>
+                  <p className="text-sm text-orchestra-brown/80 mt-1">
+                    Choose the instrument-specific download link for Margaret Bonds&apos; <em>Montgomery Variations</em>.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMontgomeryModal(false)}
+                  className="text-orchestra-dark hover:text-orchestra-gold transition-colors bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="shrink-0">
+                <label htmlFor="montgomery-search" className="text-xs uppercase tracking-wide text-orchestra-brown/70 font-medium">
+                  Search instruments
+                </label>
+                <input
+                  id="montgomery-search"
+                  type="text"
+                  placeholder="Start typing, e.g. violin"
+                  value={montgomerySearch}
+                  onChange={(event) => setMontgomerySearch(event.target.value)}
+                  className="mt-2 w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-sm text-orchestra-dark placeholder-orchestra-brown/50 focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {filteredMontgomeryDownloads.length > 0 ? (
+                  filteredMontgomeryDownloads.map((part) => (
+                    <div
+                      key={part.instrument}
+                      className="flex items-center justify-between bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-3 shadow-sm"
+                    >
+                      <div>
+                        <p className="text-orchestra-dark font-medium">{part.instrument}</p>
+                        {!part.available && (
+                          <p className="text-xs text-orchestra-brown/70 mt-1">
+                            Download link coming soon
+                          </p>
+                        )}
+                      </div>
+                      {part.available ? (
+                        <button
+                          onClick={() => handleDirectDownload(part.url, `Montgomery-Variations-${part.instrument}.pdf`)}
+                          disabled={downloadingFiles.has(`${part.url}-Montgomery-Variations-${part.instrument}.pdf`)}
+                          className="inline-flex items-center space-x-2 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:bg-orchestra-gold/50 disabled:cursor-not-allowed text-orchestra-dark text-sm font-bold px-4 py-2 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
+                        >
+                          {downloadingFiles.has(`${part.url}-Montgomery-Variations-${part.instrument}.pdf`) ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-orchestra-dark border-t-transparent rounded-full animate-spin" />
+                              <span>Downloading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              <span>Download</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-orchestra-brown/70 italic">Pending</span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-orchestra-gold/30 bg-white/50 px-4 text-sm text-orchestra-brown/70">
+                    No matching instruments found.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showBeamVideo && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
