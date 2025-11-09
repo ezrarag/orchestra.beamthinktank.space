@@ -4,6 +4,7 @@ import { Timestamp } from 'firebase-admin/firestore'
 import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
+  let body: any = null
   try {
     // Verify authentication
     const authHeader = request.headers.get('authorization')
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    body = await request.json()
     const { name, email, phone, instrument, projectId = 'bdso-2025-annual' } = body
 
     // Validate required fields
