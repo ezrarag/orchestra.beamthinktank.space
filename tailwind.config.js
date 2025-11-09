@@ -14,10 +14,13 @@ module.exports = {
         'orchestra-dark': '#2C1810',
         'orchestra-red': '#8B0000',
         'orchestra-navy': '#1B365D',
+        'beam-gold': '#D4AF37',
+        'beam-bronze': '#CD7F32',
+        'beam-black': '#000000',
       },
       fontFamily: {
         'serif': ['Playfair Display', 'Georgia', 'serif'],
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
+        'sans': ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
         'cursive': ['Dancing Script', 'cursive'],
       },
       backgroundImage: {
