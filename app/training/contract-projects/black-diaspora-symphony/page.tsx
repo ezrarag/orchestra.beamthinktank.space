@@ -37,10 +37,11 @@ import {
 } from './data'
 import MusicianProfileModal from '@/components/MusicianProfileModal'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { db } from '@/lib/firebase'
+import { db, auth } from '@/lib/firebase'
 import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/lib/firebase'
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 
 // Define types for Firestore roster data
 type MusicianDetail = {
@@ -399,6 +400,26 @@ export default function BlackDiasporaSymphonyPage() {
   }
 
   // Musician profile submission
+  const handleGoogleSignIn = async () => {
+    if (!auth) {
+      alert('Firebase Auth is not available. Please configure Firebase.')
+      return
+    }
+
+    try {
+      const provider = new GoogleAuthProvider()
+      provider.addScope('profile')
+      provider.addScope('email')
+      
+      await signInWithPopup(auth, provider)
+    } catch (error: any) {
+      console.error('Error signing in:', error)
+      if (error.code !== 'auth/popup-closed-by-user') {
+        alert(`Authentication failed: ${error.message}`)
+      }
+    }
+  }
+
   const handleMusicianProfileSubmit = async () => {
     if (!user) {
       alert('Please sign in to join this project')
@@ -803,16 +824,18 @@ export default function BlackDiasporaSymphonyPage() {
         setMobileNavOpen(false)
         setShowMusicianModal(false)
         setSelectedMusician(null)
+        setShowProjectDetailsModal(false)
+        setActiveTab('overview')
       }
     }
 
-    if (showRavelModal || showBeamVideo || mobileNavOpen || showMusicianModal) {
+    if (showRavelModal || showBeamVideo || mobileNavOpen || showMusicianModal || showProjectDetailsModal) {
       window.addEventListener('keydown', handleKeyDown)
       return () => window.removeEventListener('keydown', handleKeyDown)
     }
 
     return () => {}
-  }, [showRavelModal, showBeamVideo, mobileNavOpen, showMusicianModal])
+  }, [showRavelModal, showBeamVideo, mobileNavOpen, showMusicianModal, showProjectDetailsModal])
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -919,10 +942,10 @@ export default function BlackDiasporaSymphonyPage() {
                     setShowProjectDetailsModal(true)
                     setActiveTab('join')
                   }}
-                  className="bg-white/10 text-white font-semibold px-8 py-3 rounded-lg border border-white/20 hover:bg-white/20 transition-colors flex items-center justify-center"
+                  className="bg-white/10 text-white font-semibold px-8 py-3 rounded-lg border border-white/20 hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Music className="w-5 h-5 mr-2" />
-                  Play in This Project
+                  <Music className="w-5 h-5" />
+                  <span>Play in This Project</span>
                 </motion.button>
               </div>
             </motion.div>
@@ -1640,9 +1663,29 @@ export default function BlackDiasporaSymphonyPage() {
       />
 
       {/* Project Details Full-Screen Modal */}
-      {showProjectDetailsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-6xl max-h-[90vh] bg-slate-900/95 backdrop-blur-md rounded-2xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
+      <AnimatePresence>
+        {showProjectDetailsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowProjectDetailsModal(false)
+                setActiveTab('overview')
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+              className="relative w-full max-w-4xl max-h-[90vh] bg-orchestra-cream/80 backdrop-blur-lg rounded-2xl border-2 border-orchestra-gold/50 flex flex-col overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
             {/* Success Animation */}
             {showSuccessAnimation && (
               <motion.div
@@ -1665,39 +1708,40 @@ export default function BlackDiasporaSymphonyPage() {
                 setShowProjectDetailsModal(false)
                 setActiveTab('overview')
               }}
-              className="absolute top-6 right-6 z-10 text-white hover:text-yellow-400 transition-colors"
+              className="absolute top-6 right-6 z-10 text-orchestra-dark hover:text-orchestra-gold transition-colors bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+              aria-label="Close modal"
             >
-              <X className="w-8 h-8" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Tab Navigation */}
             <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex gap-2">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                className={`px-6 py-3 rounded-full font-semibold transition-all duration-200 ${
                   activeTab === 'overview'
-                    ? 'bg-white text-black'
-                    : 'bg-white/10 text-white hover:bg-white/20'
+                    ? 'bg-orchestra-gold text-orchestra-dark shadow-lg scale-105'
+                    : 'bg-white/80 text-orchestra-dark hover:bg-white hover:scale-105'
                 }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab('join')}
-                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                className={`px-6 py-3 rounded-full font-semibold transition-all duration-200 ${
                   activeTab === 'join'
-                    ? 'bg-white text-black'
-                    : 'bg-white/10 text-white hover:bg-white/20'
+                    ? 'bg-orchestra-gold text-orchestra-dark shadow-lg scale-105'
+                    : 'bg-white/80 text-orchestra-dark hover:bg-white hover:scale-105'
                 }`}
               >
                 Join / Update
               </button>
               <button
                 onClick={() => setActiveTab('media')}
-                className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                className={`px-6 py-3 rounded-full font-semibold transition-all duration-200 ${
                   activeTab === 'media'
-                    ? 'bg-white text-black'
-                    : 'bg-white/10 text-white hover:bg-white/20'
+                    ? 'bg-orchestra-gold text-orchestra-dark shadow-lg scale-105'
+                    : 'bg-white/80 text-orchestra-dark hover:bg-white hover:scale-105'
                 }`}
               >
                 Media
@@ -1705,7 +1749,7 @@ export default function BlackDiasporaSymphonyPage() {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 flex items-center justify-center p-6 pb-6 overflow-y-auto">
+            <div className="flex-1 flex items-center justify-center p-6 pb-6 overflow-y-auto mt-20">
               <AnimatePresence mode="wait">
                 {activeTab === 'overview' && (
                   <motion.div
@@ -1716,20 +1760,20 @@ export default function BlackDiasporaSymphonyPage() {
                     transition={{ duration: 0.3 }}
                     className="w-full max-w-4xl space-y-6"
                   >
-                    <h2 className="text-4xl font-bold text-white mb-6">Black Diaspora Symphony Orchestra</h2>
-                    <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-4">
+                    <h2 className="text-4xl font-bold text-orchestra-dark mb-6 text-center">Black Diaspora Symphony Orchestra</h2>
+                    <div className="bg-white/90 rounded-xl p-6 border-2 border-orchestra-gold/30 space-y-4 shadow-lg">
                       <div>
-                        <h3 className="text-xl font-semibold text-white mb-2">About the Project</h3>
-                        <p className="text-gray-300">Join us for the 2025 Annual Memorial Concert featuring Margaret Bonds' Montgomery Variations and Maurice Ravel's Le Tombeau de Couperin.</p>
+                        <h3 className="text-xl font-semibold text-orchestra-dark mb-2">About the Project</h3>
+                        <p className="text-orchestra-brown/80">Join us for the 2025 Annual Memorial Concert featuring Margaret Bonds' Montgomery Variations and Maurice Ravel's Le Tombeau de Couperin.</p>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <span className="text-gray-400 text-sm">Rehearsals:</span>
-                          <p className="text-white font-medium">4 rehearsal sessions</p>
+                          <span className="text-orchestra-brown/70 text-sm">Rehearsals:</span>
+                          <p className="text-orchestra-dark font-medium">4 rehearsal sessions</p>
                         </div>
                         <div>
-                          <span className="text-gray-400 text-sm">Compensation:</span>
-                          <p className="text-white font-medium">Up to $250 USD or 25 BEAM Coins</p>
+                          <span className="text-orchestra-brown/70 text-sm">Compensation:</span>
+                          <p className="text-orchestra-dark font-medium">Up to $250 USD or 25 BEAM Coins</p>
                         </div>
                       </div>
                     </div>
@@ -1745,40 +1789,43 @@ export default function BlackDiasporaSymphonyPage() {
                     transition={{ duration: 0.3 }}
                     className="w-full max-w-2xl space-y-6"
                   >
-                    <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                      <h2 className="text-2xl font-bold text-white mb-6">Join or Update Your Profile</h2>
+                    <div className="bg-orchestra-cream/30 backdrop-blur-sm rounded-xl p-8 border-2 border-orchestra-gold/30 shadow-xl">
+                      <h2 className="text-3xl md:text-4xl font-bold text-orchestra-dark mb-6 text-center">Join or Update Your Profile</h2>
                       
                       {!user ? (
                         <div className="text-center py-8">
-                          <p className="text-gray-300 mb-4">Please sign in to join this project</p>
+                          <p className="text-lg text-orchestra-brown/80 mb-8">Please sign in to join this project</p>
                           <button
-                            onClick={() => {
-                              // Redirect to login
-                              alert('Please sign in first')
-                            }}
-                            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                            onClick={handleGoogleSignIn}
+                            className="bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold px-8 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-3 mx-auto"
                           >
-                            Sign In
+                            <svg className="w-5 h-5" viewBox="0 0 24 24">
+                              <path fill="#1a1a1a" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                              <path fill="#1a1a1a" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                              <path fill="#1a1a1a" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                              <path fill="#1a1a1a" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            <span>Sign In with Google</span>
                           </button>
                         </div>
                       ) : (
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Name</label>
+                            <label className="block text-sm font-medium text-orchestra-dark mb-2">Name</label>
                             <input
                               type="text"
                               value={musicianProfile.name}
                               onChange={(e) => setMusicianProfile({ ...musicianProfile, name: e.target.value })}
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-orchestra-dark focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Instrument</label>
+                            <label className="block text-sm font-medium text-orchestra-dark mb-2">Instrument</label>
                             <select
                               value={musicianProfile.instrument}
                               onChange={(e) => setMusicianProfile({ ...musicianProfile, instrument: e.target.value })}
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-orchestra-dark focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
                             >
                               <option value="">Select your instrument</option>
                               {rosterData.map(section => (
@@ -1790,32 +1837,32 @@ export default function BlackDiasporaSymphonyPage() {
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                            <label className="block text-sm font-medium text-orchestra-dark mb-2">Email</label>
                             <input
                               type="email"
                               value={musicianProfile.email}
                               disabled
-                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-gray-400"
+                              className="w-full bg-white/50 border-2 border-orchestra-gold/20 rounded-lg px-4 py-2 text-orchestra-brown/70"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Bio</label>
+                            <label className="block text-sm font-medium text-orchestra-dark mb-2">Bio</label>
                             <textarea
                               value={musicianProfile.bio}
                               onChange={(e) => setMusicianProfile({ ...musicianProfile, bio: e.target.value })}
                               rows={4}
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-orchestra-dark focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
                               placeholder="Tell us about your musical background..."
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                            <label className="block text-sm font-medium text-orchestra-dark mb-2">Status</label>
                             <select
                               value={musicianProfile.status}
                               onChange={(e) => setMusicianProfile({ ...musicianProfile, status: e.target.value as 'Interested' | 'Confirmed' })}
-                              className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full bg-white/90 border-2 border-orchestra-gold/30 rounded-lg px-4 py-2 text-orchestra-dark focus:outline-none focus:ring-2 focus:ring-orchestra-gold focus:border-orchestra-gold"
                             >
                               <option value="Interested">Interested</option>
                               <option value="Confirmed">Confirmed</option>
@@ -1824,12 +1871,12 @@ export default function BlackDiasporaSymphonyPage() {
                           
                           <button
                             onClick={handleMusicianProfileSubmit}
-                            className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                            className="w-full bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
                           >
                             Submit Profile
                           </button>
                           
-                          <p className="text-gray-400 text-sm text-center mt-4">
+                          <p className="text-orchestra-brown/80 text-sm text-center mt-4">
                             Already listed in the roster? Log in to update your information.
                           </p>
                         </div>
@@ -1948,9 +1995,10 @@ export default function BlackDiasporaSymphonyPage() {
                 </div>
               </>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Documents Modal */}
       {showDocumentsModal && (
