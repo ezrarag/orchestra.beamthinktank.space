@@ -1415,24 +1415,24 @@ export default function BlackDiasporaSymphonyPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Sectional Rehearsal (3 hrs)</span>
-                    <span className="text-white font-semibold">$50</span>
+                    <span className="text-white font-semibold">$25</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Full Orchestra (4 hrs)</span>
-                    <span className="text-white font-semibold">$50</span>
+                    <span className="text-white font-semibold">$25</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Dress Rehearsal (4 hrs)</span>
-                    <span className="text-white font-semibold">$50</span>
+                    <span className="text-white font-semibold">$25</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-white/10 pt-4">
                     <span className="text-white font-semibold">Concert Performance (2 hrs)</span>
-                    <span className="text-white font-bold text-lg">100</span>
+                    <span className="text-white font-bold text-lg">$50</span>
                   </div>
                 </div>
                 <div className="mt-6 p-4 bg-green-500/10 rounded-lg border border-green-500/20">
                   <p className="text-green-200 text-sm">
-                    <strong>Total Project Earnings:</strong> Up to $250 aprroximately per musician
+                    <strong>Total Project Earnings:</strong> $125 per musician
                   </p>
                 </div>
               </div>
@@ -1470,24 +1470,24 @@ export default function BlackDiasporaSymphonyPage() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300">Sectional Rehearsal</span>
-                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                        <span className="text-yellow-400 font-semibold">3 BEAM</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300">Full Orchestra Rehearsal</span>
-                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                        <span className="text-yellow-400 font-semibold">3 BEAM</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-300">Dress Rehearsal</span>
-                        <span className="text-yellow-400 font-semibold">5 BEAM</span>
+                        <span className="text-yellow-400 font-semibold">3 BEAM</span>
                       </div>
                       <div className="flex justify-between items-center border-t border-white/10 pt-4">
                         <span className="text-white font-semibold">Concert Performance</span>
-                        <span className="text-yellow-400 font-bold text-lg">10 BEAM</span>
+                        <span className="text-yellow-400 font-bold text-lg">5 BEAM</span>
                       </div>
                     </div>
                     <div className="mt-6 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20 space-y-2">
                       <p className="text-yellow-200 text-sm">
-                        <strong>Total BEAM Compensation:</strong> 25 BEAM Coins per musician
+                        <strong>Total BEAM Compensation:</strong> 14 BEAM Coins per musician
                       </p>
                       <p className="text-yellow-200 text-xs">
                         1 BEAM ≈ $1 (internal stable value); redeemable for cash, lessons, housing, or future BEAM FCU project staking.
