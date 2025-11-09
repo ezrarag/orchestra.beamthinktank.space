@@ -38,7 +38,14 @@ export function QRCode({
 
 // Utility function to generate QR code URL for a rehearsal
 export function generateCheckInURL(rehearsalId: string, baseUrl?: string): string {
-  const url = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://orchestra.beamthinktank.space')
+  // Prefer provided baseUrl, then env variable, then production URL
+  // Never use localhost in production
+  const url = baseUrl || 
+    process.env.NEXT_PUBLIC_BASE_URL || 
+    process.env.NEXT_PUBLIC_APP_URL || 
+    (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') 
+      ? window.location.origin 
+      : 'https://orchestra.beamthinktank.space')
   return `${url}/checkin?id=${rehearsalId}`
 }
 

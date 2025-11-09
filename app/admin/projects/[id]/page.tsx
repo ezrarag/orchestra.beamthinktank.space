@@ -31,7 +31,7 @@ function MusiciansList({ musicians }: { musicians: any[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
         {displayedMusicians.map((musician) => (
           <div
             key={musician.id}
@@ -294,7 +294,7 @@ export default function ProjectDetailPage() {
     : 0
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full min-w-0">
       {/* Header with Breadcrumb */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -313,25 +313,25 @@ export default function ProjectDetailPage() {
           <span className="text-orchestra-gold">{project.name || projectId}</span>
         </div>
         
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
             <Link
               href="/admin/projects"
-              className="flex items-center space-x-2 text-orchestra-cream hover:text-orchestra-gold transition-colors"
+              className="flex items-center space-x-2 text-orchestra-cream hover:text-orchestra-gold transition-colors flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-orchestra-gold mb-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl lg:text-3xl font-bold text-orchestra-gold mb-2 truncate">
                 {project.name || projectId}
               </h1>
-              <div className="flex items-center space-x-4 text-sm text-orchestra-cream/70">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-orchestra-cream/70">
                 <div className="flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
                   {project.city || 'Unknown'}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                <span className={`px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
                   project.status === 'active' 
                     ? 'bg-green-500/20 text-green-400' 
                     : project.status === 'planning'
@@ -344,14 +344,15 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 flex-shrink-0">
             {/* Invite Button */}
             <Link
               href={`/admin/projects/${projectId}/invites`}
-              className="flex items-center space-x-2 px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-all shadow-lg hover:shadow-orchestra-gold/20"
+              className="flex items-center space-x-2 px-4 lg:px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-all shadow-lg hover:shadow-orchestra-gold/20 text-sm lg:text-base"
             >
-              <UserPlus className="h-5 w-5" />
-              <span>Manage Invites</span>
+              <UserPlus className="h-4 w-4 lg:h-5 lg:w-5" />
+              <span className="hidden sm:inline">Manage Invites</span>
+              <span className="sm:hidden">Invites</span>
             </Link>
 
             {/* Readyaimgo Subscription Button */}
@@ -359,11 +360,12 @@ export default function ProjectDetailPage() {
               href={`https://readyaimgo.biz/onboard?project=${projectId}&return=${encodeURIComponent(process.env.NEXT_PUBLIC_BASE_URL || 'https://orchestra.beamthinktank.space')}/admin/dashboard`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-all shadow-lg hover:shadow-purple-600/20"
+              className="flex items-center space-x-2 px-4 lg:px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-all shadow-lg hover:shadow-purple-600/20 text-sm lg:text-base"
             >
-              <Zap className="h-5 w-5" />
-              <span>Activate Readyaimgo</span>
-              <ExternalLink className="h-4 w-4" />
+              <Zap className="h-4 w-4 lg:h-5 lg:w-5" />
+              <span className="hidden sm:inline">Activate Readyaimgo</span>
+              <span className="sm:hidden">Readyaimgo</span>
+              <ExternalLink className="h-3 w-3 lg:h-4 lg:w-4" />
             </a>
           </div>
         </div>
@@ -371,7 +373,7 @@ export default function ProjectDetailPage() {
 
       {/* Stats Cards */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
@@ -429,7 +431,7 @@ export default function ProjectDetailPage() {
 
       {/* Quick Actions */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
@@ -458,13 +460,17 @@ export default function ProjectDetailPage() {
           <p className="text-orchestra-cream/70 text-sm">View project performance and metrics</p>
         </Link>
 
-        <div className="bg-gradient-to-r from-green-500/20 to-teal-500/20 backdrop-blur-sm rounded-xl border border-green-500/30 p-6">
+        <Link
+          href="/admin/settings"
+          className="bg-gradient-to-r from-green-500/20 to-teal-500/20 backdrop-blur-sm rounded-xl border border-green-500/30 p-6 hover:border-green-500/50 transition-all group"
+        >
           <div className="flex items-center justify-between mb-3">
-            <Settings className="h-8 w-8 text-green-400" />
+            <Settings className="h-8 w-8 text-green-400 group-hover:scale-110 transition-transform" />
+            <ArrowLeft className="h-5 w-5 text-orchestra-cream/50 group-hover:text-green-400 transition-colors rotate-180" />
           </div>
           <h3 className="text-lg font-bold text-green-400 mb-2">Settings</h3>
           <p className="text-orchestra-cream/70 text-sm">Configure project settings and preferences</p>
-        </div>
+        </Link>
       </motion.div>
 
       {/* Project Musicians List */}
@@ -488,7 +494,7 @@ export default function ProjectDetailPage() {
               <span>Add Musician</span>
             </button>
           </div>
-          <div className="p-6">
+          <div className="p-6 max-w-full overflow-x-auto">
             <MusiciansList musicians={musicians} />
           </div>
         </motion.div>

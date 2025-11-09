@@ -18,7 +18,9 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  QrCode,
+  ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 import { collection, getDocs, query, where, orderBy, limit, doc, setDoc, serverTimestamp } from 'firebase/firestore'
@@ -102,6 +104,24 @@ export default function AdminDashboard() {
     totalAttendanceCheckIns: 0
   })
   const [loading, setLoading] = useState(true)
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [gmailScanning, setGmailScanning] = useState(false)
+  const [docsScanning, setDocsScanning] = useState(false)
+  const [gmailResults, setGmailResults] = useState<any[] | null>(null)
+  const [docsResults, setDocsResults] = useState<any[] | null>(null)
+  const [showGmailModal, setShowGmailModal] = useState(false)
+  const [showDocsModal, setShowDocsModal] = useState(false)
+  const [showAddMusicianModal, setShowAddMusicianModal] = useState(false)
+  const [newMusician, setNewMusician] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    instrument: '',
+    status: 'pending' as 'pending' | 'confirmed' | 'interested',
+    notes: '',
+    source: 'Manual Entry'
+  })
+  const [addingMusician, setAddingMusician] = useState(false)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -729,11 +749,23 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.6 }}
       >
+        <Link
+          href="/admin/qr-codes"
+          className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-xl border border-purple-500/30 p-6 hover:border-purple-500/50 transition-all group"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <QrCode className="h-8 w-8 text-purple-400 group-hover:scale-110 transition-transform" />
+            <ArrowLeft className="h-5 w-5 text-orchestra-cream/50 group-hover:text-purple-400 transition-colors rotate-180" />
+          </div>
+          <h3 className="text-lg font-bold text-purple-400 mb-2">QR Codes</h3>
+          <p className="text-orchestra-cream/70 text-sm">Generate and print QR codes for rehearsal check-ins</p>
+        </Link>
+
         <motion.div
           className="bg-gradient-to-r from-orchestra-gold/20 to-orchestra-brown/20 backdrop-blur-sm rounded-xl border border-orchestra-gold/30 p-6"
           whileHover={{ scale: 1.02 }}

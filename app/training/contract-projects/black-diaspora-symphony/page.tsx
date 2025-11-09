@@ -26,7 +26,8 @@ import {
   Menu,
   X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  QrCode
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
@@ -42,6 +43,8 @@ import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, onSnaps
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/lib/firebase'
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { generateCheckInURL } from '@/lib/generateQR'
+import Link from 'next/link'
 
 // Define types for Firestore roster data
 type MusicianDetail = {
@@ -1537,50 +1540,69 @@ export default function BlackDiasporaSymphonyPage() {
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {rehearsalSchedule.map((rehearsal, index) => (
-                <motion.div
-                  key={rehearsal.date}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-                  className="bg-white/5 rounded-lg p-6 border border-white/10 hover:border-blue-400/50 transition-colors"
-                >
-                  <div className="flex items-center mb-3">
-                    <Calendar className="w-5 h-5 text-blue-400 mr-2" />
-                    <span className="text-white font-semibold">
-                      {new Date(rehearsal.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center text-gray-300">
-                      <Clock className="w-4 h-4 mr-2" />
-                      <span className="text-sm">{rehearsal.time}</span>
-                      <span className="text-xs ml-2">({rehearsal.duration}h)</span>
-                    </div>
-                    
-                    <div className="flex items-center text-gray-300">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      <span className="text-sm">{rehearsal.location}</span>
-                    </div>
-                    
-                    <div className="mt-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        rehearsal.type.includes('Sectional') 
-                          ? 'bg-purple-500/20 text-purple-300' 
-                          : rehearsal.type.includes('Concert')
-                          ? 'bg-green-500/20 text-green-300'
-                          : 'bg-blue-500/20 text-blue-300'
-                      }`}>
-                        {rehearsal.type}
+              {rehearsalSchedule.map((rehearsal, index) => {
+                // Parse date string to avoid timezone issues
+                const [year, month, day] = rehearsal.date.split('-').map(Number)
+                const date = new Date(year, month - 1, day)
+                const checkInUrl = generateCheckInURL(rehearsal.date)
+                
+                return (
+                  <motion.div
+                    key={rehearsal.date}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
+                    className="bg-white/5 rounded-lg p-6 border border-white/10 hover:border-blue-400/50 transition-colors flex flex-col"
+                  >
+                    <div className="flex items-center mb-3">
+                      <Calendar className="w-5 h-5 text-blue-400 mr-2" />
+                      <span className="text-white font-semibold">
+                        {date.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
                       </span>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                    
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center text-gray-300">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <span className="text-sm">{rehearsal.time}</span>
+                        <span className="text-xs ml-2">({rehearsal.duration}h)</span>
+                      </div>
+                      
+                      <div className="flex items-start text-gray-300">
+                        <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm">{rehearsal.location}</span>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          rehearsal.type.includes('Sectional') 
+                            ? 'bg-purple-500/20 text-purple-300' 
+                            : rehearsal.type.includes('Concert')
+                            ? 'bg-green-500/20 text-green-300'
+                            : 'bg-blue-500/20 text-blue-300'
+                        }`}>
+                          {rehearsal.type}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Check In Button */}
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <Link
+                        href={checkInUrl}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 text-sm"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>Check In</span>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
           </div>
         </motion.section>
