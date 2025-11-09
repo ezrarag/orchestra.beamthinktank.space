@@ -11,11 +11,21 @@ import {
   TrendingUp,
   Calendar,
   MapPin,
-  UserPlus
+  UserPlus,
+  X,
+  Mail,
+  FileText,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, limit, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
+import { useRouter } from 'next/navigation'
 
 // Mock data for initial development
 const mockData = {
@@ -70,6 +80,17 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
+  const { user, role } = useUserRole()
+  const partnerProjectId = usePartnerProject()
+  
+  // Redirect partner_admins to their project page
+  useEffect(() => {
+    if (role === 'partner_admin' && partnerProjectId) {
+      router.push(`/admin/projects/${partnerProjectId}`)
+    }
+  }, [role, partnerProjectId, router])
+  
   const [stats, setStats] = useState<DashboardStats>({
     totalOrganizations: 0,
     activeProjects: 0,
@@ -143,7 +164,183 @@ export default function AdminDashboard() {
     }
 
     fetchStats()
-  }, [])
+    if (user) {
+      checkGoogleConnection()
+    }
+  }, [user])
+
+  const checkGoogleConnection = async () => {
+    try {
+      const token = await user?.getIdToken()
+      if (!token) return
+
+      // Check if Google is connected by trying to get tokens
+      const response = await fetch('/api/google/check', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        setGoogleConnected(true)
+      }
+    } catch (error) {
+      // Not connected
+      setGoogleConnected(false)
+    }
+  }
+
+  const handleConnectGoogle = async () => {
+    try {
+      const token = await user?.getIdToken()
+      if (!token) {
+        alert('Please sign in to connect Google')
+        return
+      }
+
+      const response = await fetch('/api/google/auth', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(`Failed to initiate Google connection: ${error.error}`)
+        return
+      }
+
+      const data = await response.json()
+      // Open OAuth flow in new window
+      window.open(data.authUrl, 'google-oauth', 'width=600,height=700')
+    } catch (error: any) {
+      console.error('Error connecting Google:', error)
+      alert(`Failed to connect Google: ${error.message}`)
+    }
+  }
+
+  const handleScanGmail = async () => {
+    if (!user) {
+      alert('Please sign in to scan Gmail')
+      return
+    }
+
+    setGmailScanning(true)
+    setGmailResults(null)
+
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch('/api/google/gmail', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: process.env.NEXT_PUBLIC_GMAIL_QUERY || 'subject:(join OR audition OR play OR BDSO OR orchestra)',
+          maxResults: 50,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to scan Gmail')
+      }
+
+      const data = await response.json()
+      setGmailResults(data.results || [])
+      setShowGmailModal(true)
+    } catch (error: any) {
+      console.error('Gmail scan error:', error)
+      alert(`Failed to scan Gmail: ${error.message}`)
+    } finally {
+      setGmailScanning(false)
+    }
+  }
+
+  const handleSearchDocs = async () => {
+    if (!user) {
+      alert('Please sign in to search Google Docs')
+      return
+    }
+
+    setDocsScanning(true)
+    setDocsResults(null)
+
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch('/api/google/docs', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: 'name contains "roster" or name contains "audition" or name contains "musicians" or name contains "BDSO"',
+          maxResults: 50,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to search Google Docs')
+      }
+
+      const data = await response.json()
+      setDocsResults(data.results || [])
+      setShowDocsModal(true)
+    } catch (error: any) {
+      console.error('Docs search error:', error)
+      alert(`Failed to search Google Docs: ${error.message}`)
+    } finally {
+      setDocsScanning(false)
+    }
+  }
+
+  const handleAddFromGmail = async (candidate: any) => {
+    if (!user || !db) {
+      alert('Please sign in to add musicians')
+      return
+    }
+
+    try {
+      const emailPart = candidate.email 
+        ? candidate.email.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+        : candidate.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+      
+      const docId = `${emailPart}_black-diaspora-symphony`
+
+      const musicianData = {
+        projectId: 'black-diaspora-symphony',
+        instrument: candidate.instrument || 'TBD',
+        name: candidate.name,
+        email: candidate.email || null,
+        phone: candidate.phone || null,
+        status: 'pending',
+        role: 'musician',
+        notes: candidate.notes || null,
+        source: `Gmail: ${candidate.subject}`,
+        joinedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+
+      await setDoc(doc(db, 'projectMusicians', docId), musicianData, { merge: true })
+      
+      // Update results to mark as added
+      if (gmailResults) {
+        setGmailResults(gmailResults.map(r => 
+          r.email === candidate.email ? { ...r, isNew: false } : r
+        ))
+      }
+
+      alert(`${candidate.name} added to roster!`)
+    } catch (error: any) {
+      console.error('Error adding musician:', error)
+      alert(`Failed to add musician: ${error.message}`)
+    }
+  }
 
   const StatCard = ({ 
     title, 
@@ -347,12 +544,152 @@ export default function AdminDashboard() {
         />
       </motion.div>
 
+      {/* Google Integration Section */}
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 gap-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        {/* Gmail Scan Card */}
+        <div className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <Mail className="h-6 w-6 text-blue-400" />
+              <h3 className="text-lg font-bold text-orchestra-gold">Gmail Scan</h3>
+            </div>
+            {googleConnected && (
+              <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                Connected
+              </span>
+            )}
+          </div>
+          <p className="text-orchestra-cream/70 text-sm mb-4">
+            Scan Gmail inbox for musician inquiries and join requests
+          </p>
+          <div className="space-y-3">
+            {!googleConnected && (
+              <motion.button
+                onClick={handleConnectGoogle}
+                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Connect Google Account
+              </motion.button>
+            )}
+            {googleConnected && (
+              <>
+                <motion.button
+                  onClick={handleScanGmail}
+                  disabled={gmailScanning}
+                  className="w-full px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:opacity-50 text-orchestra-dark font-bold rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {gmailScanning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Scanning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      <span>Scan Gmail for Musicians</span>
+                    </>
+                  )}
+                </motion.button>
+                {gmailResults && (
+                  <div className="mt-3 p-3 bg-orchestra-dark/50 rounded-lg border border-orchestra-gold/20">
+                    <p className="text-sm text-orchestra-cream/70">
+                      Found <span className="font-bold text-orchestra-gold">{gmailResults.filter(r => r.isNew).length}</span> new potential musicians
+                    </p>
+                    <button
+                      onClick={() => setShowGmailModal(true)}
+                      className="text-xs text-orchestra-gold hover:text-orchestra-gold/80 mt-2"
+                    >
+                      View Results →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Google Docs Search Card */}
+        <div className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <FileText className="h-6 w-6 text-purple-400" />
+              <h3 className="text-lg font-bold text-orchestra-gold">Google Docs</h3>
+            </div>
+            {googleConnected && (
+              <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                Connected
+              </span>
+            )}
+          </div>
+          <p className="text-orchestra-cream/70 text-sm mb-4">
+            Search Google Drive for roster documents and audition lists
+          </p>
+          <div className="space-y-3">
+            {!googleConnected && (
+              <motion.button
+                onClick={handleConnectGoogle}
+                className="w-full px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Connect Google Account
+              </motion.button>
+            )}
+            {googleConnected && (
+              <>
+                <motion.button
+                  onClick={handleSearchDocs}
+                  disabled={docsScanning}
+                  className="w-full px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:opacity-50 text-orchestra-dark font-bold rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {docsScanning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Searching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      <span>Search Google Docs</span>
+                    </>
+                  )}
+                </motion.button>
+                {docsResults && (
+                  <div className="mt-3 p-3 bg-orchestra-dark/50 rounded-lg border border-orchestra-gold/20">
+                    <p className="text-sm text-orchestra-cream/70">
+                      Found <span className="font-bold text-orchestra-gold">{docsResults.length}</span> relevant documents
+                    </p>
+                    <button
+                      onClick={() => setShowDocsModal(true)}
+                      className="text-xs text-orchestra-gold hover:text-orchestra-gold/80 mt-2"
+                    >
+                      View Results →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
       {/* Projects Table */}
       <motion.div
         className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 overflow-hidden"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
       >
         <div className="p-6 border-b border-orchestra-gold/20">
           <div className="flex items-center justify-between">
@@ -421,6 +758,156 @@ export default function AdminDashboard() {
           <p className="text-orchestra-cream/70 text-sm">All systems operational</p>
         </motion.div>
       </motion.div>
+
+      {/* Gmail Results Modal */}
+      {showGmailModal && gmailResults && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowGmailModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-orchestra-dark border border-orchestra-gold/30 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-orchestra-gold">Gmail Scan Results</h2>
+              <button
+                onClick={() => setShowGmailModal(false)}
+                className="text-orchestra-cream/70 hover:text-orchestra-cream"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-center space-x-4 text-sm">
+              <span className="text-orchestra-cream/70">
+                Total: <span className="font-bold text-orchestra-gold">{gmailResults.length}</span>
+              </span>
+              <span className="text-green-400">
+                New: <span className="font-bold">{gmailResults.filter(r => r.isNew).length}</span>
+              </span>
+              <span className="text-orchestra-cream/50">
+                Existing: <span className="font-bold">{gmailResults.filter(r => !r.isNew).length}</span>
+              </span>
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {gmailResults.map((candidate, index) => (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border ${
+                    candidate.isNew 
+                      ? 'bg-green-500/10 border-green-500/30' 
+                      : 'bg-orchestra-dark/50 border-orchestra-gold/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h3 className="font-bold text-orchestra-cream">{candidate.name}</h3>
+                        {candidate.isNew && (
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-orchestra-cream/70 mb-1">{candidate.email}</p>
+                      {candidate.phone && (
+                        <p className="text-sm text-orchestra-cream/70 mb-1">Phone: {candidate.phone}</p>
+                      )}
+                      {candidate.instrument && (
+                        <p className="text-sm text-orchestra-cream/70 mb-1">Instrument: {candidate.instrument}</p>
+                      )}
+                      <p className="text-xs text-orchestra-cream/50 mt-2">{candidate.snippet}</p>
+                    </div>
+                    {candidate.isNew && (
+                      <button
+                        onClick={() => handleAddFromGmail(candidate)}
+                        className="ml-4 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-colors text-sm"
+                      >
+                        Add to Roster
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Google Docs Results Modal */}
+      {showDocsModal && docsResults && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShowDocsModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-orchestra-dark border border-orchestra-gold/30 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-orchestra-gold">Google Docs Results</h2>
+              <button
+                onClick={() => setShowDocsModal(false)}
+                className="text-orchestra-cream/70 hover:text-orchestra-cream"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 text-sm text-orchestra-cream/70">
+              Found <span className="font-bold text-orchestra-gold">{docsResults.length}</span> documents
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {docsResults.map((doc, index) => (
+                <div
+                  key={doc.id}
+                  className="p-4 rounded-lg border bg-orchestra-dark/50 border-orchestra-gold/10"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-orchestra-cream mb-2">{doc.name}</h3>
+                      <p className="text-xs text-orchestra-cream/50 mb-2">
+                        Type: {doc.mimeType}
+                      </p>
+                      {doc.modifiedTime && (
+                        <p className="text-xs text-orchestra-cream/50">
+                          Modified: {new Date(doc.modifiedTime).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    {doc.webViewLink && (
+                      <a
+                        href={doc.webViewLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-4 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-bold rounded-lg transition-colors text-sm flex items-center space-x-2"
+                      >
+                        <span>Open</span>
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }

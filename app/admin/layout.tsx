@@ -138,9 +138,23 @@ export default function AdminLayout({
           </button>
         </header>
 
+        {/* Desktop header with Settings button */}
+        <header className="hidden lg:flex items-center justify-between bg-orchestra-dark/95 backdrop-blur-md border-b border-orchestra-gold/20 px-6 py-4">
+          <div className="flex-1"></div>
+          <Link
+            href="/admin/settings"
+            className="flex items-center space-x-2 px-4 py-2 bg-orchestra-gold/10 hover:bg-orchestra-gold/20 text-orchestra-gold rounded-lg transition-colors border border-orchestra-gold/30"
+          >
+            <Settings className="h-5 w-5" />
+            <span className="font-medium">Settings</span>
+          </Link>
+        </header>
+
         {/* Page content */}
-        <main className="p-6">
-          {children}
+        <main className="p-6 overflow-x-auto">
+          <div className="max-w-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>
