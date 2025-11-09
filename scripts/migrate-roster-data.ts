@@ -45,9 +45,12 @@ async function migrateRoster() {
         status = 'open'
       }
 
+      // Use musician's individual instrument if specified, otherwise use section instrument
+      const musicianInstrument = (musician as any).instrument || instrument
+
       const musicianData = {
         projectId: 'black-diaspora-symphony',
-        instrument: instrument,
+        instrument: musicianInstrument,
         name: musician.name,
         email: musician.email || null,
         phone: musician.phone || null,

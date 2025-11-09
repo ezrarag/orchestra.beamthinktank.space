@@ -22,6 +22,7 @@
     "nodemailer": "^7.0.10",
     "openai": "^4.20.0",
     "postcss": "^8.4.32",
+    "qrcode.react": "^4.2.0",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",

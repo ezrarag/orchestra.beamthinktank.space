@@ -1,7 +1,12 @@
+'use client'
+
 import { Music, Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react'
 import Link from 'next/link'
+import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export default function Footer() {
+  const { role } = useUserRole()
+  const isAdmin = role === 'beam_admin'
   return (
     <footer className="bg-orchestra-dark text-orchestra-cream">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -82,10 +87,20 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-orchestra-gold/30 mt-8 pt-8 text-center">
-          <p className="text-orchestra-cream/60">
-            © 2024 BEAM Orchestra. All rights reserved. Building Excellence in Arts and Music.
-          </p>
+        <div className="border-t border-orchestra-gold/30 mt-8 pt-8">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            <p className="text-orchestra-cream/60">
+              © 2024 BEAM Orchestra. All rights reserved. Building Excellence in Arts and Music.
+            </p>
+            {isAdmin && (
+              <Link 
+                href="/admin/dashboard" 
+                className="text-xs text-orchestra-gold/60 hover:text-orchestra-gold transition-colors"
+              >
+                Admin
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </footer>

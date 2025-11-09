@@ -14,7 +14,7 @@ import {
   UserPlus
 } from 'lucide-react'
 import Link from 'next/link'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 // Mock data for initial development
@@ -62,6 +62,11 @@ interface DashboardStats {
   activeProjects: number
   totalMusicians: number
   totalBeamCoins: number
+  // BDSO-specific stats
+  bdsoTotalMusicians: number
+  bdsoConfirmedMusicians: number
+  bdsoPendingMusicians: number
+  totalAttendanceCheckIns: number
 }
 
 export default function AdminDashboard() {
@@ -69,25 +74,66 @@ export default function AdminDashboard() {
     totalOrganizations: 0,
     activeProjects: 0,
     totalMusicians: 0,
-    totalBeamCoins: 0
+    totalBeamCoins: 0,
+    bdsoTotalMusicians: 0,
+    bdsoConfirmedMusicians: 0,
+    bdsoPendingMusicians: 0,
+    totalAttendanceCheckIns: 0
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // In production, this would fetch from Firestore
-    // For now, using mock data
     const fetchStats = async () => {
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        if (!db) {
+          // Fallback to mock data if Firebase not initialized
+          const totalBeamCoins = mockData.musicians.reduce((sum, musician) => sum + musician.beamCoinsBalance, 0)
+          setStats({
+            totalOrganizations: mockData.organizations.length,
+            activeProjects: mockData.projects.filter(p => p.status === 'active').length,
+            totalMusicians: mockData.musicians.length,
+            totalBeamCoins,
+            bdsoTotalMusicians: 0,
+            bdsoConfirmedMusicians: 0,
+            bdsoPendingMusicians: 0,
+            totalAttendanceCheckIns: 0
+          })
+          setLoading(false)
+          return
+        }
+
+        // Fetch BDSO project musicians
+        const bdsoMusiciansQuery = query(
+          collection(db, 'projectMusicians'),
+          where('projectId', '==', 'black-diaspora-symphony')
+        )
+        const bdsoMusiciansSnapshot = await getDocs(bdsoMusiciansQuery)
+        const bdsoMusicians = bdsoMusiciansSnapshot.docs.map(doc => doc.data())
         
+        const bdsoTotal = bdsoMusicians.length
+        const bdsoConfirmed = bdsoMusicians.filter(m => m.status === 'confirmed' || m.status === 'Confirmed').length
+        const bdsoPending = bdsoMusicians.filter(m => m.status === 'pending' || m.status === 'Pending' || m.status === 'interested' || m.status === 'Interested').length
+
+        // Fetch attendance check-ins
+        const attendanceQuery = query(
+          collection(db, 'attendance'),
+          orderBy('timestamp', 'desc')
+        )
+        const attendanceSnapshot = await getDocs(attendanceQuery)
+        const totalCheckIns = attendanceSnapshot.size
+
+        // Fallback stats (can be enhanced later)
         const totalBeamCoins = mockData.musicians.reduce((sum, musician) => sum + musician.beamCoinsBalance, 0)
         
         setStats({
           totalOrganizations: mockData.organizations.length,
           activeProjects: mockData.projects.filter(p => p.status === 'active').length,
           totalMusicians: mockData.musicians.length,
-          totalBeamCoins
+          totalBeamCoins,
+          bdsoTotalMusicians: bdsoTotal,
+          bdsoConfirmedMusicians: bdsoConfirmed,
+          bdsoPendingMusicians: bdsoPending,
+          totalAttendanceCheckIns: totalCheckIns
         })
       } catch (error) {
         console.error('Error fetching dashboard stats:', error)
@@ -246,22 +292,52 @@ export default function AdminDashboard() {
         transition={{ duration: 0.5, delay: 0.2 }}
       >
         <StatCard
+          title="BDSO Total Musicians"
+          value={stats.bdsoTotalMusicians}
+          icon={Users}
+          trend={{ value: 12, label: 'total' }}
+        />
+        <StatCard
+          title="BDSO Confirmed"
+          value={stats.bdsoConfirmedMusicians}
+          icon={UserPlus}
+          trend={{ value: stats.bdsoTotalMusicians > 0 ? Math.round((stats.bdsoConfirmedMusicians / stats.bdsoTotalMusicians) * 100) : 0, label: '% confirmed' }}
+        />
+        <StatCard
+          title="BDSO Pending"
+          value={stats.bdsoPendingMusicians}
+          icon={Users}
+          trend={{ value: stats.bdsoTotalMusicians > 0 ? Math.round((stats.bdsoPendingMusicians / stats.bdsoTotalMusicians) * 100) : 0, label: '% pending' }}
+        />
+        <StatCard
+          title="Attendance Check-ins"
+          value={stats.totalAttendanceCheckIns}
+          icon={Calendar}
+          color="orchestra-gold"
+        />
+      </motion.div>
+
+      {/* Additional Stats Grid */}
+      <motion.div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <StatCard
           title="Total Organizations"
           value={stats.totalOrganizations}
           icon={Building2}
-          trend={{ value: 12, label: 'vs last month' }}
         />
         <StatCard
           title="Active Projects"
           value={stats.activeProjects}
           icon={FolderOpen}
-          trend={{ value: 8, label: 'vs last month' }}
         />
         <StatCard
           title="Total Musicians"
           value={stats.totalMusicians}
           icon={Users}
-          trend={{ value: 25, label: 'vs last month' }}
         />
         <StatCard
           title="BEAM Coin Economy"

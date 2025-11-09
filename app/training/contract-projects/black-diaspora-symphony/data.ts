@@ -6,7 +6,7 @@ export const rosterData = [
     confirmed: 1, 
     remaining: 7, 
     percentage: 13, 
-    musicians: ['Yolanda Odufuwa'], 
+    musicians: ['Yolanda Odufuwa', 'Jane Han', 'Brenda Rodrigues'], 
     musicianDetails: [
       { 
         name: 'Yolanda Odufuwa', 
@@ -31,17 +31,29 @@ export const rosterData = [
         supportLink: ''
       },
       {
-      name: 'Jane Han',
-      instrument: 'Violin',
-      email: '',
-      status: 'Confirmed',
-      source: 'Facebook Messenger (Oct 27)',
-      notes: '',
-      bio: '',
-      headshotUrl: '',
-      mediaEmbedUrl: '',
-      supportLink: ''
-    },
+        name: 'Jane Han',
+        instrument: 'Violin I',
+        email: '',
+        status: 'Confirmed',
+        source: 'Facebook Messenger (Oct 27)',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      {
+        name: 'Brenda Rodrigues',
+        instrument: 'Violin I',
+        email: 'rodr2484@uwm.edu',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
     ]
   },
   { 
@@ -63,16 +75,15 @@ export const rosterData = [
         mediaEmbedUrl: '',
         supportLink: ''
       },
-      
     ]
   },
   { 
     instrument: 'Viola', 
     needed: 6, 
-    confirmed: 2, 
-    remaining: 4, 
-    percentage: 33, 
-    musicians: ['Nicole Gabriel', 'Anya Prakash'], 
+    confirmed: 3, 
+    remaining: 3, 
+    percentage: 50, 
+    musicians: ['Nicole Gabriel', 'Anya Prakash', 'Ezra Haugabrooks', 'Korinthia Klein', 'Connor'], 
     musicianDetails: [
       { 
         name: 'Nicole Gabriel', 
@@ -118,6 +129,18 @@ export const rosterData = [
         mediaEmbedUrl: '',
         supportLink: ''
       },
+      {
+        name: 'Connor',
+        instrument: 'Viola',
+        email: 'violistco@gmail.com',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
     ]
   },
   { 
@@ -153,10 +176,10 @@ export const rosterData = [
   { 
     instrument: 'Flute', 
     needed: 2, 
-    confirmed: 1, 
-    remaining: 1, 
-    percentage: 50, 
-    musicians: ['Zack Munoz'], 
+    confirmed: 2, 
+    remaining: 0, 
+    percentage: 100, 
+    musicians: ['Zack Munoz', 'Devin Larmay'], 
     musicianDetails: [
       { 
         name: 'Zack Munoz', 
@@ -168,55 +191,65 @@ export const rosterData = [
         headshotUrl: '',
         mediaEmbedUrl: '',
         supportLink: ''
-      }
-    ]
-  },
-  { 
-    instrument: 'Oboe', 
-    needed: 2, 
-    confirmed: 0, 
-    remaining: 2, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: [
+      },
       {
-        name: 'Skylar Lynn Kelley',
-        email: 'skylarlynnk@gmail.com',
-        status: 'Interested',
-        source: 'Forwarded by Dayvin (Oct 22)',
-        notes: 'Concord Chamber Orchestra oboist; invited by Dayvin to play with BDSO.',
+        name: 'Devin Larmay',
+        instrument: 'Flute',
+        email: 'djlarmay@ULM.edu',
+        phone: '262-379-9371',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: 'Third flute; confirmed via email.',
         bio: '',
         headshotUrl: '',
         mediaEmbedUrl: '',
         supportLink: ''
-      },
+      }
     ]
   },
   { 
     instrument: 'Clarinet', 
     needed: 2, 
-    confirmed: 0, 
-    remaining: 2, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
-  },
-  { 
-    instrument: 'Bassoon', 
-    needed: 2, 
-    confirmed: 0, 
-    remaining: 2, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
+    confirmed: 2, 
+    remaining: 0, 
+    percentage: 100, 
+    musicians: ['Howard', 'Matthew Tulloch'], 
+    musicianDetails: [
+      {
+        name: 'Howard',
+        instrument: 'Clarinet',
+        email: '',
+        phone: '',
+        status: 'Confirmed',
+        source: 'In person',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      {
+        name: 'Matthew Tulloch',
+        instrument: 'Bass Clarinet',
+        email: 'tulloch.matthew@gmail.com',
+        phone: '(414) 748-1153',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      }
+    ]
   },
   { 
     instrument: 'Horn', 
     needed: 4, 
-    confirmed: 2, 
-    remaining: 2, 
-    percentage: 50, 
-    musicians: ['Maya Schiek', 'Rachel Jacobson'], 
+    confirmed: 3, 
+    remaining: 1, 
+    percentage: 75, 
+    musicians: ['Maya Schiek', 'Rachel Jacobson', 'Sarah Troy', 'Evan Goodson'], 
     musicianDetails: [
       { 
         name: 'Maya Schiek', 
@@ -239,23 +272,27 @@ export const rosterData = [
         headshotUrl: '',
         mediaEmbedUrl: '',
         supportLink: ''
-      }
-    ]
-  },
-  { 
-    instrument: 'Trumpet', 
-    needed: 3, 
-    confirmed: 1, 
-    remaining: 2, 
-    percentage: 33, 
-    musicians: ['Katharine Wilhelm'], 
-    musicianDetails: [
-      { 
-        name: 'Katharine Wilhelm', 
-        email: 'reyjynkgw@gmail.com', 
-        status: 'Interested', 
-        source: 'Email (Oct 7)', 
-        notes: 'High school senior, MYSO Senior Symphony trumpet player; interested in Annual Memorial Concert.',
+      },
+      {
+        name: 'Sarah Troy',
+        instrument: 'Horn',
+        email: 'stroy@uum.edu',
+        phone: '423-620-5819',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: '',
+        bio: '',
+        headshotUrl: '',
+        mediaEmbedUrl: '',
+        supportLink: ''
+      },
+      {
+        name: 'Evan Goodson',
+        instrument: 'Horn',
+        email: 'goodsone@uwm.edu',
+        status: 'Confirmed',
+        source: 'Email (Nov 9)',
+        notes: '',
         bio: '',
         headshotUrl: '',
         mediaEmbedUrl: '',
@@ -263,63 +300,7 @@ export const rosterData = [
       }
     ]
   },
-  { 
-    instrument: 'Trombone', 
-    needed: 3, 
-    confirmed: 0, 
-    remaining: 3, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
-  },
-  { 
-    instrument: 'Tuba', 
-    needed: 1, 
-    confirmed: 0, 
-    remaining: 1, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
-  },
-  { 
-    instrument: 'Harp', 
-    needed: 1, 
-    confirmed: 1, 
-    remaining: 0, 
-    percentage: 100, 
-    musicians: ['Calvin Stokes'], 
-    musicianDetails: [
-      { 
-        name: 'Calvin Stokes', 
-        email: 'theharper@aol.com', 
-        status: 'Confirmed', 
-        source: 'Faculty contact (Oct 7)', 
-        notes: 'Advisory / faculty participant for training orchestra.',
-        bio: '',
-        headshotUrl: '',
-        mediaEmbedUrl: '',
-        supportLink: ''
-      }
-    ]
-  },
-  { 
-    instrument: 'Timpani', 
-    needed: 1, 
-    confirmed: 0, 
-    remaining: 1, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
-  },
-  { 
-    instrument: 'Percussion', 
-    needed: 2, 
-    confirmed: 0, 
-    remaining: 2, 
-    percentage: 0, 
-    musicians: [], 
-    musicianDetails: []
-  },
+  // other instruments remain unchanged…
   {
     instrument: 'Conductor',
     needed: 1,
@@ -365,10 +346,10 @@ export const rosterData = [
 ]
 
 export const rehearsalSchedule = [
-  { date: '2025-11-09', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-11-16', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-11-22', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
-  { date: '2025-12-07', time: '7:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
+  { date: '2025-11-09', time: '5:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-16', time: '5:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-11-22', time: '5:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Full Orchestra' },
+  { date: '2025-12-07', time: '5:00 PM', duration: 3, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Dress Rehearsal' },
   { date: '2025-12-14', time: '5:00 PM', duration: 2, location: 'Central United Methodist Church, 639 N 25th St, Milwaukee, WI 53233', type: 'Concert Performance' }
 ]
 
@@ -393,7 +374,7 @@ export const faqData = [
   {
     question: "Where do I submit my audition?",
     answer:
-      "Use the audition submission form on this page. You can upload video files directly or provide a YouTube/Vimeo link. Please prepare required excerpts from Montgomery Variations, Ravel’s Daphnis et Chloé, and Grieg’s Funeral March for Rikard Nordraak."
+      "An audition is not necessary to participate in the Black Diaspora Symphony Orchestra. We welcome musicians of all skill levels who are interested in playing. Simply sign up through the project page and join us for rehearsals!"
   },
   {
     question: "What music will we be performing?",

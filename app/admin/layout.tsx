@@ -12,7 +12,8 @@ import {
   Settings, 
   Menu, 
   X,
-  Music
+  Music,
+  Calendar
 } from 'lucide-react'
 import { useRequireRole } from '@/lib/hooks/useUserRole'
 
@@ -21,6 +22,7 @@ const navLinks = [
   { label: 'Pulse', href: '/admin/pulse', icon: Zap },
   { label: 'Projects', href: '/admin/projects', icon: FolderOpen },
   { label: 'Musicians', href: '/admin/musicians', icon: Users },
+  { label: 'Attendance', href: '/admin/attendance', icon: Calendar },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 

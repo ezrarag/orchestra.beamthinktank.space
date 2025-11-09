@@ -1089,19 +1089,33 @@ export default function BlackDiasporaSymphonyPage() {
                     <p className="text-gray-400 text-sm">Margaret Bonds - Movement I</p>
                   </div>
                   <div className="relative">
-                    <motion.button 
-                      type="button"
-                      onClick={() => hasMontgomeryDownloads && setShowMontgomeryModal(true)}
-                      onMouseEnter={() => setHoveredExcerpt('montgomery')}
-                      onMouseLeave={() => setHoveredExcerpt(null)}
-                      onFocus={() => setHoveredExcerpt('montgomery')}
-                      onBlur={() => setHoveredExcerpt(null)}
-                      disabled={!hasMontgomeryDownloads}
-                      className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasMontgomeryDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
-                      aria-disabled={!hasMontgomeryDownloads}
-                    >
-                      Download PDF
-                    </motion.button>
+                    {!user ? (
+                      <motion.button 
+                        type="button"
+                        onClick={handleGoogleSignIn}
+                        onMouseEnter={() => setHoveredExcerpt('montgomery')}
+                        onMouseLeave={() => setHoveredExcerpt(null)}
+                        onFocus={() => setHoveredExcerpt('montgomery')}
+                        onBlur={() => setHoveredExcerpt(null)}
+                        className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors hover:bg-purple-600"
+                      >
+                        Sign In to Download
+                      </motion.button>
+                    ) : (
+                      <motion.button 
+                        type="button"
+                        onClick={() => hasMontgomeryDownloads && setShowMontgomeryModal(true)}
+                        onMouseEnter={() => setHoveredExcerpt('montgomery')}
+                        onMouseLeave={() => setHoveredExcerpt(null)}
+                        onFocus={() => setHoveredExcerpt('montgomery')}
+                        onBlur={() => setHoveredExcerpt(null)}
+                        disabled={!hasMontgomeryDownloads}
+                        className={`bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors ${hasMontgomeryDownloads ? 'hover:bg-purple-600' : 'opacity-50 cursor-not-allowed'}`}
+                        aria-disabled={!hasMontgomeryDownloads}
+                      >
+                        Download PDF
+                      </motion.button>
+                    )}
                     <AnimatePresence>
                       {hoveredExcerpt === 'montgomery' && (
                         <motion.span
