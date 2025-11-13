@@ -86,7 +86,7 @@ export function createRecaptchaVerifier(
     throw new Error('Firebase Auth is not initialized')
   }
 
-  return new RecaptchaVerifier(auth, containerId, {
+  return new RecaptchaVerifier(containerId, {
     size,
     callback: () => {
       // reCAPTCHA solved, allow signInWithPhoneNumber to proceed
@@ -95,7 +95,7 @@ export function createRecaptchaVerifier(
       // Response expired, ask user to solve reCAPTCHA again
       throw new Error('reCAPTCHA expired. Please try again.')
     }
-  })
+  }, auth)
 }
 
 /**
