@@ -161,7 +161,7 @@ export default function UserMenu() {
                     <Link
                       href="/admin/dashboard"
                       onClick={(e) => {
-                        if (role !== 'beam_admin') {
+                        if (role !== 'beam_admin' && role !== 'partner_admin') {
                           e.preventDefault()
                           alert('Admin access required. Please contact an administrator.')
                         } else {
@@ -169,21 +169,33 @@ export default function UserMenu() {
                         }
                       }}
                       className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors group ${
-                        role === 'beam_admin'
+                        role === 'beam_admin' || role === 'partner_admin'
                           ? 'hover:bg-orchestra-gold/10 text-orchestra-cream'
                           : 'hover:bg-gray-500/10 text-orchestra-cream/60 cursor-not-allowed opacity-50'
                       }`}
                     >
                       <LayoutDashboard className={`h-5 w-5 group-hover:scale-110 transition-transform ${
-                        role === 'beam_admin' ? 'text-orchestra-gold' : 'text-gray-400'
+                        role === 'beam_admin' || role === 'partner_admin' ? 'text-orchestra-gold' : 'text-gray-400'
                       }`} />
                       <span className="font-medium">
                         Admin Dashboard
-                        {role !== 'beam_admin' && (
+                        {role !== 'beam_admin' && role !== 'partner_admin' && (
                           <span className="ml-2 text-xs text-gray-400">(Admin Only)</span>
                         )}
                       </span>
                     </Link>
+
+                    {/* Board Dashboard Link - Visible to board members and admins */}
+                    {(role === 'board' || role === 'beam_admin' || role === 'partner_admin') && (
+                      <Link
+                        href="/admin/board"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
+                      >
+                        <LayoutDashboard className="h-5 w-5 text-orchestra-gold group-hover:scale-110 transition-transform" />
+                        <span className="font-medium">Board Dashboard</span>
+                      </Link>
+                    )}
 
                     {/* Divider */}
                     <div className="border-t border-orchestra-gold/20 my-1" />

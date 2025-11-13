@@ -5,7 +5,7 @@ import { User, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 
-export type UserRole = 'beam_admin' | 'partner_admin' | 'musician' | 'audience'
+export type UserRole = 'beam_admin' | 'partner_admin' | 'board' | 'musician' | 'subscriber' | 'audience'
 
 interface UserWithRole {
   user: User | null
@@ -49,11 +49,23 @@ export function useUserRole(): UserWithRole {
             return
           }
           
+          // Check for board claim
+          if (claims.role === 'board' || claims.board === true) {
+            setRole('board')
+            setLoading(false)
+            return
+          }
+          
           // Fall back to Firestore user document
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
-            setRole(userData.role || 'musician')
+            // Check if user is a subscriber
+            if (userData.subscriber === true) {
+              setRole('subscriber')
+            } else {
+              setRole(userData.role || 'musician')
+            }
           } else {
             setRole('musician') // Default role
           }
@@ -85,5 +97,31 @@ export function useRequireRole(requiredRole: UserRole) {
     loading,
     hasAccess,
     redirect: !loading && (!user || role !== requiredRole)
+  }
+}
+
+/**
+ * Hook to check if user has board access (board role or higher)
+ * Board users have read-only access to analytics and project data
+ */
+export function useBoardAccess() {
+  const { user, role, loading } = useUserRole()
+  
+  // Board, partner_admin, and beam_admin all have board access
+  const hasAccess = !loading && user && (
+    role === 'board' || 
+    role === 'partner_admin' || 
+    role === 'beam_admin'
+  )
+  
+  const isReadOnly = role === 'board' // Only board role is read-only
+  
+  return {
+    user,
+    role,
+    loading,
+    hasAccess,
+    isReadOnly,
+    redirect: !loading && !hasAccess
   }
 }

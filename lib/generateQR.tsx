@@ -38,6 +38,12 @@ export function QRCode({
 
 // Utility function to generate QR code URL for a rehearsal
 export function generateCheckInURL(rehearsalId: string, baseUrl?: string): string {
+  // Validate rehearsalId format (should be YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(rehearsalId)) {
+    throw new Error(`Invalid rehearsal ID format: ${rehearsalId}. Expected format: YYYY-MM-DD`)
+  }
+
   // Prefer provided baseUrl, then env variable, then production URL
   // Never use localhost in production
   const url = baseUrl || 
@@ -47,5 +53,30 @@ export function generateCheckInURL(rehearsalId: string, baseUrl?: string): strin
       ? window.location.origin 
       : 'https://orchestra.beamthinktank.space')
   return `${url}/checkin?id=${rehearsalId}`
+}
+
+/**
+ * Generate QR codes for all upcoming rehearsals
+ * @param rehearsalSchedule - Array of rehearsal objects with date property
+ * @param baseUrl - Optional base URL for check-in links
+ * @returns Array of objects with rehearsal info and QR URL
+ */
+export function generateRehearsalQRCodes(
+  rehearsalSchedule: Array<{ date: string; [key: string]: any }>,
+  baseUrl?: string
+): Array<{ rehearsalId: string; date: string; url: string; [key: string]: any }> {
+  const now = new Date()
+  const upcoming = rehearsalSchedule
+    .filter(r => {
+      const rehearsalDate = new Date(r.date)
+      return rehearsalDate >= now
+    })
+    .map(r => ({
+      ...r,
+      rehearsalId: r.date,
+      url: generateCheckInURL(r.date, baseUrl)
+    }))
+  
+  return upcoming
 }
 

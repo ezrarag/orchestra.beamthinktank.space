@@ -12,6 +12,8 @@ The Admin Portal allows authorized staff (Ezra, Dayvin, Dayvin's mom, etc.) to v
 
 3. **Non-admins attempting to visit `/admin/*`** will be redirected with an "Access Denied" message.
 
+4. **Board members** have read-only access to analytics dashboards via `/admin/board` and `/admin/projects/[id]/board`.
+
 ## Dashboard
 
 The admin dashboard (`/admin/dashboard`) provides:
@@ -65,6 +67,56 @@ import { setUserRole } from '@/lib/firebase-admin'
 await setUserRole('user_uid', 'beam_admin')
 ```
 
+## How to Grant Board Access
+
+Board members have read-only access to analytics dashboards. They cannot edit roster data or make changes.
+
+### Method 1: Using Firebase Console
+
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Navigate to **Authentication** → **Users**
+3. Find the user you want to grant board access
+4. Click on the user → **Custom Claims** tab
+5. Add custom claim:
+   ```json
+   {
+     "role": "board",
+     "board": true
+   }
+   ```
+6. Save changes
+
+### Method 2: Using Firebase Admin SDK
+
+```typescript
+import { setUserRole } from '@/lib/firebase-admin'
+
+// Get user UID first, then:
+await setUserRole('user_uid', 'board')
+```
+
+**Important:** After setting board role, the user must **sign out and sign back in** to refresh their ID token.
+
+### What Board Members Can See
+
+- **Board Dashboard** (`/admin/board`):
+  - Total registered musicians
+  - Breakdown by instrument (needed vs confirmed vs checked-in)
+  - Attendance summary (total check-ins, transportation requests)
+  - Budget summary (total budget, projected payouts)
+
+- **Project Board View** (`/admin/projects/[id]/board`):
+  - Project-specific analytics
+  - Same metrics as board dashboard, filtered by project
+
+### What Board Members Cannot Do
+
+- ❌ Add, edit, or delete musicians
+- ❌ Modify roster data
+- ❌ Access admin-only pages (dashboard, settings, etc.)
+- ❌ Export or modify data
+- ✅ Read-only access to analytics only
+
 ## Admin Pages
 
 ### `/admin/dashboard`
@@ -88,9 +140,22 @@ await setUserRole('user_uid', 'beam_admin')
 - View project details
 - Manage project invites
 
-### `/admin/settings`
-- System configuration
-- Metadata management
+### `/admin/board`
+- Read-only board dashboard for stakeholders
+- Shows analytics: registered musicians, instrument breakdown, attendance, budget
+- Accessible to board members, partner admins, and beam admins
+- Board members see read-only badge
+
+### `/admin/projects/[id]/board`
+- Project-specific board view
+- Same analytics as board dashboard, filtered by project
+- Read-only access for board members
+
+### `/admin/checkin-test`
+- Admin-only utility for testing QR check-in functionality
+- Generate QR codes for upcoming rehearsals
+- Test check-in with different authentication methods
+- Verify Firestore writes are working correctly
 
 ## Security
 

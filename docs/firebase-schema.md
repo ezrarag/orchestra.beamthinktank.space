@@ -150,7 +150,9 @@ interface MusicianEngagement {
 interface User {
   uid: string
   email: string
-  role: 'beam_admin' | 'partner_admin' | 'musician' | 'audience'
+  role: 'beam_admin' | 'partner_admin' | 'board' | 'musician' | 'subscriber' | 'audience'
+  subscriber?: boolean // True if user has active subscription
+  stripeCustomerId?: string // Stripe customer ID if subscribed
   organizationId?: string
   customClaims: {
     role: string
@@ -224,6 +226,48 @@ interface Rehearsal {
   currentParticipants: number
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
   notes?: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+```
+
+### 11. `projectMedia`
+```typescript
+interface ProjectMedia {
+  id: string
+  projectId: string
+  title: string
+  type: 'rehearsal' | 'performance' | 'document' | 'promotional' | 'interview'
+  rehearsalId?: string // For rehearsal videos (YYYY-MM-DD format)
+  storagePath: string // Firebase Storage path
+  downloadURL?: string // Public download URL (if applicable)
+  access: 'musician' | 'subscriber' | 'public' // Access level
+  uploadedBy: string // User email or UID
+  uploadedAt: Timestamp
+  duration?: number // Video duration in seconds
+  thumbnailURL?: string // Thumbnail image URL
+  description?: string
+  metadata?: {
+    fileSize?: number
+    mimeType?: string
+    resolution?: string // For videos: "1920x1080"
+  }
+}
+```
+
+### 12. `subscriptions`
+```typescript
+interface Subscription {
+  id: string
+  userId: string
+  userEmail: string
+  stripeCustomerId: string
+  stripeSubscriptionId: string
+  stripePriceId: string
+  status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing'
+  currentPeriodStart: Timestamp
+  currentPeriodEnd: Timestamp
+  cancelAtPeriodEnd: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
 }

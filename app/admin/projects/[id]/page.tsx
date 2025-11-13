@@ -18,7 +18,8 @@ import {
   Mail,
   ExternalLink,
   Zap,
-  X
+  X,
+  Video
 } from 'lucide-react'
 import { doc, getDoc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -431,7 +432,7 @@ export default function ProjectDetailPage() {
 
       {/* Quick Actions */}
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
@@ -458,6 +459,18 @@ export default function ProjectDetailPage() {
           </div>
           <h3 className="text-lg font-bold text-blue-400 mb-2">Analytics</h3>
           <p className="text-orchestra-cream/70 text-sm">View project performance and metrics</p>
+        </Link>
+
+        <Link
+          href={`/admin/projects/${projectId}/media`}
+          className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-xl border border-purple-500/30 p-6 hover:border-purple-500/50 transition-all group"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <Video className="h-8 w-8 text-purple-400 group-hover:scale-110 transition-transform" />
+            <ArrowLeft className="h-5 w-5 text-orchestra-cream/50 group-hover:text-purple-400 transition-colors rotate-180" />
+          </div>
+          <h3 className="text-lg font-bold text-purple-400 mb-2">Media Library</h3>
+          <p className="text-orchestra-cream/70 text-sm">Upload and manage rehearsal videos</p>
         </Link>
 
         <Link
