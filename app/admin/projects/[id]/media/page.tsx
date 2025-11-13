@@ -266,7 +266,7 @@ export default function AdminMediaPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  {item.type === 'video' || item.type === 'rehearsal' ? (
+                  {item.type === 'rehearsal' || item.type === 'performance' || item.type === 'interview' ? (
                     <Video className="w-5 h-5 text-purple-400" />
                   ) : item.type === 'document' ? (
                     <FileText className="w-5 h-5 text-blue-400" />

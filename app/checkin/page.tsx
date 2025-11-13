@@ -28,7 +28,7 @@ function CheckInContent() {
       const emailLink = window.location.href
       const email = window.localStorage.getItem('emailForSignIn')
       
-      if (email && isSignInWithEmailLink(auth, emailLink)) {
+      if (email && auth && isSignInWithEmailLink(auth, emailLink)) {
         completeEmailSignIn(email, emailLink)
           .then(() => {
             window.localStorage.removeItem('emailForSignIn')

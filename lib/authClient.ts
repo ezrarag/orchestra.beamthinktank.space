@@ -110,3 +110,6 @@ export async function verifyPhoneCode(
   await confirmationResult.confirm(code)
 }
 
+// Re-export isSignInWithEmailLink for convenience
+export { isSignInWithEmailLink }
+
