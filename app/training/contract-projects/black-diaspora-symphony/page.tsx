@@ -29,7 +29,8 @@ import {
   AlertCircle,
   QrCode,
   LogOut,
-  User
+  User,
+  Lightbulb
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
@@ -41,6 +42,7 @@ import {
 } from './data'
 import MusicianProfileModal from '@/components/MusicianProfileModal'
 import AuthButtons from '@/components/AuthButtons'
+import SetupGuide from '@/components/SetupGuide'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { useRouter } from 'next/navigation'
 import { db, auth } from '@/lib/firebase'
@@ -218,6 +220,10 @@ export default function BlackDiasporaSymphonyPage() {
   const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0)
   const [activeTab, setActiveTab] = useState<'overview' | 'join' | 'media'>('overview')
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
+  
+  // Setup guide state
+  const [showSetupGuide, setShowSetupGuide] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   
   // Musician profile state
   const [musicianProfile, setMusicianProfile] = useState({
@@ -837,6 +843,21 @@ export default function BlackDiasporaSymphonyPage() {
     return () => {}
   }, [showRavelModal, showMontgomeryModal, showBeamVideo, mobileNavOpen, showMusicianModal, showProjectDetailsModal])
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showUserMenu && !target.closest('.user-menu-container')) {
+        setShowUserMenu(false)
+      }
+    }
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showUserMenu])
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Fixed Background Video */}
@@ -886,23 +907,16 @@ export default function BlackDiasporaSymphonyPage() {
               transition={{ duration: 0.8 }}
               className="space-y-8"
             >
-              {/* Status Indicator with Sign Out */}
-              {user && (
+              {/* Status Indicator with User Menu Dropdown - Hidden when scrolled */}
+              {user && scrollY <= 200 && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                   <span className="text-white text-sm">Signed in</span>
                 </div>
+                <div className="relative user-menu-container">
                   <motion.button
-                    onClick={async () => {
-                      if (auth) {
-                        try {
-                          await signOut(auth)
-                        } catch (error) {
-                          console.error('Error signing out:', error)
-                        }
-                      }
-                    }}
+                    onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center space-x-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -921,8 +935,52 @@ export default function BlackDiasporaSymphonyPage() {
                     <span className="text-white text-xs font-medium hidden sm:inline max-w-[120px] truncate">
                       {user.displayName || user.email?.split('@')[0] || 'User'}
                     </span>
-                    <LogOut className="h-3.5 w-3.5 text-white" />
+                    <ChevronDown className={`h-3.5 w-3.5 text-white transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                   </motion.button>
+
+                  {/* Dropdown Menu */}
+                  <AnimatePresence>
+                    {showUserMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        className="absolute right-0 mt-2 w-56 bg-orchestra-cream/95 backdrop-blur-lg rounded-xl shadow-2xl border-2 border-orchestra-gold/30 overflow-hidden z-50"
+                      >
+                        <div className="py-2">
+                          <button
+                            onClick={() => {
+                              setShowSetupGuide(true)
+                              setShowUserMenu(false)
+                            }}
+                            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-orchestra-gold/20 transition-colors text-left"
+                          >
+                            <Lightbulb className="h-5 w-5 text-orchestra-gold" />
+                            <span className="text-orchestra-dark font-medium">Setup Guide</span>
+                          </button>
+                          <div className="border-t border-orchestra-gold/20 my-1" />
+                          <button
+                            onClick={async () => {
+                              if (auth) {
+                                try {
+                                  await signOut(auth)
+                                  setShowUserMenu(false)
+                                } catch (error) {
+                                  console.error('Error signing out:', error)
+                                }
+                              }
+                            }}
+                            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/20 transition-colors text-left"
+                          >
+                            <LogOut className="h-5 w-5 text-red-500" />
+                            <span className="text-orchestra-dark font-medium">Sign Out</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
               )}
 
@@ -2775,6 +2833,100 @@ export default function BlackDiasporaSymphonyPage() {
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* Setup Guide */}
+      {user && (
+        <SetupGuide
+          isOpen={showSetupGuide}
+          onClose={() => setShowSetupGuide(false)}
+          user={user}
+          onDocumentComplete={(documentType) => {
+            // Document completion is handled internally by SetupGuide
+            console.log(`Document ${documentType} completed`)
+          }}
+        />
+      )}
+
+      {/* Floating Avatar Button (Bottom Right) - Appears on Scroll */}
+      <AnimatePresence>
+        {user && scrollY > 200 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, x: 50, y: 50 }}
+            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, x: 50, y: 50 }}
+            transition={{ 
+              type: 'spring', 
+              damping: 25, 
+              stiffness: 300,
+              mass: 0.8
+            }}
+            className="fixed bottom-6 right-6 z-50 user-menu-container"
+          >
+          <motion.button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center justify-center w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full transition-colors border border-white/20 backdrop-blur-md shadow-lg"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            title={user.displayName || user.email?.split('@')[0] || 'User'}
+          >
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={user.displayName || 'User'}
+                className="h-10 w-10 rounded-full"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-yellow-400/30 flex items-center justify-center">
+                <User className="h-5 w-5 text-white" />
+              </div>
+            )}
+          </motion.button>
+
+          {/* Dropdown Menu - Opens upward from bottom */}
+          <AnimatePresence>
+            {showUserMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="absolute bottom-full right-0 mb-2 w-56 bg-orchestra-cream/95 backdrop-blur-lg rounded-xl shadow-2xl border-2 border-orchestra-gold/30 overflow-hidden"
+              >
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setShowSetupGuide(true)
+                      setShowUserMenu(false)
+                    }}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-orchestra-gold/20 transition-colors text-left"
+                  >
+                    <Lightbulb className="h-5 w-5 text-orchestra-gold" />
+                    <span className="text-orchestra-dark font-medium">Setup Guide</span>
+                  </button>
+                  <div className="border-t border-orchestra-gold/20 my-1" />
+                  <button
+                    onClick={async () => {
+                      if (auth) {
+                        try {
+                          await signOut(auth)
+                          setShowUserMenu(false)
+                        } catch (error) {
+                          console.error('Error signing out:', error)
+                        }
+                      }
+                    }}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/20 transition-colors text-left"
+                  >
+                    <LogOut className="h-5 w-5 text-red-500" />
+                    <span className="text-orchestra-dark font-medium">Sign Out</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

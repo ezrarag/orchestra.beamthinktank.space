@@ -155,13 +155,19 @@ export default function AdminDashboard() {
         const bdsoConfirmed = bdsoMusicians.filter(m => m.status === 'confirmed' || m.status === 'Confirmed').length
         const bdsoPending = bdsoMusicians.filter(m => m.status === 'pending' || m.status === 'Pending' || m.status === 'interested' || m.status === 'Interested').length
 
-        // Fetch attendance check-ins
-        const attendanceQuery = query(
-          collection(db, 'attendance'),
-          orderBy('timestamp', 'desc')
-        )
-        const attendanceSnapshot = await getDocs(attendanceQuery)
-        const totalCheckIns = attendanceSnapshot.size
+        // Fetch attendance check-ins (may fail if user doesn't have admin role in token yet)
+        let totalCheckIns = 0
+        try {
+          const attendanceQuery = query(
+            collection(db, 'attendance'),
+            orderBy('timestamp', 'desc')
+          )
+          const attendanceSnapshot = await getDocs(attendanceQuery)
+          totalCheckIns = attendanceSnapshot.size
+        } catch (attendanceError: any) {
+          // Permission error is expected if user hasn't refreshed their token after role assignment
+          console.warn('Could not fetch attendance (user may need to sign out and back in):', attendanceError.message)
+        }
 
         // Fallback stats (can be enhanced later)
         const totalBeamCoins = mockData.musicians.reduce((sum, musician) => sum + musician.beamCoinsBalance, 0)

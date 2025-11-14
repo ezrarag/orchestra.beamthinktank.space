@@ -24,9 +24,10 @@ interface DocumentSignerProps {
   documentType: 'w9' | 'contract' | 'mediaRelease'
   musicianName: string
   musicianEmail: string
+  onComplete?: (documentType: 'w9' | 'contract' | 'mediaRelease') => void
 }
 
-export default function DocumentSigner({ isOpen, onClose, documentType, musicianName, musicianEmail }: DocumentSignerProps) {
+export default function DocumentSigner({ isOpen, onClose, documentType, musicianName, musicianEmail, onComplete }: DocumentSignerProps) {
   const [formData, setFormData] = useState<Partial<W9FormData>>({
     legalName: musicianName,
     businessName: '',
@@ -80,6 +81,8 @@ export default function DocumentSigner({ isOpen, onClose, documentType, musician
       await sendEmailNotification(documentType, musicianName, musicianEmail, downloadUrl)
       await saveDocumentMetadata(documentType, downloadUrl, musicianEmail)
       setSubmitted(true)
+      // Call onComplete callback if provided
+      onComplete?.(documentType)
     } catch (error) {
       console.error('Error submitting document:', error)
       alert('Error submitting document. Please try again.')

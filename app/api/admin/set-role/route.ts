@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, verifyAdminRole } from '@/lib/firebase-admin'
+import { adminAuth, verifyAdminRole, isAdminSDKAvailable } from '@/lib/firebase-admin'
 
 /**
  * Set user role (admin only)
@@ -8,6 +8,17 @@ import { adminAuth, verifyAdminRole } from '@/lib/firebase-admin'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Check if Admin SDK is available
+    if (!isAdminSDKAvailable() || !adminAuth) {
+      return NextResponse.json(
+        { 
+          error: 'Admin SDK not configured. Please set up Firebase Admin credentials in environment variables.',
+          details: 'FIREBASE_ADMIN_PRIVATE_KEY and FIREBASE_ADMIN_CLIENT_EMAIL are required for Vercel deployments.'
+        },
+        { status: 503 }
+      )
+    }
+
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

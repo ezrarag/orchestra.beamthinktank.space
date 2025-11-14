@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, verifyAdminRole } from '@/lib/firebase-admin'
+import { adminAuth, verifyAdminRole, isAdminSDKAvailable } from '@/lib/firebase-admin'
 import { getGoogleTokens } from '@/lib/googleUtils'
 
 /**
@@ -7,6 +7,17 @@ import { getGoogleTokens } from '@/lib/googleUtils'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Check if Admin SDK is available
+    if (!isAdminSDKAvailable() || !adminAuth) {
+      // Return not connected if Admin SDK isn't available
+      return NextResponse.json({
+        connected: false,
+        hasAccessToken: false,
+        hasRefreshToken: false,
+        error: 'Admin SDK not configured'
+      })
+    }
+
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

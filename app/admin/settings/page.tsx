@@ -186,12 +186,16 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (!response.ok) {
+        // Provide helpful error message for Admin SDK configuration issues
+        if (response.status === 503 && data.details) {
+          throw new Error(`${data.error}\n\n${data.details}\n\nTo fix this, add FIREBASE_ADMIN_PRIVATE_KEY and FIREBASE_ADMIN_CLIENT_EMAIL to your Vercel environment variables.`)
+        }
         throw new Error(data.error || 'Failed to set user role')
       }
 
       setRoleResult({
         success: true,
-        message: data.message || `Successfully set role "${userRole}" for ${userEmail}`
+        message: data.message || `Successfully set role "${userRole}" for ${userEmail}. Note: User must sign out and sign back in for the role to take effect.`
       })
 
       // Clear form after success
