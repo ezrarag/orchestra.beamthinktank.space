@@ -554,12 +554,12 @@ export const rehearsalVideos: Array<{
   date?: string
   description?: string
 }> = [
-   {
-  //   title: 'Rehearsal - November 10, 2025',
-  //   url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FBonds%20-%205%2008%20pm%20-%2011%2010%2025.mov?alt=media&token=68f26fd3-60ed-465a-841b-71073d683034',
-  //   date: '2025-11-10',
-  //   description: 'Full orchestra rehearsal'
-   },
+  {
+    title: 'Rehearsal - November 10, 2025',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FBonds%20-%205%2008%20pm%20-%2011%2010%2025.mov?alt=media&token=68f26fd3-60ed-465a-841b-71073d683034',
+    date: '2025-11-10',
+    description: 'Full orchestra rehearsal'
+  },
 ]
 
 export const ravelExcerptDownloads = [
