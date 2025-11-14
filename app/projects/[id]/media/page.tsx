@@ -202,9 +202,21 @@ export default function MediaLibraryPage() {
                         const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
                         return (
                           <>
-                            {accessLevels.includes('public') && <Globe className="w-4 h-4 text-green-400" title="Public" />}
-                            {accessLevels.includes('subscriber') && <CreditCard className="w-4 h-4 text-yellow-400" title="Subscriber" />}
-                            {accessLevels.includes('musician') && <Users className="w-4 h-4 text-purple-400" title="Musician" />}
+                            {accessLevels.includes('public') && (
+                              <span title="Public">
+                                <Globe className="w-4 h-4 text-green-400" aria-label="Public" />
+                              </span>
+                            )}
+                            {accessLevels.includes('subscriber') && (
+                              <span title="Subscriber">
+                                <CreditCard className="w-4 h-4 text-yellow-400" aria-label="Subscriber" />
+                              </span>
+                            )}
+                            {accessLevels.includes('musician') && (
+                              <span title="Musician">
+                                <Users className="w-4 h-4 text-purple-400" aria-label="Musician" />
+                              </span>
+                            )}
                           </>
                         )
                       })()}
@@ -267,9 +279,21 @@ export default function MediaLibraryPage() {
                         const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
                         return (
                           <>
-                            {accessLevels.includes('subscriber') && <CreditCard className="w-4 h-4 text-yellow-400" title="Subscriber" />}
-                            {accessLevels.includes('musician') && <Users className="w-4 h-4 text-purple-400" title="Musician" />}
-                            {accessLevels.includes('public') && <Globe className="w-4 h-4 text-green-400" title="Public" />}
+                            {accessLevels.includes('subscriber') && (
+                              <span title="Subscriber">
+                                <CreditCard className="w-4 h-4 text-yellow-400" aria-label="Subscriber" />
+                              </span>
+                            )}
+                            {accessLevels.includes('musician') && (
+                              <span title="Musician">
+                                <Users className="w-4 h-4 text-purple-400" aria-label="Musician" />
+                              </span>
+                            )}
+                            {accessLevels.includes('public') && (
+                              <span title="Public">
+                                <Globe className="w-4 h-4 text-green-400" aria-label="Public" />
+                              </span>
+                            )}
                           </>
                         )
                       })()}
