@@ -1992,7 +1992,7 @@ export default function BlackDiasporaSymphonyPage() {
                         </div>
                         <div>
                           <span className="text-orchestra-brown/70 text-sm">Compensation:</span>
-                          <p className="text-orchestra-dark font-medium">Up to $250 USD or 25 BEAM Coins</p>
+                          <p className="text-orchestra-dark font-medium">Up to $125 USD</p>
                         </div>
                       </div>
                     </div>
