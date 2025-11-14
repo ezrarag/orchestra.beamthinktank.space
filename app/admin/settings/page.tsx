@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Settings as SettingsIcon, Loader2, Save, Check, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react'
+import { Settings as SettingsIcon, Loader2, Save, Check, RefreshCw, AlertCircle, CheckCircle, UserPlus, Shield } from 'lucide-react'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useRouter } from 'next/navigation'
 import { db } from '@/lib/firebase'
@@ -17,6 +17,12 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string; count?: number } | null>(null)
+  
+  // User role management state
+  const [userEmail, setUserEmail] = useState('')
+  const [userRole, setUserRole] = useState<'beam_admin' | 'partner_admin' | 'board' | 'musician' | 'subscriber' | 'audience'>('musician')
+  const [settingRole, setSettingRole] = useState(false)
+  const [roleResult, setRoleResult] = useState<{ success: boolean; message: string } | null>(null)
 
   if (roleLoading) {
     return (
@@ -147,6 +153,61 @@ export default function SettingsPage() {
       })
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleSetUserRole = async () => {
+    if (!user || !userEmail.trim()) {
+      setRoleResult({
+        success: false,
+        message: 'Please enter an email address'
+      })
+      return
+    }
+
+    setSettingRole(true)
+    setRoleResult(null)
+
+    try {
+      const token = await user.getIdToken()
+      
+      const response = await fetch('/api/admin/set-role', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: userEmail.trim(),
+          role: userRole
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to set user role')
+      }
+
+      setRoleResult({
+        success: true,
+        message: data.message || `Successfully set role "${userRole}" for ${userEmail}`
+      })
+
+      // Clear form after success
+      setUserEmail('')
+      
+      // Clear result after 5 seconds
+      setTimeout(() => setRoleResult(null), 5000)
+
+    } catch (error: any) {
+      console.error('Set role error:', error)
+      setRoleResult({
+        success: false,
+        message: error.message || 'Failed to set user role. Please try again.'
+      })
+    } finally {
+      setSettingRole(false)
     }
   }
 
@@ -286,12 +347,122 @@ export default function SettingsPage() {
         )}
       </motion.div>
 
+      {/* User Role Management Section */}
+      <motion.div
+        className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <h2 className="text-xl font-bold text-orchestra-gold mb-4 flex items-center gap-2">
+          <Shield className="h-6 w-6" />
+          User Role Management
+        </h2>
+        <p className="text-orchestra-cream/70 mb-6 text-sm">
+          Set admin privileges and user roles. Users must sign in at least once with Google before you can set their role.
+        </p>
+
+        {roleResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
+              roleResult.success
+                ? 'bg-green-500/10 border border-green-500/20'
+                : 'bg-red-500/10 border border-red-500/20'
+            }`}
+          >
+            {roleResult.success ? (
+              <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className={`font-medium ${roleResult.success ? 'text-green-300' : 'text-red-300'}`}>
+                {roleResult.success ? 'Role Set Successfully' : 'Failed to Set Role'}
+              </p>
+              <p className={`text-sm mt-1 ${roleResult.success ? 'text-green-200' : 'text-red-200'}`}>
+                {roleResult.message}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-orchestra-cream mb-2">
+              User Email
+            </label>
+            <input
+              type="email"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              placeholder="ezra@readyaimgo.biz"
+              className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+            />
+            <p className="text-xs text-orchestra-cream/50 mt-1">
+              User must have signed in at least once with this email
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-orchestra-cream mb-2">
+              Role
+            </label>
+            <select
+              value={userRole}
+              onChange={(e) => setUserRole(e.target.value as any)}
+              className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+            >
+              <option value="beam_admin">Beam Admin (Full access to all projects)</option>
+              <option value="partner_admin">Partner Admin (Access to assigned project only)</option>
+              <option value="board">Board Member (Read-only analytics access)</option>
+              <option value="musician">Musician (Musician-level access)</option>
+              <option value="subscriber">Subscriber (Subscriber-level access)</option>
+              <option value="audience">Audience (Public access)</option>
+            </select>
+          </div>
+
+          <motion.button
+            onClick={handleSetUserRole}
+            disabled={settingRole || !user || !userEmail.trim()}
+            className="flex items-center space-x-2 px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/90 disabled:opacity-50 disabled:cursor-not-allowed text-orchestra-dark font-bold rounded-lg transition-colors"
+            whileHover={!settingRole && user && userEmail.trim() ? { scale: 1.05 } : {}}
+            whileTap={!settingRole && user && userEmail.trim() ? { scale: 0.95 } : {}}
+          >
+            {settingRole ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Setting Role...</span>
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-5 w-5" />
+                <span>Set User Role</span>
+              </>
+            )}
+          </motion.button>
+        </div>
+
+        <div className="mt-6 p-4 bg-orchestra-dark/30 rounded-lg border border-orchestra-gold/10">
+          <p className="text-sm text-orchestra-cream/70 mb-2">
+            <strong className="text-orchestra-gold">Quick Setup:</strong>
+          </p>
+          <p className="text-xs text-orchestra-cream/60">
+            To set admin privileges for multiple users, you can also use the script:
+          </p>
+          <code className="block mt-2 text-xs bg-orchestra-dark/50 p-2 rounded text-orchestra-cream/80">
+            ADMIN_EMAILS="ezra@readyaimgo.biz,blackdiaspora@gmail.com" npx tsx scripts/setMultipleAdmins.ts
+          </code>
+        </div>
+      </motion.div>
+
       {/* Coming Soon Section */}
       <motion.div
         className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-12 text-center"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
       >
         <SettingsIcon className="h-16 w-16 text-orchestra-gold/30 mx-auto mb-4" />
         <p className="text-orchestra-cream/70 text-lg">

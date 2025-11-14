@@ -14,11 +14,23 @@ The platform supports role-based and subscription-based access to media content:
 
 ## Access Levels
 
-Media items have three access levels:
+Media items can have **multiple access levels** (array format):
 
 1. **`musician`** - Only accessible to logged-in musicians, admins, board members
 2. **`subscriber`** - Accessible to subscribers ($5/month) and higher roles
 3. **`public`** - Accessible to everyone
+
+### Multiple Access Levels
+
+You can select **multiple access levels** for a single media item:
+- `['musician']` - Only musicians can see
+- `['subscriber']` - Only subscribers can see
+- `['public']` - Everyone can see
+- `['musician', 'subscriber']` - Both musicians AND subscribers can see
+- `['subscriber', 'public']` - Both subscribers AND public can see
+- `['musician', 'subscriber', 'public']` - All three groups can see
+
+**Access Logic**: If a user's role matches **ANY** of the access levels in the array, they can see the media.
 
 ## Stripe Setup
 
@@ -85,10 +97,12 @@ role === 'beam_admin' || 'partner_admin' || 'board' || 'musician'
 // User has subscriber access if:
 role === 'subscriber' || hasMusicianAccess
 
-// Accessible media:
-- public: everyone
-- subscriber: subscribers and above
-- musician: musicians and above
+// Accessible media (supports multiple access levels):
+// Media is accessible if user's role matches ANY access level in the array
+// Example: access: ['musician', 'subscriber']
+//   - Musicians can see it (matches 'musician')
+//   - Subscribers can see it (matches 'subscriber')
+//   - Public cannot see it (doesn't match either)
 ```
 
 ## Admin Media Management
@@ -97,14 +111,17 @@ role === 'subscriber' || hasMusicianAccess
 
 1. Go to `/admin/projects/black-diaspora-symphony/media`
 2. Click **Upload Media**
-3. Fill in form:
+3. Choose upload method:
+   - **Upload File**: Upload to Firebase Storage
+   - **Use URL**: Paste external URL (e.g., Firebase Storage link, YouTube, etc.)
+4. Fill in form:
    - **Title:** e.g., "Bonds – 5:08 PM – 11/10/25"
    - **Type:** rehearsal, performance, interview, etc.
-   - **Access Level:** musician, subscriber, or public
+   - **Access Levels:** Select multiple checkboxes (musician, subscriber, public)
    - **Rehearsal Date:** YYYY-MM-DD format (optional)
    - **Description:** Optional
-   - **File:** Select video/image file
-4. Click **Upload**
+   - **File or URL:** Depending on upload method
+5. Click **Upload** or **Add Media**
 
 ### Editing Media
 
@@ -117,6 +134,7 @@ role === 'subscriber' || hasMusicianAccess
 - **Musician:** Internal rehearsal videos, practice recordings
 - **Subscriber:** Behind-the-scenes content, interviews, exclusive performances
 - **Public:** Promotional videos, public performances, announcements
+- **Multiple Levels:** You can select multiple levels (e.g., `['musician', 'subscriber']`) to allow both groups to access the same content
 
 ## User Experience
 
@@ -149,9 +167,9 @@ role === 'subscriber' || hasMusicianAccess
   title: "Bonds – 5:08 PM – 11/10/25"
   type: "rehearsal" | "performance" | "interview" | "promotional" | "document"
   rehearsalId?: "2025-11-10" // YYYY-MM-DD format
-  storagePath: "Black Diaspora Symphony/Music/rehearsal footage/video.mov"
-  downloadURL: "https://firebasestorage.googleapis.com/..."
-  access: "musician" | "subscriber" | "public"
+  storagePath?: "Black Diaspora Symphony/Music/rehearsal footage/video.mov" // Optional if using external URL
+  downloadURL: "https://firebasestorage.googleapis.com/..." // Required - Firebase Storage or external URL
+  access: ["musician", "subscriber", "public"] // Array of access levels (can select multiple)
   uploadedBy: "admin@example.com"
   uploadedAt: Timestamp
   duration?: number // seconds

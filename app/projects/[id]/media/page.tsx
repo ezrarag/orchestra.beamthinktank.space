@@ -31,9 +31,9 @@ interface MediaItem {
   title: string
   type: 'rehearsal' | 'performance' | 'document' | 'promotional' | 'interview'
   rehearsalId?: string
-  storagePath: string
-  downloadURL?: string
-  access: 'musician' | 'subscriber' | 'public'
+  storagePath?: string
+  downloadURL: string
+  access: ('musician' | 'subscriber' | 'public')[] | 'musician' | 'subscriber' | 'public' // Support both array and single for backward compatibility
   uploadedBy: string
   uploadedAt: any
   duration?: number
@@ -82,22 +82,38 @@ export default function MediaLibraryPage() {
     }
   }
 
-  // Filter media based on access
+  // Filter media based on access (supports both array and single access format)
   const getAccessibleMedia = () => {
     return mediaItems.filter(item => {
-      if (item.access === 'public') return true
-      if (item.access === 'subscriber' && hasSubscriberAccess) return true
-      if (item.access === 'musician' && hasMusicianAccess) return true
+      const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
+      
+      // If public is in access levels, everyone can see it
+      if (accessLevels.includes('public')) return true
+      
+      // If subscriber is in access levels and user has subscriber access
+      if (accessLevels.includes('subscriber') && hasSubscriberAccess) return true
+      
+      // If musician is in access levels and user has musician access
+      if (accessLevels.includes('musician') && hasMusicianAccess) return true
+      
       return false
     })
   }
 
   const getLockedMedia = () => {
     return mediaItems.filter(item => {
-      if (item.access === 'public') return false
-      if (item.access === 'subscriber' && !hasSubscriberAccess) return true
-      if (item.access === 'musician' && !hasMusicianAccess) return true
-      return false
+      const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
+      
+      // If public is the only access level, it's not locked
+      if (accessLevels.length === 1 && accessLevels[0] === 'public') return false
+      
+      // Check if user has access to any of the levels
+      const hasAccess = 
+        accessLevels.includes('public') ||
+        (accessLevels.includes('subscriber') && hasSubscriberAccess) ||
+        (accessLevels.includes('musician') && hasMusicianAccess)
+      
+      return !hasAccess
     })
   }
 
@@ -182,9 +198,16 @@ export default function MediaLibraryPage() {
                   
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      {item.access === 'public' && <Globe className="w-4 h-4 text-green-400" />}
-                      {item.access === 'subscriber' && <CreditCard className="w-4 h-4 text-yellow-400" />}
-                      {item.access === 'musician' && <Users className="w-4 h-4 text-purple-400" />}
+                      {(() => {
+                        const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
+                        return (
+                          <>
+                            {accessLevels.includes('public') && <Globe className="w-4 h-4 text-green-400" title="Public" />}
+                            {accessLevels.includes('subscriber') && <CreditCard className="w-4 h-4 text-yellow-400" title="Subscriber" />}
+                            {accessLevels.includes('musician') && <Users className="w-4 h-4 text-purple-400" title="Musician" />}
+                          </>
+                        )
+                      })()}
                       <span className="text-xs text-gray-400">{item.type}</span>
                     </div>
                     <h3 className="text-white font-semibold mb-1">{item.title}</h3>
@@ -240,7 +263,16 @@ export default function MediaLibraryPage() {
                   
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <CreditCard className="w-4 h-4 text-yellow-400" />
+                      {(() => {
+                        const accessLevels = Array.isArray(item.access) ? item.access : [item.access]
+                        return (
+                          <>
+                            {accessLevels.includes('subscriber') && <CreditCard className="w-4 h-4 text-yellow-400" title="Subscriber" />}
+                            {accessLevels.includes('musician') && <Users className="w-4 h-4 text-purple-400" title="Musician" />}
+                            {accessLevels.includes('public') && <Globe className="w-4 h-4 text-green-400" title="Public" />}
+                          </>
+                        )
+                      })()}
                       <span className="text-xs text-gray-400">{item.type}</span>
                     </div>
                     <h3 className="text-white font-semibold mb-1">{item.title}</h3>

@@ -142,7 +142,7 @@ export default function OrchestraHero() {
         </div>
       </div>
 
-      {/* Bottom Left - Minimal Contact Info */}
+      {/* Bottom Left - Login Links */}
       <motion.div
         className="absolute bottom-4 left-4 md:bottom-8 md:left-8 z-20 text-white/70 text-xs space-y-1"
         initial={{ opacity: 0 }}
@@ -150,22 +150,28 @@ export default function OrchestraHero() {
         transition={{ duration: 0.6, delay: 1.2 }}
       >
         <div>
-          <a
-            href="mailto:hello@beamthinktank.space"
+          <Link
+            href="/admin/dashboard"
             className="hover:text-[#D4AF37] transition-colors"
           >
-            hello@beamthinktank.space
-          </a>
+            Admin Login
+          </Link>
         </div>
         <div>
-          <a
-            href="https://beamthinktank.space"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/musician"
             className="hover:text-[#D4AF37] transition-colors"
           >
-            @beamthinktank | beamthinktank.space
-          </a>
+            Musician
+          </Link>
+        </div>
+        <div>
+          <Link
+            href="/subscriber"
+            className="hover:text-[#D4AF37] transition-colors"
+          >
+            Subscriber
+          </Link>
         </div>
       </motion.div>
     </section>

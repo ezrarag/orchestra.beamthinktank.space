@@ -27,22 +27,26 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  QrCode
+  QrCode,
+  LogOut,
+  User
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { 
   rehearsalSchedule, 
   faqData, 
   ravelExcerptDownloads,
-  montgomeryExcerptDownloads
+  montgomeryExcerptDownloads,
+  rehearsalVideos
 } from './data'
 import MusicianProfileModal from '@/components/MusicianProfileModal'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import { useRouter } from 'next/navigation'
 import { db, auth } from '@/lib/firebase'
 import { doc, setDoc, serverTimestamp, getDoc, collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/lib/firebase'
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { generateCheckInURL } from '@/lib/generateQR'
 import Link from 'next/link'
 
@@ -170,7 +174,7 @@ function groupByInstrument(musicians: any[]): RosterSection[] {
 }
 
 export default function BlackDiasporaSymphonyPage() {
-  const { user } = useUserRole()
+  const { user, role } = useUserRole()
   const [rosterData, setRosterData] = useState<RosterSection[]>([])
   const [rosterLoading, setRosterLoading] = useState(true)
   const [mediaItems, setMediaItems] = useState<any[]>([])
@@ -180,6 +184,7 @@ export default function BlackDiasporaSymphonyPage() {
   const [submittedAudition, setSubmittedAudition] = useState(false)
   const [showRavelModal, setShowRavelModal] = useState(false)
   const [showMontgomeryModal, setShowMontgomeryModal] = useState(false)
+  const [showRehearsalVideos, setShowRehearsalVideos] = useState(false)
   const [hoveredExcerpt, setHoveredExcerpt] = useState<string | null>(null)
   const [ravelSearch, setRavelSearch] = useState('')
   const [montgomerySearch, setMontgomerySearch] = useState('')
@@ -880,11 +885,45 @@ export default function BlackDiasporaSymphonyPage() {
               transition={{ duration: 0.8 }}
               className="space-y-8"
             >
-              {/* Status Indicator */}
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                <span className="text-white text-sm">Active Project</span>
+              {/* Status Indicator with Sign Out */}
+              {user && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                  <span className="text-white text-sm">Signed in</span>
+                </div>
+                  <motion.button
+                    onClick={async () => {
+                      if (auth) {
+                        try {
+                          await signOut(auth)
+                        } catch (error) {
+                          console.error('Error signing out:', error)
+                        }
+                      }
+                    }}
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors border border-white/20"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || 'User'}
+                        className="h-6 w-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-yellow-400/30 flex items-center justify-center">
+                        <User className="h-3.5 w-3.5 text-white" />
+                      </div>
+                    )}
+                    <span className="text-white text-xs font-medium hidden sm:inline max-w-[120px] truncate">
+                      {user.displayName || user.email?.split('@')[0] || 'User'}
+                    </span>
+                    <LogOut className="h-3.5 w-3.5 text-white" />
+                  </motion.button>
               </div>
+              )}
 
               {/* Title */}
               <div>
@@ -1670,6 +1709,23 @@ export default function BlackDiasporaSymphonyPage() {
                 <Play className="w-8 h-8 mr-3 text-purple-400" />
                 Media & Coverage
               </h2>
+              <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={() => setShowRehearsalVideos(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-semibold flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                View Rehearsal Videos
+              </button>
+              {(user && (role === 'musician' || role === 'board' || role === 'beam_admin' || role === 'partner_admin')) && (
+                <Link
+                  href="/projects/black-diaspora-symphony/media"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-semibold flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  View Full Media Library
+                </Link>
+              )}
               <button
                 onClick={() => {
                   setMediaLoading(true)
@@ -1688,6 +1744,7 @@ export default function BlackDiasporaSymphonyPage() {
               >
                 Refresh
               </button>
+              </div>
             </div>
 
             {mediaLoading ? (
@@ -2536,6 +2593,109 @@ export default function BlackDiasporaSymphonyPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Rehearsal Videos Modal */}
+      <AnimatePresence>
+        {showRehearsalVideos && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowRehearsalVideos(false)
+              }
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 300, damping: 30 }}
+              className="relative bg-orchestra-cream/80 backdrop-blur-lg rounded-2xl border-2 border-orchestra-gold/50 w-full max-w-4xl max-h-[85vh] p-6 flex flex-col space-y-4 overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-start justify-between gap-4 shrink-0">
+                <div>
+                  <h4 className="text-2xl font-bold text-orchestra-dark">Rehearsal Videos</h4>
+                  <p className="text-sm text-orchestra-brown/80 mt-1">
+                    Watch recordings from our rehearsals leading up to the 2025 Annual Memorial Concert.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowRehearsalVideos(false)}
+                  className="text-orchestra-dark hover:text-orchestra-gold transition-colors bg-white/80 hover:bg-white rounded-full p-2 shadow-lg"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                {rehearsalVideos.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {rehearsalVideos.map((video, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="bg-white/90 border-2 border-orchestra-gold/30 rounded-lg overflow-hidden shadow-sm"
+                      >
+                        <div className="aspect-video bg-black">
+                          {video.url.includes('youtube.com') || video.url.includes('youtu.be') ? (
+                            <iframe
+                              src={video.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                              className="w-full h-full"
+                              allowFullScreen
+                              title={video.title}
+                            />
+                          ) : (
+                            <video
+                              src={video.url}
+                              className="w-full h-full object-cover"
+                              controls
+                            />
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h5 className="text-orchestra-dark font-semibold mb-1">{video.title}</h5>
+                          {video.date && (
+                            <p className="text-xs text-orchestra-brown/70 mb-2">
+                              {new Date(video.date).toLocaleDateString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </p>
+                          )}
+                          {video.description && (
+                            <p className="text-sm text-orchestra-brown/80">{video.description}</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-orchestra-gold/30 bg-white/50 px-4 py-12 text-center">
+                    <div>
+                      <Play className="w-12 h-12 text-orchestra-brown/50 mx-auto mb-3" />
+                      <p className="text-orchestra-brown/70 font-medium mb-1">No rehearsal videos available yet</p>
+                      <p className="text-sm text-orchestra-brown/60">
+                        Rehearsal videos will appear here once they are uploaded.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Navigation - Portfolio Style */}
       <div className="fixed bottom-6 inset-x-0 z-40 px-4 sm:px-6 md:px-8">

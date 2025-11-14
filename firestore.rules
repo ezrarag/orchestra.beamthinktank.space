@@ -171,6 +171,59 @@ service cloud.firestore {
       allow read: if false; // Public reads handled through API endpoint
     }
     
+    // Project Media - Media library for projects
+    match /projectMedia/{mediaId} {
+      // Admins can read/write all media
+      allow read, write: if isAdmin();
+      
+      // Partner admins can read/write media for their projects
+      allow read, write: if isPartnerAdmin();
+      
+      // Board members can read all media (read-only)
+      allow read: if isAuthenticated() && request.auth.token.role == 'board';
+      
+      // Public read access - filtered by access level in application logic
+      // Users can read if media has 'public' access or if they match access level
+      allow read: if true; // Application filters by access level
+      
+      // Only admins and partner admins can write
+      allow write: if isAdmin() || isPartnerAdmin();
+    }
+    
+    // Attendance - Check-in records
+    match /attendance/{attendanceId} {
+      // Admins can read/write all attendance
+      allow read, write: if isAdmin();
+      
+      // Partner admins can read/write attendance for their projects
+      allow read, write: if isPartnerAdmin();
+      
+      // Board members can read attendance (read-only)
+      allow read: if isAuthenticated() && request.auth.token.role == 'board';
+      
+      // Users can read their own check-ins
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can create their own check-ins
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own check-ins (if needed)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Subscriptions - Stripe subscription records
+    match /subscriptions/{subscriptionId} {
+      // Admins can read all subscriptions
+      allow read: if isAdmin();
+      
+      // Users can read their own subscription
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Only webhook can write (handled server-side)
+      // Users cannot write directly - only via Stripe webhook
+      allow write: if false; // All writes handled via API/webhook
+    }
+    
     // Default deny rule for any unmatched paths
     match /{document=**} {
       allow read, write: if false;

@@ -239,9 +239,9 @@ interface ProjectMedia {
   title: string
   type: 'rehearsal' | 'performance' | 'document' | 'promotional' | 'interview'
   rehearsalId?: string // For rehearsal videos (YYYY-MM-DD format)
-  storagePath: string // Firebase Storage path
-  downloadURL?: string // Public download URL (if applicable)
-  access: 'musician' | 'subscriber' | 'public' // Access level
+  storagePath?: string // Firebase Storage path (optional if using external URL)
+  downloadURL: string // Public download URL (Firebase Storage or external URL)
+  access: ('musician' | 'subscriber' | 'public')[] // Array of access levels (can select multiple)
   uploadedBy: string // User email or UID
   uploadedAt: Timestamp
   duration?: number // Video duration in seconds
