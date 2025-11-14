@@ -262,7 +262,7 @@ export default function SetupGuide({ isOpen, onClose, user, onDocumentComplete }
                                       <span className={`flex-1 text-sm ${task.completed ? 'text-orchestra-brown/70 line-through' : 'text-orchestra-dark'}`}>
                                         {task.label}
                                       </span>
-                                      {!task.completed && task.action && (
+                                      {!task.completed && 'action' in task && task.action && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation()
