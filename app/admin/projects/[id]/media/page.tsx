@@ -698,16 +698,28 @@ export default function AdminMediaPage() {
                   <div className="flex items-center gap-1">
                     {Array.isArray(item.access) ? (
                       <>
-                        {item.access.includes('public') && <Globe className="w-4 h-4 text-green-400" title="Public" />}
-                        {item.access.includes('subscriber') && <CreditCard className="w-4 h-4 text-yellow-400" title="Subscriber" />}
-                        {item.access.includes('musician') && <Users className="w-4 h-4 text-purple-400" title="Musician" />}
+                        {item.access.includes('public') && (
+                          <span title="Public">
+                            <Globe className="w-4 h-4 text-green-400" aria-label="Public" />
+                          </span>
+                        )}
+                        {item.access.includes('subscriber') && (
+                          <span title="Subscriber">
+                            <CreditCard className="w-4 h-4 text-yellow-400" aria-label="Subscriber" />
+                          </span>
+                        )}
+                        {item.access.includes('musician') && (
+                          <span title="Musician">
+                            <Users className="w-4 h-4 text-purple-400" aria-label="Musician" />
+                          </span>
+                        )}
                       </>
                     ) : (
                       // Backward compatibility with old single access format
                       <>
-                        {item.access === 'public' && <Globe className="w-4 h-4 text-green-400" />}
-                        {item.access === 'subscriber' && <CreditCard className="w-4 h-4 text-yellow-400" />}
-                        {item.access === 'musician' && <Users className="w-4 h-4 text-purple-400" />}
+                        {item.access === 'public' && <Globe className="w-4 h-4 text-green-400" aria-label="Public" />}
+                        {item.access === 'subscriber' && <CreditCard className="w-4 h-4 text-yellow-400" aria-label="Subscriber" />}
+                        {item.access === 'musician' && <Users className="w-4 h-4 text-purple-400" aria-label="Musician" />}
                       </>
                     )}
                   </div>
