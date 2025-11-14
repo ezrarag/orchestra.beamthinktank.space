@@ -131,6 +131,13 @@ export async function POST(request: NextRequest) {
 
     switch (testType) {
       case 'firestore':
+        // Check if adminDb is initialized
+        if (!adminDb) {
+          return NextResponse.json(
+            { error: 'Database not initialized' },
+            { status: 500 }
+          )
+        }
         // Test Firestore connection without auth
         const snapshot = await adminDb.collection('organizations').limit(1).get()
         return NextResponse.json({
@@ -140,6 +147,13 @@ export async function POST(request: NextRequest) {
         })
 
       case 'auth':
+        // Check if adminAuth is initialized
+        if (!adminAuth) {
+          return NextResponse.json(
+            { error: 'Authentication service not initialized' },
+            { status: 500 }
+          )
+        }
         // Test Auth service without user verification
         const users = await adminAuth.listUsers(1)
         return NextResponse.json({
