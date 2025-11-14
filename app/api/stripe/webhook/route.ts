@@ -30,6 +30,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Check if adminDb is initialized
+  if (!adminDb) {
+    console.error('Database not initialized')
+    return NextResponse.json(
+      { error: 'Database not initialized' },
+      { status: 500 }
+    )
+  }
+
   try {
     // Handle subscription events
     if (event.type === 'checkout.session.completed') {

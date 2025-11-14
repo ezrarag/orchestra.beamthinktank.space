@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
     const userId = decodedToken.uid
     const userEmail = decodedToken.email || ''
 
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+
     // Get or create Stripe customer
     let customerId: string
     

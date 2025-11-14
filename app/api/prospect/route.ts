@@ -14,6 +14,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+
     // Get prospect document
     const prospectDoc = await adminDb.collection('prospects').doc(prospectId).get()
 

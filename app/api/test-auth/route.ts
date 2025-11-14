@@ -28,6 +28,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+
     // Test Firestore access
     const organizationsSnapshot = await adminDb.collection('organizations').limit(5).get()
     const projectsSnapshot = await adminDb.collection('projects').limit(5).get()

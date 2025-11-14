@@ -34,6 +34,15 @@ export async function POST(request: NextRequest) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('Database not initialized')
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+    
     try {
       // Save donation to Firestore
       await adminDb.collection('donations').add({

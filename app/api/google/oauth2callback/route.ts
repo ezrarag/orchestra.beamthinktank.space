@@ -77,6 +77,13 @@ export async function GET(request: NextRequest) {
 
     const tokens = await tokenResponse.json()
 
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.redirect(
+        new URL('/admin/settings?error=database_not_initialized', request.url)
+      )
+    }
+
     // Store tokens in Firestore
     await adminDb.collection('integrations').doc('google').set({
       userId: stateData.uid,

@@ -60,6 +60,14 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.split('Bearer ')[1]
     
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+    
     // Verify admin access (you'll need to decode the token and check role)
     // For now, we'll add a simple check - in production, verify the Firebase ID token
     // This is a temporary solution - you should verify the Firebase ID token properly

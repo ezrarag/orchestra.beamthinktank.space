@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
     // Generate unique confirmation token
     const confirmationToken = crypto.randomBytes(32).toString('hex')
     
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not initialized' },
+        { status: 500 }
+      )
+    }
+
     // Create prospect document
     const prospectData = {
       name,
