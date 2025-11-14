@@ -11,6 +11,12 @@ export interface GoogleTokens {
  */
 export async function getGoogleTokens(): Promise<GoogleTokens | null> {
   try {
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('Database not initialized')
+      return null
+    }
+    
     const doc = await adminDb.collection('integrations').doc('google').get()
     if (!doc.exists) {
       return null
@@ -65,6 +71,12 @@ export async function refreshGoogleToken(refreshToken: string): Promise<string |
     }
 
     const tokens = await response.json()
+
+    // Check if adminDb is initialized
+    if (!adminDb) {
+      console.error('Database not initialized')
+      return null
+    }
 
     // Update stored tokens
     await adminDb.collection('integrations').doc('google').update({
