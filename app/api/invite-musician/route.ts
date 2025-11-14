@@ -16,6 +16,15 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.split('Bearer ')[1]
+    
+    // Check if adminAuth is initialized
+    if (!adminAuth) {
+      return NextResponse.json(
+        { error: 'Authentication service not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await adminAuth.verifyIdToken(token)
     
     // Verify admin role

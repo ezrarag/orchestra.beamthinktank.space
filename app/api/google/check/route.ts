@@ -28,6 +28,15 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.split('Bearer ')[1]
+    
+    // Additional null check for TypeScript
+    if (!adminAuth) {
+      return NextResponse.json(
+        { error: 'Authentication service not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await adminAuth.verifyIdToken(token)
     
     // Verify admin role

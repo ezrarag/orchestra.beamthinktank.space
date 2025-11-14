@@ -15,6 +15,14 @@ export async function GET(request: NextRequest) {
     // Extract the token
     const token = authHeader.split('Bearer ')[1]
     
+    // Check if adminAuth is initialized
+    if (!adminAuth) {
+      return NextResponse.json(
+        { error: 'Authentication service not initialized' },
+        { status: 500 }
+      )
+    }
+    
     // Verify the token
     const decodedToken = await adminAuth.verifyIdToken(token)
     const uid = decodedToken.uid

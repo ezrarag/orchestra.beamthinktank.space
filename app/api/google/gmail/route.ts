@@ -17,6 +17,15 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.split('Bearer ')[1]
+    
+    // Check if adminAuth is initialized
+    if (!adminAuth) {
+      return NextResponse.json(
+        { error: 'Authentication service not initialized' },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await adminAuth.verifyIdToken(token)
     
     // Verify admin role
@@ -55,6 +64,14 @@ export async function POST(request: NextRequest) {
       const emailBatches = []
       for (let i = 0; i < emailAddresses.length; i += 10) {
         emailBatches.push(emailAddresses.slice(i, i + 10))
+      }
+      
+      // Check if adminDb is initialized
+      if (!adminDb) {
+        return NextResponse.json(
+          { error: 'Database not initialized' },
+          { status: 500 }
+        )
       }
       
       // Query each batch

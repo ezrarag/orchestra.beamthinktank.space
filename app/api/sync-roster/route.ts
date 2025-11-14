@@ -23,6 +23,15 @@ export async function POST(request: NextRequest) {
     // Try to verify with Admin SDK if available
     try {
       const { adminAuth, verifyAdminRole } = await import('@/lib/firebase-admin')
+      
+      // Check if adminAuth is initialized
+      if (!adminAuth) {
+        return NextResponse.json(
+          { error: 'Authentication service not initialized' },
+          { status: 500 }
+        )
+      }
+      
       const decodedToken = await adminAuth.verifyIdToken(token)
       
       // Verify admin role
