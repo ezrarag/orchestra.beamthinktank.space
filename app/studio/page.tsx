@@ -99,7 +99,7 @@ const ALLOWED_PHONE_NUMBERS = [
 // Add your Google sign-in email addresses here for testing
 // These emails will have access even if they're not marked as subscribers in Firestore
 // TODO: Remove this hardcoded list once proper subscription system is in place
-const ALLOWED_EMAILS = [
+const ALLOWED_EMAILS: string[] = [
   // Add your email addresses here, e.g.:
   // 'your-email@gmail.com',
   // 'dayvin@example.com',
