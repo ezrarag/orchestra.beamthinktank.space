@@ -8,7 +8,7 @@ The Admin Portal allows authorized staff (Ezra, Dayvin, Dayvin's mom, etc.) to v
 
 1. **Admins must log in with Google** (Firebase Auth).
 
-2. **Admin status is stored in Firebase Custom Claims** as `beam_admin: true` or `role: 'beam_admin'`.
+2. **Admin status is stored in Firebase Authentication Custom Claims** as `beam_admin: true` or `role: 'beam_admin'`. These claims are set using the **Firebase Admin SDK** (not through the Firebase Console UI).
 
 3. **Non-admins attempting to visit `/admin/*`** will be redirected with an "Access Denied" message.
 
@@ -32,68 +32,101 @@ The admin dashboard (`/admin/dashboard`) provides:
 
 ## How to Grant Admin Access
 
-### Method 1: Using the Script (Recommended)
+**Important:** Admin roles are granted using **Firebase Authentication Custom Claims**, which must be set using the Firebase Admin SDK. Custom claims cannot be set directly through the Firebase Console UI - they require server-side code with admin privileges.
+
+### Method 1: Using the Admin Settings Page (Easiest - Requires Existing Admin)
+
+If you already have an admin account:
+
+1. **Sign in** to the admin portal with an existing admin account
+2. Navigate to **Admin → Settings** (`/admin/settings`)
+3. Scroll to the **"User Role Management"** section
+4. Enter the user's email address
+5. Select **"Beam Admin"** from the role dropdown
+6. Click **"Set User Role"**
+7. The user must **sign out and sign back in** to refresh their ID token
+
+### Method 2: Using the Script (Recommended for First Admin or Multiple Users)
+
+Use the `setMultipleAdmins.ts` script to set admin roles for one or more users:
 
 ```bash
-# Set ADMIN_EMAIL environment variable
-ADMIN_EMAIL=dayvin@example.com npx tsx scripts/setAdminRole.ts
+# Set multiple admins at once
+ADMIN_EMAILS="ezra@readyaimgo.biz,dayvin@example.com" npx tsx scripts/setMultipleAdmins.ts
 
-# Or edit scripts/setAdminRole.ts directly and set the email
+# Or set a single admin
+ADMIN_EMAIL=dayvin@example.com npx tsx scripts/setAdminRole.ts
 ```
+
+**Prerequisites:**
+- Firebase Admin SDK must be configured (see `docs/firebase-admin-setup.md`)
+- User must have signed in at least once with Google to create their Firebase Auth account
+- Run `gcloud auth application-default login` if using Application Default Credentials
 
 **Important:** After running the script, the user must **sign out and sign back in** to refresh their ID token with the new admin claims.
 
-### Method 2: Using Firebase Console
+### Method 3: Using Firebase Admin SDK Programmatically
 
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Navigate to **Authentication** → **Users**
-3. Find the user you want to make admin
-4. Click on the user → **Custom Claims** tab
-5. Add custom claim:
-   ```json
-   {
-     "beam_admin": true,
-     "role": "beam_admin"
-   }
-   ```
-6. Save changes
-
-### Method 3: Using Firebase Admin SDK
+If you're building custom tooling or need to set roles programmatically:
 
 ```typescript
-import { setUserRole } from '@/lib/firebase-admin'
+import { getAuth } from 'firebase-admin/auth'
 
-// Get user UID first, then:
-await setUserRole('user_uid', 'beam_admin')
+const auth = getAuth()
+const user = await auth.getUserByEmail('user@example.com')
+
+// Preserve existing claims and add admin role
+const existing = (user.customClaims || {}) as Record<string, unknown>
+await auth.setCustomUserClaims(user.uid, {
+  ...existing,
+  beam_admin: true,
+  role: 'beam_admin',
+})
 ```
+
+**Note:** This requires Firebase Admin SDK to be initialized with proper credentials.
 
 ## How to Grant Board Access
 
 Board members have read-only access to analytics dashboards. They cannot edit roster data or make changes.
 
-### Method 1: Using Firebase Console
+**Important:** Board roles are granted using **Firebase Authentication Custom Claims**, which must be set using the Firebase Admin SDK. Custom claims cannot be set directly through the Firebase Console UI.
 
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Navigate to **Authentication** → **Users**
-3. Find the user you want to grant board access
-4. Click on the user → **Custom Claims** tab
-5. Add custom claim:
-   ```json
-   {
-     "role": "board",
-     "board": true
-   }
-   ```
-6. Save changes
+### Method 1: Using the Admin Settings Page (Easiest - Requires Existing Admin)
+
+1. **Sign in** to the admin portal with an existing admin account
+2. Navigate to **Admin → Settings** (`/admin/settings`)
+3. Scroll to the **"User Role Management"** section
+4. Enter the user's email address
+5. Select **"Board"** from the role dropdown
+6. Click **"Set User Role"**
+7. The user must **sign out and sign back in** to refresh their ID token
 
 ### Method 2: Using Firebase Admin SDK
 
-```typescript
-import { setUserRole } from '@/lib/firebase-admin'
+You can create a script similar to `setAdminRole.ts` but for board members:
 
-// Get user UID first, then:
-await setUserRole('user_uid', 'board')
+```typescript
+import { initializeApp, applicationDefault } from 'firebase-admin/app'
+import { getAuth } from 'firebase-admin/auth'
+
+initializeApp({
+  credential: applicationDefault(),
+  projectId: process.env.FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+})
+
+const email = process.env.USER_EMAIL || 'user@example.com'
+const user = await getAuth().getUserByEmail(email)
+
+const existing = (user.customClaims || {}) as Record<string, unknown>
+await getAuth().setCustomUserClaims(user.uid, {
+  ...existing,
+  role: 'board',
+  board: true,
+})
 ```
+
+Or use the Admin Settings page API endpoint programmatically (requires admin authentication).
 
 **Important:** After setting board role, the user must **sign out and sign back in** to refresh their ID token.
 
@@ -207,14 +240,16 @@ Example:
 ### "Access Denied" Message
 
 **Possible causes:**
-1. User doesn't have admin role set
+1. User doesn't have admin role set via custom claims
 2. User needs to sign out and back in to refresh token
-3. Custom claims not properly set
+3. Custom claims not properly set using Admin SDK
 
 **Solution:**
-1. Verify admin role in Firebase Console → Authentication → Users → Custom Claims
-2. Have user sign out completely and sign back in
-3. Re-run the admin role script if needed
+1. Verify admin role was set using one of the methods above (Admin Settings page, script, or Admin SDK)
+2. Note: You cannot verify custom claims in Firebase Console UI - they're only visible in ID tokens
+3. Have user sign out completely and sign back in to refresh their ID token
+4. Re-run the admin role script or use Admin Settings page if needed
+5. Check that Firebase Admin SDK is properly configured if using scripts
 
 ### Dashboard Shows Zero Data
 
@@ -235,11 +270,15 @@ Example:
 1. Firebase Admin SDK not configured
 2. Missing service account credentials
 3. Insufficient permissions
+4. User hasn't signed in yet (account doesn't exist in Firebase Auth)
 
 **Solution:**
-1. Follow setup in `docs/firebase-admin-setup.md`
-2. Run `gcloud auth application-default login`
-3. Verify service account has `roles/firebase.admin`
+1. Ensure the user has signed in at least once with Google to create their Firebase Auth account
+2. Follow setup in `docs/firebase-admin-setup.md` to configure Admin SDK
+3. Run `gcloud auth application-default login` if using Application Default Credentials
+4. Verify service account has `roles/firebase.admin` role
+5. If using scripts, ensure environment variables are set correctly
+6. Use the Admin Settings page (`/admin/settings`) if you already have an admin account
 
 ## Managing Roster Data
 

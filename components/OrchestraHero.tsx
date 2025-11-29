@@ -1,22 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
 
-const labs = ['Symphony.', 'Chamber.', 'Choir.', 'Opera.']
-
 export default function OrchestraHero() {
-  const [currentLabIndex, setCurrentLabIndex] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentLabIndex((prev) => (prev + 1) % labs.length)
-    }, 3000) // Change every 3 seconds
-
-    return () => clearInterval(interval)
-  }, [])
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden bg-black">
@@ -62,7 +50,7 @@ export default function OrchestraHero() {
               </p>
             </motion.div>
 
-            {/* Main Title with Rotating Lab Names */}
+            {/* Main Title */}
             <motion.div
               className="min-h-[120px] md:min-h-[160px] flex items-center"
               initial={{ opacity: 0, y: 20 }}
@@ -70,18 +58,7 @@ export default function OrchestraHero() {
               transition={{ duration: 0.6, delay: 0.4 }}
             >
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-tight">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={currentLabIndex}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.5 }}
-                    className="block"
-                  >
-                    {labs[currentLabIndex]}
-                  </motion.span>
-                </AnimatePresence>
+                Orchestra.
               </h1>
             </motion.div>
 
@@ -92,7 +69,7 @@ export default function OrchestraHero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
             >
-              Building pathways for musicians, educators, and communities to perform, create, and grow.
+              A professional orchestra and training ecosystem connecting concerts, education, and community.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -107,10 +84,10 @@ export default function OrchestraHero() {
                 whileTap={{ scale: 0.95 }}
               >
                 <Link
-                  href="/training"
+                  href="/tickets"
                   className="inline-block px-8 py-4 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 hover:shadow-2xl text-center"
                 >
-                  Explore Projects
+                  Buy Tickets
                 </Link>
               </motion.div>
               <motion.div
@@ -118,10 +95,10 @@ export default function OrchestraHero() {
                 whileTap={{ scale: 0.95 }}
               >
                 <Link
-                  href="/training"
+                  href="/studio"
                   className="inline-block px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
                 >
-                  Join a Program
+                  Watch & Explore
                 </Link>
               </motion.div>
             </motion.div>
@@ -133,7 +110,7 @@ export default function OrchestraHero() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 1 }}
             >
-              For musicians, educators, and community partners.
+              For audiences, musicians, and partner organizations.
             </motion.p>
           </motion.div>
 

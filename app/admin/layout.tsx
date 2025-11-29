@@ -25,6 +25,7 @@ const navLinks = [
   { label: 'Pulse', href: '/admin/pulse', icon: Zap },
   { label: 'Projects', href: '/admin/projects', icon: FolderOpen },
   { label: 'Musicians', href: '/admin/musicians', icon: Users },
+  { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'Attendance', href: '/admin/attendance', icon: Calendar },
   { label: 'QR Codes', href: '/admin/qr-codes', icon: QrCode },
   { label: 'Settings', href: '/admin/settings', icon: Settings },

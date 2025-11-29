@@ -22,11 +22,14 @@ export default function Header() {
 
           {/* Desktop Navigation - All links in header */}
           <nav className="hidden md:flex items-center space-x-8">
+            <Link href="/tickets" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+              Tickets
+            </Link>
+            <Link href="/studio" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+              Watch & Explore
+            </Link>
             <Link href="/performances" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Performances
-            </Link>
-            <Link href="/rehearsals" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
-              Rehearsals
             </Link>
             <Link href="/training" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Training
@@ -36,9 +39,6 @@ export default function Header() {
             </Link>
             <Link href="/donate" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Donate
-            </Link>
-            <Link href="/scholarship" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
-              Scholarship
             </Link>
           </nav>
 
@@ -60,11 +60,14 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden pb-4">
             <nav className="flex flex-col space-y-4">
+              <Link href="/tickets" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+                Tickets
+              </Link>
+              <Link href="/studio" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
+                Watch & Explore
+              </Link>
               <Link href="/performances" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Performances
-              </Link>
-              <Link href="/rehearsals" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
-                Rehearsals
               </Link>
               <Link href="/training" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Training
@@ -74,9 +77,6 @@ export default function Header() {
               </Link>
               <Link href="/donate" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
                 Donate
-              </Link>
-              <Link href="/scholarship" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
-                Scholarship
               </Link>
             </nav>
           </div>

@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Handle subscription events
+    // Handle checkout.session.completed events
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session
       
+      // Handle subscription payments
       if (session.mode === 'subscription' && session.subscription) {
         const subscription = await stripe.subscriptions.retrieve(
           session.subscription as string
@@ -80,6 +81,37 @@ export async function POST(request: NextRequest) {
         })
 
         console.log('Subscription activated for user:', userId)
+      }
+      
+      // Handle ticket purchases (one-time payments)
+      if (session.mode === 'payment' && session.metadata?.eventId) {
+        const orderId = session.metadata.orderId
+        const userId = session.metadata.userId
+        const userEmail = session.customer_email || ''
+        const paymentIntentId = session.payment_intent as string | undefined
+        
+        if (!orderId) {
+          console.error('No orderId in session metadata')
+          return NextResponse.json({ received: true })
+        }
+
+        // Update order status to paid
+        const orderRef = adminDb.collection('eventOrders').doc(orderId)
+        await orderRef.update({
+          status: 'paid',
+          stripePaymentIntentId: paymentIntentId,
+          userEmail: userEmail,
+          paidAt: Timestamp.now(),
+        })
+
+        console.log('Ticket order completed:', orderId, 'for event:', session.metadata.eventId)
+        
+        // TODO: Send confirmation email to user
+        // TODO: Generate QR codes for tickets (for ticket scanning at venue)
+        // TODO: Update available ticket quantities (decrement tier.quantity)
+        // TODO: Add subscription discounts for members (check user subscription status)
+        // TODO: Sync events with media system (link event to projectMedia)
+        // TODO: Allow partner organizations to manage their own events (add organizationId check)
       }
     }
 

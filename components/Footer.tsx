@@ -41,13 +41,18 @@ export default function Footer() {
             <h3 className="text-lg font-serif text-orchestra-gold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/performances" className="text-orchestra-cream/80 hover:text-orchestra-gold transition-colors">
-                  Performances
+                <Link href="/tickets" className="text-orchestra-cream/80 hover:text-orchestra-gold transition-colors">
+                  Tickets & Performances
                 </Link>
               </li>
               <li>
-                <Link href="/rehearsals" className="text-orchestra-cream/80 hover:text-orchestra-gold transition-colors">
-                  Rehearsals
+                <Link href="/studio" className="text-orchestra-cream/80 hover:text-orchestra-gold transition-colors">
+                  Watch & Explore
+                </Link>
+              </li>
+              <li>
+                <Link href="/performances" className="text-orchestra-cream/80 hover:text-orchestra-gold transition-colors">
+                  Performances
                 </Link>
               </li>
               <li>
