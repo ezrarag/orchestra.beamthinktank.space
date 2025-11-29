@@ -26,6 +26,17 @@
 
 ## In Progress / Next Steps 🚧
 
+### Authentication & SMS
+
+1. **Fix reCAPTCHA for SMS Authentication**
+   - [ ] Investigate and fix reCAPTCHA container rendering issues
+   - [ ] Ensure reCAPTCHA verifier properly initializes before SMS send
+   - [ ] Handle reCAPTCHA expiration and retry logic
+   - [ ] Improve error handling for reCAPTCHA-related failures
+   - [ ] Test SMS authentication flow across different browsers/devices
+   - [ ] Location: `components/AuthButtons.tsx` and `lib/authClient.ts`
+   - **Priority: High** - SMS authentication is currently unreliable
+
 ### Ticketing System Enhancements
 
 1. **Email Confirmations**

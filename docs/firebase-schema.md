@@ -273,6 +273,29 @@ interface Subscription {
 }
 ```
 
+### 13. `projectRehearsalMedia`
+```typescript
+interface ProjectRehearsalMedia {
+  id: string            // doc id
+  projectId: string     // e.g. 'black-diaspora-symphony', 'uwm-afro-caribbean-jazz'
+  title: string         // "Bonds – Excerpt 1"
+  description?: string  // optional notes about the clip
+  date: Timestamp       // when the rehearsal happened (or upload date)
+  instrumentGroup?: 'Strings' | 'Winds' | 'Brass' | 'Percussion' | 'Full Orchestra' | 'Choir' | 'Rhythm Section' | 'Other'
+  url: string           // Firebase Storage download URL
+  thumbnailUrl?: string // optional poster frame
+  private: boolean      // true = paywalled / future subscription, false = public
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+```
+
+**Usage Notes:**
+- Used by `/studio` page to display rehearsal videos dynamically
+- Only documents with `private: false` are publicly readable
+- Admins can manage all media via Firebase Console or API
+- To add videos manually: Create documents in Firebase Console → Firestore → `projectRehearsalMedia` collection
+
 ## Indexes Required
 
 ### Firestore Indexes

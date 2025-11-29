@@ -56,6 +56,13 @@ export function useUserRole(): UserWithRole {
             return
           }
           
+          // Check for subscriber claim
+          if (claims.beam_subscriber === true || claims.subscriber === true) {
+            setRole('subscriber')
+            setLoading(false)
+            return
+          }
+          
           // Fall back to Firestore user document
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {

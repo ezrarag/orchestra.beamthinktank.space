@@ -30,7 +30,7 @@ export default function AuthButtons({
   const recaptchaContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Clean up reCAPTCHA on unmount
+    // Clean up reCAPTCHA on unmount or when auth method changes
     return () => {
       if (recaptchaVerifierRef.current) {
         try {
@@ -38,9 +38,10 @@ export default function AuthButtons({
         } catch (e) {
           // Ignore cleanup errors
         }
+        recaptchaVerifierRef.current = null
       }
     }
-  }, [])
+  }, [authMethod])
 
   const handleGoogleSignIn = async () => {
     if (!auth) {
@@ -108,17 +109,48 @@ export default function AuthButtons({
     setError(null)
 
     try {
-      // Create reCAPTCHA verifier
-      if (!recaptchaVerifierRef.current && recaptchaContainerRef.current) {
-        recaptchaVerifierRef.current = createRecaptchaVerifier('recaptcha-container', 'invisible')
+      // Wait for container to be in DOM
+      let containerElement = document.getElementById('recaptcha-container')
+      if (!containerElement) {
+        // If container doesn't exist, wait a bit for React to render it
+        await new Promise(resolve => setTimeout(resolve, 100))
+        containerElement = document.getElementById('recaptcha-container')
       }
+
+      if (!containerElement) {
+        throw new Error('reCAPTCHA container not found. Please refresh the page and try again.')
+      }
+
+      // Clean up any existing verifier
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        recaptchaVerifierRef.current = null
+      }
+
+      // Create reCAPTCHA verifier
+      recaptchaVerifierRef.current = createRecaptchaVerifier('recaptcha-container', 'invisible')
 
       const result = await signInWithPhone(formattedPhone, recaptchaVerifierRef.current)
       setConfirmationResult(result)
       setAuthMethod('sms')
     } catch (error: any) {
       console.error('Error sending SMS:', error)
-      const err = `SMS sign-in failed: ${error.message}`
+      
+      // Provide more helpful error messages
+      let errMessage = error.message || 'Unknown error occurred'
+      if (error.code === 'auth/invalid-app-credential') {
+        errMessage = 'Phone authentication is not properly configured. Please contact support or try a different sign-in method.'
+      } else if (error.code === 'auth/invalid-phone-number') {
+        errMessage = 'Invalid phone number format. Please enter a valid phone number.'
+      } else if (error.code === 'auth/too-many-requests') {
+        errMessage = 'Too many requests. Please try again later.'
+      }
+      
+      const err = `SMS sign-in failed: ${errMessage}`
       setError(err)
       onError?.(err)
       
@@ -126,10 +158,10 @@ export default function AuthButtons({
       if (recaptchaVerifierRef.current) {
         try {
           recaptchaVerifierRef.current.clear()
-          recaptchaVerifierRef.current = null
         } catch (e) {
           // Ignore cleanup errors
         }
+        recaptchaVerifierRef.current = null
       }
     } finally {
       setLoading(false)
@@ -217,8 +249,8 @@ export default function AuthButtons({
           </motion.div>
         )}
 
-        {/* Hidden reCAPTCHA container */}
-        <div id="recaptcha-container" ref={recaptchaContainerRef} />
+        {/* Hidden reCAPTCHA container - always render for SMS auth */}
+        <div id="recaptcha-container" ref={recaptchaContainerRef} style={{ display: 'none' }} />
       </div>
     )
   }

@@ -263,6 +263,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
+    // Project Rehearsal Media - Public rehearsal videos for /studio page
+    match /projectRehearsalMedia/{mediaId} {
+      // Public can read only if private == false
+      allow read: if resource.data.private == false;
+      
+      // Admins can manage media (using existing admin claim logic)
+      allow write, update, delete: if isAdmin() || 
+        (isAuthenticated() && request.auth.token.beam_admin == true);
+    }
+    
     // Default deny rule for any unmatched paths
     match /{document=**} {
       allow read, write: if false;
