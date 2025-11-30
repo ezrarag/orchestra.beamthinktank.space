@@ -13,8 +13,10 @@ import {
   Calendar,
   Coins
 } from 'lucide-react'
-import { collection, query, getDocs } from 'firebase/firestore'
+import { collection, query, getDocs, where, doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
 
 // Mock projects data - in production, fetch from Firestore
 const mockProjects = [
@@ -45,6 +47,8 @@ const mockProjects = [
 ]
 
 export default function ProjectsPage() {
+  const { role } = useUserRole()
+  const partnerProjectId = usePartnerProject()
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -52,33 +56,72 @@ export default function ProjectsPage() {
     const fetchProjects = async () => {
       try {
         if (db) {
-          // Try to fetch from Firestore
-          const projectsQuery = query(collection(db, 'projects'))
-          const snapshot = await getDocs(projectsQuery)
-          
-          if (!snapshot.empty) {
-            const projectsData = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            setProjects(projectsData)
+          // For partner admins, only fetch their assigned project
+          if (role === 'partner_admin' && partnerProjectId) {
+            try {
+              // Try to get project by ID directly
+              const projectRef = doc(db, 'projects', partnerProjectId)
+              const projectSnap = await getDoc(projectRef)
+              
+              if (projectSnap.exists()) {
+                setProjects([{
+                  id: projectSnap.id,
+                  ...projectSnap.data()
+                }])
+              } else {
+                // Fallback: fetch all and filter
+                const projectsQuery = query(collection(db, 'projects'))
+                const snapshot = await getDocs(projectsQuery)
+                const allProjects = snapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                }))
+                const filtered = allProjects.filter(p => p.id === partnerProjectId)
+                setProjects(filtered.length > 0 ? filtered : mockProjects.filter(p => p.id === partnerProjectId))
+              }
+            } catch (error) {
+              console.error('Error fetching partner project:', error)
+              setProjects(mockProjects.filter(p => p.id === partnerProjectId))
+            }
           } else {
-            // Fallback to mock data
-            setProjects(mockProjects)
+            // For beam admins, fetch all projects
+            const projectsQuery = query(collection(db, 'projects'))
+            const snapshot = await getDocs(projectsQuery)
+            
+            if (!snapshot.empty) {
+              const projectsData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }))
+              setProjects(projectsData)
+            } else {
+              // Fallback to mock data
+              setProjects(mockProjects)
+            }
           }
         } else {
-          setProjects(mockProjects)
+          // Fallback to mock data, filtered for partner admins
+          if (role === 'partner_admin' && partnerProjectId) {
+            setProjects(mockProjects.filter(p => p.id === partnerProjectId))
+          } else {
+            setProjects(mockProjects)
+          }
         }
       } catch (error) {
         console.error('Error fetching projects:', error)
-        setProjects(mockProjects)
+        // Fallback to mock data, filtered for partner admins
+        if (role === 'partner_admin' && partnerProjectId) {
+          setProjects(mockProjects.filter(p => p.id === partnerProjectId))
+        } else {
+          setProjects(mockProjects)
+        }
       } finally {
         setLoading(false)
       }
     }
 
     fetchProjects()
-  }, [])
+  }, [role, partnerProjectId])
 
   if (loading) {
     return (
@@ -101,14 +144,15 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-bold text-orchestra-gold mb-2">Projects</h1>
           <p className="text-orchestra-cream/70">Manage all BEAM Orchestra projects</p>
         </div>
-        <motion.button
-          className="flex items-center space-x-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-medium rounded-lg transition-colors"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Project</span>
-        </motion.button>
+        {role === 'beam_admin' && (
+          <Link
+            href="/admin/projects/new"
+            className="flex items-center space-x-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-orchestra-dark font-medium rounded-lg transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Project</span>
+          </Link>
+        )}
       </motion.div>
 
       {/* Projects Grid */}

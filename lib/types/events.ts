@@ -56,6 +56,22 @@ export interface EventRSVP {
   eventId: string
   name: string
   email: string
+  hasPlusOne: boolean
+  plusOneName?: string
   timestamp: Timestamp | Date
 }
+
+export interface EventNotification {
+  id?: string
+  userId?: string // If user is logged in
+  email: string // Always track by email for RSVPs
+  eventId: string
+  eventTitle: string
+  type: 'rsvp_confirmed' | 'ticket_purchased' | 'event_reminder'
+  message: string
+  read: boolean
+  timestamp: Timestamp | Date
+}
+
+
 

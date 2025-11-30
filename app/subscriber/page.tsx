@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -41,6 +41,7 @@ export default function SubscriberPage() {
   const [showVideoModal, setShowVideoModal] = useState(false)
   const [showTiersMenu, setShowTiersMenu] = useState(false)
   const [selectedTier, setSelectedTier] = useState<string | null>(null)
+  const tiersMenuRef = useRef<HTMLDivElement>(null)
 
   const handleSubscribe = (tierId: string) => {
     setSelectedTier(tierId)
@@ -48,6 +49,20 @@ export default function SubscriberPage() {
     // Redirect to subscribe flow with tier parameter
     router.push(`/subscribe?tier=${tierId}`)
   }
+
+  // Scroll tiers menu into view when it opens
+  useEffect(() => {
+    if (showTiersMenu && tiersMenuRef.current) {
+      // Small delay to ensure animation starts
+      setTimeout(() => {
+        tiersMenuRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        })
+      }, 100)
+    }
+  }, [showTiersMenu])
 
   return (
     <div className="h-screen bg-black relative overflow-hidden flex flex-col">
@@ -142,67 +157,6 @@ export default function SubscriberPage() {
               >
                 Subscribe
               </motion.button>
-
-              {/* Subscription Tiers Menu - Framer Motion Animation (flies up from button) */}
-              <AnimatePresence>
-                {showTiersMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                    transition={{ 
-                      type: "spring",
-                      stiffness: 400,
-                      damping: 25,
-                      duration: 0.6
-                    }}
-                    className="absolute top-full left-0 right-0 mt-4 bg-black/95 backdrop-blur-lg border-2 border-[#D4AF37]/50 rounded-xl p-6 shadow-2xl z-50"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-[#D4AF37] font-bold text-lg">Choose Your Tier</h3>
-                      <button
-                        onClick={() => setShowTiersMenu(false)}
-                        className="text-white/60 hover:text-white transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {subscriptionTiers.map((tier, index) => (
-                        <motion.div
-                          key={tier.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          className="border border-white/20 rounded-lg p-4 hover:border-[#D4AF37]/50 transition-colors cursor-pointer group"
-                          onClick={() => handleSubscribe(tier.id)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="text-white font-bold text-lg mb-1">{tier.name}</h4>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-[#D4AF37] font-bold text-2xl">${tier.price}</span>
-                                <span className="text-white/60 text-sm">/{tier.period}</span>
-                              </div>
-                            </div>
-                            <ArrowUpRight className="w-5 h-5 text-white/40 group-hover:text-[#D4AF37] transition-colors" />
-                          </div>
-                          
-                          <ul className="space-y-2">
-                            {tier.features.map((feature, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-white/80 text-sm">
-                                <Check className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
-                                <span>{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
 
             {/* Subtext */}
@@ -235,6 +189,83 @@ export default function SubscriberPage() {
           ← Back to Home
         </Link>
       </motion.div>
+
+      {/* Subscription Tiers Modal - Fixed centered modal that scrolls into view */}
+      <AnimatePresence>
+        {showTiersMenu && (
+          <>
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100]"
+              onClick={() => setShowTiersMenu(false)}
+            />
+            
+            {/* Modal Content */}
+            <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
+              <motion.div
+                ref={tiersMenuRef}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ 
+                  type: "spring",
+                  stiffness: 400,
+                  damping: 25,
+                  duration: 0.6
+                }}
+                className="bg-black/95 backdrop-blur-lg border-2 border-[#D4AF37]/50 rounded-xl p-6 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[#D4AF37] font-bold text-lg">Choose Your Tier</h3>
+                  <button
+                    onClick={() => setShowTiersMenu(false)}
+                    className="text-white/60 hover:text-white transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {subscriptionTiers.map((tier, index) => (
+                    <motion.div
+                      key={tier.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="border border-white/20 rounded-lg p-4 hover:border-[#D4AF37]/50 transition-colors cursor-pointer group"
+                      onClick={() => handleSubscribe(tier.id)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="text-white font-bold text-lg mb-1">{tier.name}</h4>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[#D4AF37] font-bold text-2xl">${tier.price}</span>
+                            <span className="text-white/60 text-sm">/{tier.period}</span>
+                          </div>
+                        </div>
+                        <ArrowUpRight className="w-5 h-5 text-white/40 group-hover:text-[#D4AF37] transition-colors" />
+                      </div>
+                      
+                      <ul className="space-y-2">
+                        {tier.features.map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-white/80 text-sm">
+                            <Check className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Video Modal */}
       <AnimatePresence>

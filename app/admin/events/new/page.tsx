@@ -123,25 +123,36 @@ export default function NewEventPage() {
         ? Timestamp.fromDate(formData.date)
         : formData.date
 
-      const eventData: Omit<Event, 'id'> = {
+      // Build event data, only including fields that have values (Firestore doesn't allow undefined)
+      const eventData: any = {
         title: formData.title!,
         series: formData.series!,
-        projectId: formData.projectId || undefined,
         city: formData.city!,
         venueName: formData.venueName!,
         venueAddress: formData.venueAddress || '',
         date: eventDate as Timestamp,
         time: formData.time || '',
         description: formData.description || '',
-        imageUrl: imageUrl || undefined,
         isFree: formData.isFree || false,
         ticketProvider: formData.ticketProvider || 'stripe',
-        externalTicketUrl: formData.externalTicketUrl || undefined,
         onSale: formData.onSale || false,
         priceTiers: formData.priceTiers || [],
         createdBy: user.uid,
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp,
+      }
+
+      // Only include optional fields if they have values
+      if (formData.projectId && formData.projectId.trim()) {
+        eventData.projectId = formData.projectId.trim()
+      }
+      
+      if (imageUrl) {
+        eventData.imageUrl = imageUrl
+      }
+      
+      if (formData.externalTicketUrl && formData.externalTicketUrl.trim()) {
+        eventData.externalTicketUrl = formData.externalTicketUrl.trim()
       }
 
       await addDoc(collection(db, 'events'), eventData)
@@ -494,4 +505,5 @@ export default function NewEventPage() {
     </div>
   )
 }
+
 

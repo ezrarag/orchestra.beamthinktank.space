@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   LayoutDashboard, 
@@ -16,9 +16,13 @@ import {
   Calendar,
   QrCode,
   ChevronDown,
-  MoreVertical
+  MoreVertical,
+  LogOut
 } from 'lucide-react'
-import { useRequireRole } from '@/lib/hooks/useUserRole'
+import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
+import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
+import { signOut } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 
 const navLinks = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
@@ -27,19 +31,112 @@ const navLinks = [
   { label: 'Musicians', href: '/admin/musicians', icon: Users },
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'Attendance', href: '/admin/attendance', icon: Calendar },
+  { label: 'Studio Videos', href: '/admin/studio', icon: Music },
   { label: 'QR Codes', href: '/admin/qr-codes', icon: QrCode },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
+
+function AccessDeniedPage() {
+  const router = useRouter()
+  const { user } = useUserRole()
+  const [signingOut, setSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    if (!auth) return
+    
+    setSigningOut(true)
+    try {
+      await signOut(auth)
+      // Redirect to home page after sign out
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+      setSigningOut(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-orchestra-dark flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center max-w-md w-full"
+      >
+        <h1 className="text-3xl font-bold text-orchestra-gold mb-4">Access Denied</h1>
+        <p className="text-orchestra-cream/80 mb-6">
+          You need admin privileges to access this area.
+        </p>
+        
+        {user && (
+          <div className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6 mb-6">
+            <p className="text-sm text-orchestra-cream/70 mb-2">Currently signed in as:</p>
+            <p className="text-orchestra-cream font-medium mb-4">{user.email}</p>
+            <p className="text-xs text-orchestra-cream/60 mb-4">
+              If you were just granted admin access, please sign out and sign back in to refresh your permissions.
+            </p>
+            <motion.button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-400 font-medium rounded-lg transition-colors border border-red-500/30"
+              whileHover={!signingOut ? { scale: 1.02 } : {}}
+              whileTap={!signingOut ? { scale: 0.98 } : {}}
+            >
+              <LogOut className="h-5 w-5" />
+              <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+            </motion.button>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <Link
+            href="/"
+            className="inline-block px-6 py-3 bg-orchestra-gold/20 hover:bg-orchestra-gold/30 text-orchestra-gold font-medium rounded-lg transition-colors border border-orchestra-gold/30"
+          >
+            Go to Home Page
+          </Link>
+          <p className="text-xs text-orchestra-cream/50 mt-4">
+            Need admin access? Contact an existing admin or check the documentation.
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
+  const { user, role } = useUserRole()
+  const partnerProjectId = usePartnerProject()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
   const { hasAccess, loading, redirect } = useRequireRole('beam_admin')
+  
+  // Redirect partner admins to their project page
+  useEffect(() => {
+    if (role === 'partner_admin' && partnerProjectId && pathname === '/admin/dashboard') {
+      router.push(`/admin/projects/${partnerProjectId}`)
+    }
+  }, [role, partnerProjectId, pathname, router])
+
+  const handleSignOut = async () => {
+    if (!auth) return
+    
+    setSigningOut(true)
+    setDropdownOpen(false)
+    try {
+      await signOut(auth)
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+      setSigningOut(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -49,15 +146,9 @@ export default function AdminLayout({
     )
   }
 
-  if (redirect) {
-    return (
-      <div className="min-h-screen bg-orchestra-dark flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-orchestra-gold mb-4">Access Denied</h1>
-          <p className="text-orchestra-cream">You need admin privileges to access this area.</p>
-        </div>
-      </div>
-    )
+  // Allow partner admins to access admin area (they'll be redirected to their project)
+  if (redirect && role !== 'partner_admin') {
+    return <AccessDeniedPage />
   }
 
   return (
@@ -124,8 +215,21 @@ export default function AdminLayout({
           </nav>
 
           {/* Footer */}
-          <div className="p-3 border-t border-orchestra-gold/20">
-            <div className="text-xs text-orchestra-cream/70">
+          <div className="p-3 border-t border-orchestra-gold/20 space-y-2">
+            {user && (
+              <div className="text-xs text-orchestra-cream/70 truncate px-2">
+                {user.email}
+              </div>
+            )}
+            <button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm text-orchestra-cream hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              <span className="font-medium">{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+            </button>
+            <div className="text-xs text-orchestra-cream/50 pt-2 border-t border-orchestra-gold/10">
               BEAM Orchestra Admin Portal
             </div>
           </div>
@@ -195,6 +299,27 @@ export default function AdminLayout({
                           </Link>
                         )
                       })}
+                      
+                      {/* Divider */}
+                      <div className="border-t border-orchestra-gold/20 my-2" />
+                      
+                      {/* User Info */}
+                      {user && (
+                        <div className="px-4 py-2 text-xs text-orchestra-cream/70 border-b border-orchestra-gold/10">
+                          <p className="truncate">{user.email}</p>
+                        </div>
+                      )}
+                      
+                      {/* Sign Out */}
+                      <button
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="w-full flex items-center space-x-3 px-4 py-3 transition-colors relative z-[10000] text-orchestra-cream hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        <LogOut className="h-5 w-5 flex-shrink-0" />
+                        <span className="font-medium">{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+                      </button>
                     </div>
                   </motion.div>
                 </>

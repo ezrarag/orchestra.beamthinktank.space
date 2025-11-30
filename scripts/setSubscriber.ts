@@ -1,12 +1,29 @@
-import { initializeApp, applicationDefault } from 'firebase-admin/app'
+import { initializeApp, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
-// Initializes using your local ADC (gcloud, service account env, etc.)
-// Explicitly set projectId to avoid ADC lookup issues
+// Load service account key from project root
+// The service-account.json file should be in the project root directory
+let serviceAccount
+try {
+  // Try project root first (when running from scripts/ directory)
+  const serviceAccountPath = join(process.cwd(), 'service-account.json')
+  const serviceAccountData = readFileSync(serviceAccountPath, 'utf8')
+  serviceAccount = JSON.parse(serviceAccountData)
+  console.log('✅ Loaded service account from:', serviceAccountPath)
+} catch (error) {
+  console.error('❌ Failed to load service-account.json')
+  console.error('💡 Make sure service-account.json is in the project root directory')
+  console.error('💡 Get it from: Firebase Console → Project Settings → Service Accounts → Generate new private key')
+  process.exit(1)
+}
+
+// Initialize Firebase Admin with service account
 initializeApp({
-  credential: applicationDefault(),
-  projectId: process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+  credential: cert(serviceAccount),
+  projectId: serviceAccount.project_id || 'beam-orchestra-platform',
 })
 
 async function setSubscriber() {
@@ -58,4 +75,5 @@ async function setSubscriber() {
 }
 
 setSubscriber()
+
 

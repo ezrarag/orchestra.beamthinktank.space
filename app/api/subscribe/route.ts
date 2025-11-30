@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get tier from request body
+    const body = await request.json()
+    const tier = body.tier || 'basic' // Default to basic if not specified
+
+    // Validate tier
+    if (tier !== 'basic' && tier !== 'premium') {
+      return NextResponse.json(
+        { error: 'Invalid subscription tier. Must be "basic" or "premium"' },
+        { status: 400 }
+      )
+    }
+
     // Get or create Stripe customer
     let customerId: string
     
@@ -63,12 +75,19 @@ export async function POST(request: NextRequest) {
       }, { merge: true })
     }
 
-    // Get price ID from environment or use default
-    const priceId = process.env.STRIPE_PRICE_ID || process.env.STRIPE_SUBSCRIPTION_PRICE_ID
+    // Get price ID based on tier
+    let priceId: string | undefined
+    
+    if (tier === 'premium') {
+      priceId = process.env.STRIPE_PRICE_ID_PREMIUM || process.env.STRIPE_PRICE_ID
+    } else {
+      // basic tier
+      priceId = process.env.STRIPE_PRICE_ID_BASIC || process.env.STRIPE_PRICE_ID || process.env.STRIPE_SUBSCRIPTION_PRICE_ID
+    }
     
     if (!priceId) {
       return NextResponse.json(
-        { error: 'Stripe price ID not configured' },
+        { error: `Stripe price ID not configured for tier "${tier}". Please set STRIPE_PRICE_ID_BASIC, STRIPE_PRICE_ID_PREMIUM, or STRIPE_PRICE_ID environment variable.` },
         { status: 500 }
       )
     }
@@ -89,6 +108,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         userId,
         userEmail,
+        tier,
       },
     })
 

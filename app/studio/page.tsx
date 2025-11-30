@@ -132,29 +132,47 @@ const normalizePhoneNumber = (phone: string | null | undefined): string | null =
 // 5. Hardcoded email addresses (for Google/Email sign-in testing)
 // 6. Firestore user document subscriber field (for actual subscribers)
 const hasRehearsalAccess = async (user: any, role: string | null, db: any): Promise<boolean> => {
-  if (!user) return false
+  if (!user) {
+    console.log('🔐 Access check: No user')
+    return false
+  }
+  
+  console.log('🔐 Access check starting:', {
+    email: user.email,
+    role: role,
+    uid: user.uid
+  })
   
   // Admins always have access
-  if (role === 'beam_admin' || role === 'partner_admin' || role === 'board') return true
+  if (role === 'beam_admin' || role === 'partner_admin' || role === 'board') {
+    console.log('✅ Access granted: Admin role')
+    return true
+  }
   
   // Subscribers have access (from useUserRole hook)
-  if (role === 'subscriber') return true
+  if (role === 'subscriber') {
+    console.log('✅ Access granted: Subscriber role')
+    return true
+  }
   
   // Check custom claims for subscriber status
   try {
-    const tokenResult = await user.getIdTokenResult()
+    const tokenResult = await user.getIdTokenResult(true) // Force refresh
     const claims = tokenResult.claims
+    console.log('🔐 Custom claims:', claims)
     if (claims.beam_subscriber === true || claims.subscriber === true) {
+      console.log('✅ Access granted: Custom claim (beam_subscriber or subscriber)')
       return true
     }
   } catch (error) {
-    console.error('Error checking custom claims:', error)
+    console.error('❌ Error checking custom claims:', error)
   }
   
   // Check if email matches allowed list (for Google/Email sign-in testing)
   if (user.email && ALLOWED_EMAILS.length > 0) {
     const normalizedEmail = user.email.toLowerCase().trim()
     if (ALLOWED_EMAILS.some(email => email.toLowerCase().trim() === normalizedEmail)) {
+      console.log('✅ Access granted: Email in allowed list')
       return true
     }
   }
@@ -164,6 +182,7 @@ const hasRehearsalAccess = async (user: any, role: string | null, db: any): Prom
   if (userPhone) {
     const normalizedAllowed = ALLOWED_PHONE_NUMBERS.map(normalizePhoneNumber).filter(Boolean) as string[]
     if (normalizedAllowed.includes(userPhone)) {
+      console.log('✅ Access granted: Phone in allowed list')
       return true
     }
   }
@@ -175,16 +194,21 @@ const hasRehearsalAccess = async (user: any, role: string | null, db: any): Prom
       const userDoc = await getDoc(doc(db, 'users', user.uid))
       if (userDoc.exists()) {
         const userData = userDoc.data()
+        console.log('🔐 Firestore user data:', { subscriber: userData.subscriber, role: userData.role })
         // Check if user is marked as subscriber in Firestore
         if (userData.subscriber === true) {
+          console.log('✅ Access granted: Firestore subscriber field')
           return true
         }
+      } else {
+        console.log('⚠️ No Firestore user document found')
       }
     } catch (error) {
-      console.error('Error checking user subscriber status:', error)
+      console.error('❌ Error checking user subscriber status:', error)
     }
   }
   
+  console.log('❌ Access denied: No matching conditions')
   return false
 }
 
@@ -232,10 +256,17 @@ export default function StudioPage() {
       }
 
       try {
+        console.log('🔐 Checking access for user:', {
+          email: user.email,
+          phone: user.phoneNumber,
+          role: role,
+          uid: user.uid
+        })
         const access = await hasRehearsalAccess(user, role, db)
+        console.log('🔐 Access result:', access)
         setHasAccess(access)
       } catch (error) {
-        console.error('Error checking access:', error)
+        console.error('❌ Error checking access:', error)
         setHasAccess(false)
       } finally {
         setCheckingAccess(false)
@@ -247,12 +278,24 @@ export default function StudioPage() {
 
   // Load media from Firestore only if user has access
   useEffect(() => {
-    if (!hasAccess || !db) {
+    console.log('🔐 Access check:', { hasAccess, dbExists: !!db, user: user?.email, role })
+    
+    if (!hasAccess) {
+      console.log('❌ No access - user must be subscriber/admin or have allowed phone/email')
+      setLoading(false)
+      return
+    }
+    
+    if (!db) {
+      console.log('❌ Firebase not initialized')
       setLoading(false)
       return
     }
 
-    // Load ALL non-private media and filter in memory
+    console.log('🔍 Loading rehearsal media from Firestore...')
+
+    // Try the query with orderBy first (requires index)
+    // If it fails, fall back to a simpler query
     const q = query(
       collection(db, 'projectRehearsalMedia'),
       where('private', '==', false),
@@ -262,8 +305,18 @@ export default function StudioPage() {
     const unsubscribe = onSnapshot(
       q,
       snapshot => {
+        console.log(`📊 Snapshot received: ${snapshot.docs.length} documents`)
+        
         const items: RehearsalMedia[] = snapshot.docs.map(doc => {
           const data = doc.data() as any
+          console.log('📄 Document:', doc.id, {
+            title: data.title,
+            private: data.private,
+            projectId: data.projectId,
+            hasDate: !!data.date,
+            hasUrl: !!data.url,
+          })
+          
           return {
             id: doc.id,
             projectId: data.projectId || 'unknown',
@@ -277,13 +330,30 @@ export default function StudioPage() {
           }
         })
 
-        setMedia(items)
+        // Filter out items that don't have required fields
+        const validItems = items.filter(item => {
+          const isValid = item.url && !item.private
+          if (!isValid) {
+            console.log(`⚠️ Filtered out item: ${item.title}`, {
+              hasUrl: !!item.url,
+              isPrivate: item.private
+            })
+          }
+          return isValid
+        })
+        console.log(`✅ Valid items: ${validItems.length} out of ${items.length}`)
+        
+        if (validItems.length === 0 && items.length > 0) {
+          console.warn('⚠️ All items were filtered out! Check URL and private fields.')
+        }
+
+        setMedia(validItems)
         setLoading(false)
 
         if (process.env.NODE_ENV === 'development') {
           console.log('🎥 Loaded rehearsal media:', {
-            total: items.length,
-            byProject: items.reduce((acc, item) => {
+            total: validItems.length,
+            byProject: validItems.reduce((acc, item) => {
               acc[item.projectId] = (acc[item.projectId] || 0) + 1
               return acc
             }, {} as Record<string, number>),
@@ -291,7 +361,56 @@ export default function StudioPage() {
         }
       },
       error => {
-        console.error('Error loading rehearsal media:', error)
+        console.error('❌ Error loading rehearsal media:', error)
+        console.error('Error code:', error.code)
+        console.error('Error message:', error.message)
+        
+        // If index error, try simpler query without orderBy
+        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+          console.log('⚠️ Index not ready, trying simpler query...')
+          const simpleQ = query(
+            collection(db, 'projectRehearsalMedia'),
+            where('private', '==', false)
+          )
+          
+          const simpleUnsubscribe = onSnapshot(
+            simpleQ,
+            snapshot => {
+              const items: RehearsalMedia[] = snapshot.docs.map(doc => {
+                const data = doc.data() as any
+                return {
+                  id: doc.id,
+                  projectId: data.projectId || 'unknown',
+                  title: data.title || 'Untitled rehearsal',
+                  description: data.description,
+                  date: data.date?.toDate?.() ?? undefined,
+                  instrumentGroup: data.instrumentGroup,
+                  url: data.url,
+                  thumbnailUrl: data.thumbnailUrl,
+                  private: data.private === true,
+                }
+              })
+              
+              // Sort client-side
+              items.sort((a, b) => {
+                if (!a.date || !b.date) return 0
+                return b.date.getTime() - a.date.getTime()
+              })
+              
+              const validItems = items.filter(item => item.url && !item.private)
+              setMedia(validItems)
+              setLoading(false)
+              console.log(`✅ Loaded ${validItems.length} items with fallback query`)
+            },
+            fallbackError => {
+              console.error('❌ Fallback query also failed:', fallbackError)
+              setLoading(false)
+            }
+          )
+          
+          return () => simpleUnsubscribe()
+        }
+        
         setLoading(false)
       }
     )

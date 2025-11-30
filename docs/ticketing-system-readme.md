@@ -255,3 +255,5 @@ Required Stripe environment variables:
 3. Click "Get Tickets"
 4. Verify external URL opens in new tab
 
+
+

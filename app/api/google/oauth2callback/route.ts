@@ -84,18 +84,43 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Store tokens in Firestore
-    await adminDb.collection('integrations').doc('google').set({
+    // Fetch user info from Google to get email and name
+    let userEmail = 'Unknown'
+    let userName = 'Unknown'
+    try {
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${tokens.access_token}`
+        }
+      })
+      if (userInfoResponse.ok) {
+        const userInfo = await userInfoResponse.json()
+        userEmail = userInfo.email || 'Unknown'
+        userName = userInfo.name || userInfo.email || 'Unknown'
+      }
+    } catch (error) {
+      console.warn('Could not fetch user info from Google:', error)
+    }
+
+    // Generate unique ID for this integration (use email as part of ID)
+    const integrationId = `google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`
+
+    // Store tokens in Firestore with user info
+    await adminDb.collection('integrations').doc(integrationId).set({
+      type: 'google',
       userId: stateData.uid,
+      userEmail: userEmail,
+      userName: userName,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
       scope: tokens.scope,
+      createdAt: new Date(),
       updatedAt: new Date(),
     }, { merge: true })
 
     return NextResponse.redirect(
-      new URL('/admin/settings?success=google_connected', request.url)
+      new URL(`/admin/settings?success=connected&email=${encodeURIComponent(userEmail)}&type=google`, request.url)
     )
 
   } catch (error) {

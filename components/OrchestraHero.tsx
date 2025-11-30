@@ -1,10 +1,24 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { X } from 'lucide-react'
+import AuthButtons from '@/components/AuthButtons'
+import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export default function OrchestraHero() {
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const router = useRouter()
+  const { user } = useUserRole()
+
+  const handleSignInSuccess = () => {
+    setShowAuthModal(false)
+    // Redirect to admin dashboard after successful sign-in
+    router.push('/admin/dashboard')
+  }
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden bg-black">
@@ -127,12 +141,21 @@ export default function OrchestraHero() {
         transition={{ duration: 0.6, delay: 1.2 }}
       >
         <div>
-          <Link
-            href="/admin/dashboard"
-            className="hover:text-[#D4AF37] transition-colors"
-          >
-            Admin Login
-          </Link>
+          {user ? (
+            <Link
+              href="/admin/dashboard"
+              className="hover:text-[#D4AF37] transition-colors"
+            >
+              Admin Dashboard
+            </Link>
+          ) : (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="hover:text-[#D4AF37] transition-colors text-left"
+            >
+              Admin Login
+            </button>
+          )}
         </div>
         <div>
           <Link
@@ -151,6 +174,53 @@ export default function OrchestraHero() {
           </Link>
         </div>
       </motion.div>
+
+      {/* Auth Modal */}
+      <AnimatePresence>
+        {showAuthModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAuthModal(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="bg-black border-2 border-[#D4AF37]/30 rounded-2xl p-8 max-w-md w-full relative shadow-2xl">
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+
+                {/* Modal Content */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">Admin Login</h2>
+                  <p className="text-white/70 text-sm">
+                    Sign in to access the admin dashboard
+                  </p>
+                </div>
+
+                <AuthButtons
+                  onSignInSuccess={handleSignInSuccess}
+                  mobileFriendly={true}
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </section>
   )
 }

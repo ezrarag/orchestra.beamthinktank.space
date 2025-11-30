@@ -1,14 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Settings as SettingsIcon, Loader2, Save, Check, RefreshCw, AlertCircle, CheckCircle, UserPlus, Shield } from 'lucide-react'
+import { Settings as SettingsIcon, Loader2, Save, Check, RefreshCw, AlertCircle, CheckCircle, UserPlus, Shield, Mail, Plus, Trash2, ExternalLink, MessageSquare } from 'lucide-react'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useRouter } from 'next/navigation'
 import { db } from '@/lib/firebase'
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { rosterData } from '@/app/training/contract-projects/black-diaspora-symphony/data'
 import { auth } from '@/lib/firebase'
+
+interface Integration {
+  id: string
+  type: 'google' | 'outlook' | 'whatsapp'
+  userEmail: string
+  userName: string
+  createdAt?: string
+  updatedAt?: string
+  hasAccessToken: boolean
+  hasRefreshToken: boolean
+  expiresAt?: string
+  phoneNumber?: string // For WhatsApp
+}
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -23,6 +36,185 @@ export default function SettingsPage() {
   const [userRole, setUserRole] = useState<'beam_admin' | 'partner_admin' | 'board' | 'musician' | 'subscriber' | 'audience'>('musician')
   const [settingRole, setSettingRole] = useState(false)
   const [roleResult, setRoleResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  // Integrations state
+  const [integrations, setIntegrations] = useState<{
+    google: Integration[]
+    outlook: Integration[]
+    whatsapp: Integration[]
+  }>({
+    google: [],
+    outlook: [],
+    whatsapp: []
+  })
+  const [loadingIntegrations, setLoadingIntegrations] = useState(true)
+  const [connectingType, setConnectingType] = useState<'google' | 'outlook' | 'whatsapp' | null>(null)
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
+
+  // Fetch all integrations
+  useEffect(() => {
+    const fetchIntegrations = async () => {
+      if (!user || !hasAccess) return
+
+      try {
+        setLoadingIntegrations(true)
+        const token = await user.getIdToken()
+        
+        // Fetch all integration types
+        const [googleRes, outlookRes, whatsappRes] = await Promise.all([
+          fetch('/api/integrations?type=google', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => ({ ok: false, json: () => Promise.resolve({ integrations: [] }) })),
+          fetch('/api/integrations?type=outlook', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => ({ ok: false, json: () => Promise.resolve({ integrations: [] }) })),
+          fetch('/api/integrations?type=whatsapp', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => ({ ok: false, json: () => Promise.resolve({ integrations: [] }) }))
+        ])
+
+        const googleData = googleRes.ok ? await googleRes.json() : { integrations: [] }
+        const outlookData = outlookRes.ok ? await outlookRes.json() : { integrations: [] }
+        const whatsappData = whatsappRes.ok ? await whatsappRes.json() : { integrations: [] }
+
+        setIntegrations({
+          google: googleData.integrations || [],
+          outlook: outlookData.integrations || [],
+          whatsapp: whatsappData.integrations || []
+        })
+      } catch (error) {
+        console.error('Error fetching integrations:', error)
+      } finally {
+        setLoadingIntegrations(false)
+      }
+    }
+
+    fetchIntegrations()
+  }, [user, hasAccess])
+
+  // Check for success/error messages from OAuth callback
+  useEffect(() => {
+    // Check URL params on mount and when router changes
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const success = params.get('success')
+      const email = params.get('email')
+      const type = params.get('type') || 'google'
+
+      if (success === 'connected' && email) {
+        // Refresh integrations list
+        if (user) {
+          const refreshIntegrations = async () => {
+            try {
+              const token = await user.getIdToken()
+              const response = await fetch(`/api/integrations?type=${type}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              })
+              if (response.ok) {
+                const data = await response.json()
+                setIntegrations(prev => ({
+                  ...prev,
+                  [type]: data.integrations || []
+                }))
+              }
+            } catch (error) {
+              console.error('Error refreshing integrations:', error)
+            }
+          }
+          refreshIntegrations()
+        }
+        // Clean up URL
+        router.replace('/admin/settings')
+      }
+    }
+  }, [user, router])
+
+  const handleConnectIntegration = async (type: 'google' | 'outlook' | 'whatsapp') => {
+    if (!user) {
+      alert('Please sign in to connect')
+      return
+    }
+
+    setConnectingType(type)
+    try {
+      const token = await user.getIdToken()
+      
+      if (type === 'whatsapp') {
+        // WhatsApp requires phone number input
+        const phoneNumber = prompt('Enter WhatsApp Business phone number (with country code, e.g., +1234567890):')
+        if (!phoneNumber) {
+          setConnectingType(null)
+          return
+        }
+        
+        // For WhatsApp, we'll use a different flow (API key or webhook setup)
+        alert('WhatsApp integration setup coming soon. This will require WhatsApp Business API credentials.')
+        setConnectingType(null)
+        return
+      }
+
+      const apiPath = type === 'google' ? '/api/google/auth' : `/api/${type}/auth`
+      const response = await fetch(apiPath, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(`Failed to initiate ${type} connection: ${error.error}`)
+        return
+      }
+
+      const data = await response.json()
+      // Open OAuth flow in new window
+      window.open(data.authUrl, `${type}-oauth`, 'width=600,height=700')
+    } catch (error: any) {
+      console.error(`Error connecting ${type}:`, error)
+      alert(`Failed to connect ${type}: ${error.message}`)
+    } finally {
+      // Don't set to null here - let the OAuth callback handle it
+      setTimeout(() => setConnectingType(null), 5000)
+    }
+  }
+
+  const handleDisconnectIntegration = async (integrationId: string, type: 'google' | 'outlook' | 'whatsapp') => {
+    const typeName = type === 'google' ? 'Gmail' : type === 'outlook' ? 'Outlook' : 'WhatsApp'
+    if (!confirm(`Are you sure you want to disconnect this ${typeName} account?`)) {
+      return
+    }
+
+    if (!user) return
+
+    setDisconnectingId(integrationId)
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch(`/api/integrations?id=${integrationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(`Failed to disconnect: ${error.error}`)
+        return
+      }
+
+      // Remove from local state
+      setIntegrations(prev => ({
+        ...prev,
+        [type]: prev[type].filter(integration => integration.id !== integrationId)
+      }))
+    } catch (error: any) {
+      console.error(`Error disconnecting ${type}:`, error)
+      alert(`Failed to disconnect: ${error.message}`)
+    } finally {
+      setDisconnectingId(null)
+    }
+  }
 
   if (roleLoading) {
     return (
@@ -461,17 +653,332 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
-      {/* Coming Soon Section */}
+      {/* Integrations Section */}
       <motion.div
-        className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-12 text-center"
+        className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
       >
-        <SettingsIcon className="h-16 w-16 text-orchestra-gold/30 mx-auto mb-4" />
-        <p className="text-orchestra-cream/70 text-lg">
-          Additional settings and configuration options coming soon.
+        <h2 className="text-2xl font-bold text-orchestra-gold mb-6">Integrations</h2>
+        <p className="text-orchestra-cream/70 mb-6 text-sm">
+          Connect email and messaging accounts for Pulse to access data from multiple sources. Multiple accounts can be connected for comprehensive data analysis.
         </p>
+
+        {/* Gmail Integrations */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-orchestra-gold mb-1 flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Gmail
+              </h3>
+              <p className="text-orchestra-cream/70 text-xs">
+                Connect Gmail accounts for email data access
+              </p>
+            </div>
+            <motion.button
+              onClick={() => handleConnectIntegration('google')}
+              disabled={connectingType === 'google' || !user}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+              whileHover={connectingType !== 'google' && user ? { scale: 1.05 } : {}}
+              whileTap={connectingType !== 'google' && user ? { scale: 0.95 } : {}}
+            >
+              {connectingType === 'google' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Add Account</span>
+                </>
+              )}
+            </motion.button>
+          </div>
+
+          {loadingIntegrations ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-orchestra-gold" />
+            </div>
+          ) : integrations.google.length === 0 ? (
+            <div className="text-center py-6 border border-orchestra-gold/10 rounded-lg bg-orchestra-dark/30">
+              <Mail className="h-10 w-10 text-orchestra-gold/30 mx-auto mb-2" />
+              <p className="text-orchestra-cream/70 text-sm mb-1">No Gmail accounts connected</p>
+              <p className="text-orchestra-cream/50 text-xs">
+                Connect a Gmail account to enable Pulse email data access
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {integrations.google.map((integration) => {
+                const isExpired = integration.expiresAt 
+                  ? new Date(integration.expiresAt) < new Date()
+                  : false
+                
+                return (
+                  <div
+                    key={integration.id}
+                    className="flex items-center justify-between p-3 bg-orchestra-dark/30 rounded-lg border border-orchestra-gold/10 hover:border-orchestra-gold/30 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                        <Mail className="h-4 w-4 text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <p className="font-medium text-orchestra-cream truncate text-sm">
+                            {integration.userName}
+                          </p>
+                          {isExpired && (
+                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-500/30">
+                              Expired
+                            </span>
+                          )}
+                          {integration.hasRefreshToken && !isExpired && (
+                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-orchestra-cream/70 truncate">
+                          {integration.userEmail}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {isExpired && (
+                        <motion.button
+                          onClick={() => handleConnectIntegration('google')}
+                          className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Reconnect
+                        </motion.button>
+                      )}
+                      <motion.button
+                        onClick={() => handleDisconnectIntegration(integration.id, 'google')}
+                        disabled={disconnectingId === integration.id}
+                        className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        {disconnectingId === integration.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Outlook Integrations */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-orchestra-gold mb-1 flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Outlook
+              </h3>
+              <p className="text-orchestra-cream/70 text-xs">
+                Connect Outlook/Office 365 accounts for email data access
+              </p>
+            </div>
+            <motion.button
+              onClick={() => handleConnectIntegration('outlook')}
+              disabled={connectingType === 'outlook' || !user}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+              whileHover={connectingType !== 'outlook' && user ? { scale: 1.05 } : {}}
+              whileTap={connectingType !== 'outlook' && user ? { scale: 0.95 } : {}}
+            >
+              {connectingType === 'outlook' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Add Account</span>
+                </>
+              )}
+            </motion.button>
+          </div>
+
+          {integrations.outlook.length === 0 ? (
+            <div className="text-center py-6 border border-orchestra-gold/10 rounded-lg bg-orchestra-dark/30">
+              <Mail className="h-10 w-10 text-orchestra-gold/30 mx-auto mb-2" />
+              <p className="text-orchestra-cream/70 text-sm mb-1">No Outlook accounts connected</p>
+              <p className="text-orchestra-cream/50 text-xs">
+                Connect an Outlook account to enable Pulse email data access
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {integrations.outlook.map((integration) => {
+                const isExpired = integration.expiresAt 
+                  ? new Date(integration.expiresAt) < new Date()
+                  : false
+                
+                return (
+                  <div
+                    key={integration.id}
+                    className="flex items-center justify-between p-3 bg-orchestra-dark/30 rounded-lg border border-orchestra-gold/10 hover:border-orchestra-gold/30 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className="p-1.5 bg-blue-700/20 rounded-lg">
+                        <Mail className="h-4 w-4 text-blue-300" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <p className="font-medium text-orchestra-cream truncate text-sm">
+                            {integration.userName}
+                          </p>
+                          {isExpired && (
+                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-500/30">
+                              Expired
+                            </span>
+                          )}
+                          {integration.hasRefreshToken && !isExpired && (
+                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-orchestra-cream/70 truncate">
+                          {integration.userEmail}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {isExpired && (
+                        <motion.button
+                          onClick={() => handleConnectIntegration('outlook')}
+                          className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Reconnect
+                        </motion.button>
+                      )}
+                      <motion.button
+                        onClick={() => handleDisconnectIntegration(integration.id, 'outlook')}
+                        disabled={disconnectingId === integration.id}
+                        className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        {disconnectingId === integration.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* WhatsApp Integrations */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-orchestra-gold mb-1 flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                WhatsApp Business
+              </h3>
+              <p className="text-orchestra-cream/70 text-xs">
+                Connect WhatsApp Business accounts for messaging data access
+              </p>
+            </div>
+            <motion.button
+              onClick={() => handleConnectIntegration('whatsapp')}
+              disabled={connectingType === 'whatsapp' || !user}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+              whileHover={connectingType !== 'whatsapp' && user ? { scale: 1.05 } : {}}
+              whileTap={connectingType !== 'whatsapp' && user ? { scale: 0.95 } : {}}
+            >
+              {connectingType === 'whatsapp' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Add Account</span>
+                </>
+              )}
+            </motion.button>
+          </div>
+
+          {integrations.whatsapp.length === 0 ? (
+            <div className="text-center py-6 border border-orchestra-gold/10 rounded-lg bg-orchestra-dark/30">
+              <MessageSquare className="h-10 w-10 text-orchestra-gold/30 mx-auto mb-2" />
+              <p className="text-orchestra-cream/70 text-sm mb-1">No WhatsApp accounts connected</p>
+              <p className="text-orchestra-cream/50 text-xs">
+                Connect a WhatsApp Business account to enable Pulse messaging data access
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {integrations.whatsapp.map((integration) => (
+                <div
+                  key={integration.id}
+                  className="flex items-center justify-between p-3 bg-orchestra-dark/30 rounded-lg border border-orchestra-gold/10 hover:border-orchestra-gold/30 transition-colors"
+                >
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className="p-1.5 bg-green-500/20 rounded-lg">
+                      <MessageSquare className="h-4 w-4 text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-orchestra-cream truncate text-sm">
+                        {integration.phoneNumber || integration.userEmail}
+                      </p>
+                      {integration.userName && (
+                        <p className="text-xs text-orchestra-cream/70 truncate">
+                          {integration.userName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <motion.button
+                    onClick={() => handleDisconnectIntegration(integration.id, 'whatsapp')}
+                    disabled={disconnectingId === integration.id}
+                    className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    {disconnectingId === integration.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                  </motion.button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {(integrations.google.length > 0 || integrations.outlook.length > 0 || integrations.whatsapp.length > 0) && (
+          <div className="mt-6 p-4 bg-orchestra-dark/30 rounded-lg border border-orchestra-gold/10">
+            <p className="text-xs text-orchestra-cream/70">
+              <strong className="text-orchestra-gold">Note:</strong> Connected accounts are used by Pulse to analyze communications, 
+              extract musician information, and provide insights. Each account can access its own data.
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
   )

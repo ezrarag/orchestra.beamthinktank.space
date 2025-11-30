@@ -165,23 +165,43 @@ export default function EditEventPage() {
         ? Timestamp.fromDate(formData.date)
         : formData.date
 
-      const updateData: Partial<Event> = {
+      // Build update data, only including fields that have values (Firestore doesn't allow undefined)
+      const updateData: any = {
         title: formData.title!,
         series: formData.series!,
-        projectId: formData.projectId || undefined,
         city: formData.city!,
         venueName: formData.venueName!,
         venueAddress: formData.venueAddress || '',
         date: eventDate as Timestamp,
         time: formData.time || '',
         description: formData.description || '',
-        imageUrl: imageUrl || undefined,
         isFree: formData.isFree || false,
         ticketProvider: formData.ticketProvider || 'stripe',
-        externalTicketUrl: formData.externalTicketUrl || undefined,
         onSale: formData.onSale || false,
         priceTiers: formData.priceTiers || [],
         updatedAt: serverTimestamp() as Timestamp,
+      }
+
+      // Only include optional fields if they have values
+      if (formData.projectId && formData.projectId.trim()) {
+        updateData.projectId = formData.projectId.trim()
+      } else {
+        // If projectId was removed, delete it from Firestore
+        updateData.projectId = null
+      }
+      
+      if (imageUrl) {
+        updateData.imageUrl = imageUrl
+      } else if (imageUrl === null) {
+        // Explicitly set to null if image was removed
+        updateData.imageUrl = null
+      }
+      
+      if (formData.externalTicketUrl && formData.externalTicketUrl.trim()) {
+        updateData.externalTicketUrl = formData.externalTicketUrl.trim()
+      } else if (formData.ticketProvider !== 'external') {
+        // Remove externalTicketUrl if not using external provider
+        updateData.externalTicketUrl = null
       }
 
       await updateDoc(doc(db, 'events', eventId), updateData)
@@ -545,4 +565,5 @@ export default function EditEventPage() {
     </div>
   )
 }
+
 

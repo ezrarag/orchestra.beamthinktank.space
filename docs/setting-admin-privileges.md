@@ -1,5 +1,7 @@
 # Setting Admin Privileges in Firebase
 
+> **📚 See also:** [`docs/how-to-add-admins.md`](./how-to-add-admins.md) for the most up-to-date guide with troubleshooting.
+
 This guide explains how to grant admin access to users in the BEAM Orchestra platform.
 
 ## Prerequisites

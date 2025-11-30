@@ -31,7 +31,7 @@ export default function SubscribeCanceledPage() {
 
         <div className="space-y-4">
           <Link
-            href="/projects/black-diaspora-symphony/media"
+            href="/subscriber"
             className="block w-full px-6 py-3 bg-orchestra-gold hover:bg-orchestra-gold/80 text-orchestra-dark font-semibold rounded-lg transition-colors"
           >
             Try Again

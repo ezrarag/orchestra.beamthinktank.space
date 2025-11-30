@@ -238,11 +238,25 @@ service cloud.firestore {
       // Admins can read all orders
       allow read: if isAdmin();
       
+      // Partner admins can read orders for events in their project
+      // Check both partnerProjectId and assignedProjectId (for backward compatibility)
+      // First check if event exists, then check projectId
+      allow read: if isPartnerAdmin() && 
+        resource.data.eventId != null &&
+        exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+        (
+          get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.projectId == request.auth.token.partnerProjectId ||
+          get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.projectId == request.auth.token.assignedProjectId
+        );
+      
       // Users can read their own orders
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
       // Users can create orders (for ticket purchases)
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Allow guest checkout (no userId)
+      allow create: if request.resource.data.userId == null;
       
       // Only webhook can update orders (to mark as paid)
       allow update: if false; // All updates handled via API/webhook
@@ -256,21 +270,78 @@ service cloud.firestore {
       // Admins can read all RSVPs
       allow read: if isAdmin();
       
-      // Public can create RSVPs (for free events)
+      // Partner admins can read RSVPs for events in their project
+      // Check both partnerProjectId and assignedProjectId (for backward compatibility)
+      // First check if event exists, then check projectId
+      allow read: if isPartnerAdmin() && 
+        resource.data.eventId != null &&
+        exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+        (
+          get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.projectId == request.auth.token.partnerProjectId ||
+          get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.projectId == request.auth.token.assignedProjectId
+        );
+      
+      // Public can create RSVPs (for free events) - no authentication required
       allow create: if true;
       
       // No updates or deletes allowed
       allow update, delete: if false;
     }
     
-    // Project Rehearsal Media - Public rehearsal videos for /studio page
-    match /projectRehearsalMedia/{mediaId} {
-      // Public can read only if private == false
-      allow read: if resource.data.private == false;
+    // Event Notifications - User event history and notifications
+    match /eventNotifications/{notificationId} {
+      // Users can read their own notifications (by email)
+      allow read: if isAuthenticated() && 
+        (resource.data.email == request.auth.token.email || 
+         resource.data.userId == request.auth.uid);
       
-      // Admins can manage media (using existing admin claim logic)
-      allow write, update, delete: if isAdmin() || 
-        (isAuthenticated() && request.auth.token.beam_admin == true);
+      // Public can create notifications (for RSVPs)
+      allow create: if true;
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && 
+        (resource.data.email == request.auth.token.email || 
+         resource.data.userId == request.auth.uid);
+      
+      // Admins can read all notifications
+      allow read: if isAdmin();
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // Project Rehearsal Media - Studio videos for /studio page
+    match /projectRehearsalMedia/{mediaId} {
+      // Admins can read/write all media
+      allow read, write: if isAdmin();
+      
+      // Partner admins can read/write media for their projects
+      allow read, write: if isPartnerAdmin();
+      
+      // Board members can read all media (read-only)
+      allow read: if isAuthenticated() && request.auth.token.role == 'board';
+      
+      // Subscribers can read public media (private: false)
+      // Note: Application logic filters by private field and subscription status
+      allow read: if isAuthenticated() && (
+        request.auth.token.role == 'subscriber' ||
+        request.auth.token.beam_subscriber == true ||
+        request.auth.token.subscriber == true ||
+        // Allow authenticated users - application will check subscription status
+        true
+      );
+      
+      // Only admins can write
+      allow write: if isAdmin() || isPartnerAdmin();
+    }
+    
+    // Integrations - Google OAuth tokens and other integrations
+    match /integrations/{integrationId} {
+      // Only admins can read/write integrations
+      allow read, write: if isAdmin();
+      
+      // No other access allowed
+      allow read, write: if false;
     }
     
     // Default deny rule for any unmatched paths

@@ -13,7 +13,7 @@ import { collection, query, orderBy, getDocs, Timestamp } from 'firebase/firesto
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { Event } from '@/lib/types/events'
-import { Plus, Calendar, MapPin, DollarSign, ExternalLink, Edit } from 'lucide-react'
+import { Plus, Calendar, MapPin, DollarSign, ExternalLink, Edit, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function AdminEventsPage() {
@@ -79,13 +79,22 @@ export default function AdminEventsPage() {
           <h1 className="text-3xl font-bold text-orchestra-gold mb-2">Events</h1>
           <p className="text-orchestra-cream/70">Manage concerts, performances, and ticketing</p>
         </div>
-        <Link
-          href="/admin/events/new"
-          className="flex items-center gap-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-black font-bold rounded-lg transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          New Event
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/events/rsvps"
+            className="flex items-center gap-2 px-4 py-2 bg-orchestra-gold/20 hover:bg-orchestra-gold/30 text-orchestra-gold font-medium rounded-lg transition-colors border border-orchestra-gold/30"
+          >
+            <Users className="h-5 w-5" />
+            View RSVPs
+          </Link>
+          <Link
+            href="/admin/events/new"
+            className="flex items-center gap-2 px-4 py-2 bg-orchestra-gold hover:bg-orchestra-gold/90 text-black font-bold rounded-lg transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            New Event
+          </Link>
+        </div>
       </div>
 
       {events.length === 0 ? (

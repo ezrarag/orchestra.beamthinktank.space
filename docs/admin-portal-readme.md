@@ -32,6 +32,8 @@ The admin dashboard (`/admin/dashboard`) provides:
 
 ## How to Grant Admin Access
 
+> **📚 See also:** [`docs/how-to-add-admins.md`](./how-to-add-admins.md) for comprehensive step-by-step instructions with troubleshooting.
+
 **Important:** Admin roles are granted using **Firebase Authentication Custom Claims**, which must be set using the Firebase Admin SDK. Custom claims cannot be set directly through the Firebase Console UI - they require server-side code with admin privileges.
 
 ### Method 1: Using the Admin Settings Page (Easiest - Requires Existing Admin)
@@ -282,12 +284,16 @@ Example:
 
 ## Managing Roster Data
 
+> **📚 See also:** [`docs/how-to-add-musicians.md`](./how-to-add-musicians.md) for comprehensive guide on adding musicians.
+
 ### Adding Musicians
 
 Currently, musicians are added via:
-1. **Migration script** - Syncs from `data.ts` to Firestore
-2. **Manual entry** - Through Firebase Console
-3. **User sign-up** - When musicians create profiles
+1. **Admin Dashboard** - Add manually or from Gmail scan (recommended)
+2. **Project Detail Page** - Add musicians to specific projects
+3. **Migration script** - Syncs from `data.ts` to Firestore
+4. **Manual entry** - Through Firebase Console
+5. **User sign-up** - When musicians create profiles
 
 ### Updating Musician Status
 

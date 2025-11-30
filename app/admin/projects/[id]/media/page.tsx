@@ -36,7 +36,8 @@ import {
   doc, 
   serverTimestamp,
   orderBy,
-  setDoc
+  setDoc,
+  Timestamp
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
@@ -105,19 +106,70 @@ export default function AdminMediaPage() {
     
     try {
       setLoading(true)
+      // Use projectRehearsalMedia collection (same as /studio page)
+      // Filter by projectId and order by date descending
       const q = query(
-        collection(db, 'projectMedia'),
+        collection(db, 'projectRehearsalMedia'),
         where('projectId', '==', projectId),
-        orderBy('uploadedAt', 'desc')
+        orderBy('date', 'desc')
       )
       const snapshot = await getDocs(q)
-      const items = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as MediaItem[]
+      const items = snapshot.docs.map(doc => {
+        const data = doc.data()
+        // Map projectRehearsalMedia structure to MediaItem structure
+        return {
+          id: doc.id,
+          projectId: data.projectId || projectId,
+          title: data.title || 'Untitled',
+          type: 'rehearsal' as MediaItem['type'], // projectRehearsalMedia is always rehearsal type
+          downloadURL: data.url || '',
+          access: data.private ? ['musician'] : ['public', 'subscriber', 'musician'],
+          uploadedBy: data.uploadedBy || data.createdBy || '',
+          uploadedAt: data.date || data.createdAt || data.updatedAt,
+          thumbnailURL: data.thumbnailUrl,
+          description: data.description || '',
+          duration: data.duration
+        }
+      }) as MediaItem[]
       setMediaItems(items)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading media:', error)
+      // If orderBy fails (no index), try without it
+      if (error.code === 'failed-precondition') {
+        console.warn('Index missing for projectRehearsalMedia.date, fetching without orderBy')
+        try {
+          const q = query(
+            collection(db, 'projectRehearsalMedia'),
+            where('projectId', '==', projectId)
+          )
+          const snapshot = await getDocs(q)
+          const items = snapshot.docs.map(doc => {
+            const data = doc.data()
+            return {
+              id: doc.id,
+              projectId: data.projectId || projectId,
+              title: data.title || 'Untitled',
+              type: 'rehearsal' as MediaItem['type'],
+              downloadURL: data.url || '',
+              access: data.private ? ['musician'] : ['public', 'subscriber', 'musician'],
+              uploadedBy: data.uploadedBy || data.createdBy || '',
+              uploadedAt: data.date || data.createdAt || data.updatedAt,
+              thumbnailURL: data.thumbnailUrl,
+              description: data.description || '',
+              duration: data.duration
+            }
+          }) as MediaItem[]
+          // Sort client-side by date
+          items.sort((a, b) => {
+            const aDate = a.uploadedAt?.toDate?.() || a.uploadedAt || new Date(0)
+            const bDate = b.uploadedAt?.toDate?.() || b.uploadedAt || new Date(0)
+            return bDate.getTime() - aDate.getTime()
+          })
+          setMediaItems(items)
+        } catch (fallbackError) {
+          console.error('Error loading media (fallback):', fallbackError)
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -195,21 +247,22 @@ export default function AdminMediaPage() {
         throw new Error('Please select an upload method')
       }
 
-      // Create Firestore document
+      // Create Firestore document in projectRehearsalMedia (same collection as /studio page)
       const mediaData = {
         projectId,
         title: formData.title,
-        type: formData.type,
-        rehearsalId: formData.rehearsalId || null,
-        storagePath: storagePath || null,
-        downloadURL,
-        access: formData.access,
-        uploadedBy: user.email || user.uid,
-        uploadedAt: serverTimestamp(),
         description: formData.description || null,
+        date: serverTimestamp(), // Use 'date' field for projectRehearsalMedia
+        url: downloadURL, // Use 'url' field instead of 'downloadURL'
+        thumbnailUrl: null,
+        private: !formData.access.includes('public'), // Convert access array to private boolean
+        instrumentGroup: null, // Optional field
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        uploadedBy: user.email || user.uid, // Keep for reference
       }
 
-      await addDoc(collection(db, 'projectMedia'), mediaData)
+      await addDoc(collection(db, 'projectRehearsalMedia'), mediaData)
 
       // Reset form
       setFormData({
@@ -301,7 +354,7 @@ export default function AdminMediaPage() {
       for (const item of rehearsalFootage) {
         // Check if item already exists
         const existingQuery = query(
-          collection(db, 'projectMedia'),
+          collection(db, 'projectRehearsalMedia'),
           where('projectId', '==', projectId),
           where('title', '==', item.title)
         )
@@ -312,20 +365,23 @@ export default function AdminMediaPage() {
           continue
         }
 
+        // Create date for November 10, 2025
+        const rehearsalDate = new Date('2025-11-10')
         const mediaData = {
           projectId,
           title: item.title,
-          type: 'rehearsal' as MediaItem['type'],
-          rehearsalId: '2025-11-10',
-          storagePath: null,
-          downloadURL: item.url,
-          access: ['musician'] as MediaItem['access'],
+          description: `Rehearsal footage - ${item.composer} at ${item.time} on November 10, 2025`,
+          date: Timestamp.fromDate(rehearsalDate),
+          url: item.url, // Use 'url' field
+          thumbnailUrl: null,
+          private: false, // Public rehearsal footage
+          instrumentGroup: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           uploadedBy: user.email || user.uid,
-          uploadedAt: serverTimestamp(),
-          description: `Rehearsal footage - ${item.composer} at ${item.time} on November 10, 2025`
         }
 
-        await addDoc(collection(db, 'projectMedia'), mediaData)
+        await addDoc(collection(db, 'projectRehearsalMedia'), mediaData)
         addedCount++
       }
 
@@ -543,7 +599,7 @@ export default function AdminMediaPage() {
     if (!confirm('Are you sure you want to delete this media item?')) return
     
     try {
-      await deleteDoc(doc(db, 'projectMedia', itemId))
+      await deleteDoc(doc(db, 'projectRehearsalMedia', itemId))
       await loadMedia()
       alert('Media deleted successfully')
     } catch (error) {
@@ -588,12 +644,12 @@ export default function AdminMediaPage() {
     }
     
     try {
-      await updateDoc(doc(db, 'projectMedia', editingItem.id), {
+      // Update projectRehearsalMedia document (convert access array to private boolean)
+      await updateDoc(doc(db, 'projectRehearsalMedia', editingItem.id), {
         title: editingItem.title,
-        type: editingItem.type,
-        rehearsalId: editingItem.rehearsalId || null,
-        access: accessArray,
         description: editingItem.description || null,
+        private: !accessArray.includes('public'), // Convert access array to private boolean
+        updatedAt: serverTimestamp(),
       })
       setEditingItem(null)
       await loadMedia()
