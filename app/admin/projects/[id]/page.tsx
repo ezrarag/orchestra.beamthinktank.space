@@ -28,6 +28,7 @@ import { doc, getDoc, collection, query, where, getDocs, setDoc, updateDoc, dele
 import { db } from '@/lib/firebase'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useProjectAccess } from '@/lib/hooks/useProjectAccess'
+import { Event } from '@/lib/types/events'
 
 function MusiciansList({ musicians }: { musicians: any[] }) {
   const [showAll, setShowAll] = useState(false)
@@ -199,7 +200,7 @@ export default function ProjectDetailPage() {
           const allEvents = allEventsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          }))
+          })) as Event[]
           console.log('All events in database:', allEvents.map(e => ({
             id: e.id,
             title: e.title,
