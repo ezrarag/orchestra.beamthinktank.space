@@ -24,7 +24,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react'
-import { doc, getDoc, collection, query, where, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, collection, query, where, orderBy, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useProjectAccess } from '@/lib/hooks/useProjectAccess'
