@@ -473,7 +473,9 @@ export default function AdminStudioPage() {
                     )}
                   </div>
                   {!video.private && (
-                    <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" title="Public" />
+                    <div title="Public">
+                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                    </div>
                   )}
                 </div>
               </div>
