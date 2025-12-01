@@ -22,18 +22,26 @@ export default function UserAvatarMenu({ scrollY = 0, showThreshold = 200 }: Use
   const [activeNotifications, setActiveNotifications] = useState<EventNotification[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [rsvpEmail, setRsvpEmail] = useState<string | null>(null)
+
+  // Load RSVP email from localStorage on client side only
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setRsvpEmail(localStorage.getItem('rsvpEmail'))
+    }
+  }, [])
 
   // Load notifications when menu opens or when user changes
   useEffect(() => {
     if (showMenu) {
       loadNotifications()
     }
-  }, [showMenu, user])
+  }, [showMenu, user, rsvpEmail])
 
   const loadNotifications = async () => {
     if (!db) return
     
-    const email = user?.email || localStorage.getItem('rsvpEmail')
+    const email = user?.email || rsvpEmail
     if (!email) {
       setLoadingNotifications(false)
       return
@@ -177,8 +185,8 @@ export default function UserAvatarMenu({ scrollY = 0, showThreshold = 200 }: Use
   }, [showMenu])
 
   // Show avatar if user is logged in OR if there's an RSVP email in localStorage
-  const shouldShow = user || localStorage.getItem('rsvpEmail')
-  const displayEmail = user?.email || localStorage.getItem('rsvpEmail') || ''
+  const shouldShow = user || rsvpEmail
+  const displayEmail = user?.email || rsvpEmail || ''
   const displayName = user?.displayName || displayEmail.split('@')[0] || 'User'
 
   if (!shouldShow || scrollY < showThreshold) {
@@ -342,7 +350,10 @@ export default function UserAvatarMenu({ scrollY = 0, showThreshold = 200 }: Use
                         if (auth) {
                           try {
                             await signOut(auth)
-                            localStorage.removeItem('rsvpEmail')
+                            if (typeof window !== 'undefined') {
+                              localStorage.removeItem('rsvpEmail')
+                            }
+                            setRsvpEmail(null)
                             setShowMenu(false)
                           } catch (error) {
                             console.error('Error signing out:', error)
