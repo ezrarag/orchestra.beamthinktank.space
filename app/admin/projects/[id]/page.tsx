@@ -28,7 +28,7 @@ import { doc, getDoc, collection, query, where, orderBy, getDocs, setDoc, update
 import { db } from '@/lib/firebase'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useProjectAccess } from '@/lib/hooks/useProjectAccess'
-import { Event } from '@/lib/types/events'
+import { Event, EventOrder } from '@/lib/types/events'
 
 function MusiciansList({ musicians }: { musicians: any[] }) {
   const [showAll, setShowAll] = useState(false)
@@ -249,7 +249,7 @@ export default function ProjectDetailPage() {
                       ...doc.data(),
                       eventId,
                       type: 'paid'
-                    }))
+                    })) as (EventOrder & { type: string })[]
                     console.log(`Found ${orders.length} orders for event ${eventId}`)
                     return orders
                   } catch (error: any) {
@@ -266,7 +266,7 @@ export default function ProjectDetailPage() {
                         ...doc.data(),
                         eventId,
                         type: 'paid'
-                      }))
+                      })) as (EventOrder & { type: string })[]
                       // Sort manually
                       const sorted = orders.sort((a, b) => {
                         const aTime = a.timestamp?.toDate?.() || a.timestamp || new Date(0)
