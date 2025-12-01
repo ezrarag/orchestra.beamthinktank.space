@@ -71,10 +71,14 @@ export default function UserAvatarMenu({ scrollY = 0, showThreshold = 200 }: Use
       notificationsData.sort((a, b) => {
         const aTime = a.timestamp instanceof Date 
           ? a.timestamp.getTime() 
-          : (a.timestamp as any)?.toDate?.()?.getTime() || new Date(a.timestamp).getTime() || 0
+          : a.timestamp instanceof Timestamp
+            ? a.timestamp.toDate().getTime()
+            : 0
         const bTime = b.timestamp instanceof Date 
           ? b.timestamp.getTime() 
-          : (b.timestamp as any)?.toDate?.()?.getTime() || new Date(b.timestamp).getTime() || 0
+          : b.timestamp instanceof Timestamp
+            ? b.timestamp.toDate().getTime()
+            : 0
         return bTime - aTime
       })
 
