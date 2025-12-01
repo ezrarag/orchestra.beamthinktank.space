@@ -24,7 +24,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react'
-import { doc, getDoc, collection, query, where, orderBy, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, collection, query, where, orderBy, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useProjectAccess } from '@/lib/hooks/useProjectAccess'
@@ -269,8 +269,16 @@ export default function ProjectDetailPage() {
                       })) as (EventOrder & { type: string })[]
                       // Sort manually
                       const sorted = orders.sort((a, b) => {
-                        const aTime = a.timestamp?.toDate?.() || a.timestamp || new Date(0)
-                        const bTime = b.timestamp?.toDate?.() || b.timestamp || new Date(0)
+                        const aTime = a.timestamp instanceof Timestamp 
+                          ? a.timestamp.toDate() 
+                          : a.timestamp instanceof Date 
+                            ? a.timestamp 
+                            : new Date(0)
+                        const bTime = b.timestamp instanceof Timestamp 
+                          ? b.timestamp.toDate() 
+                          : b.timestamp instanceof Date 
+                            ? b.timestamp 
+                            : new Date(0)
                         return bTime.getTime() - aTime.getTime()
                       })
                       console.log(`Found ${sorted.length} orders for event ${eventId} (without orderBy)`)
