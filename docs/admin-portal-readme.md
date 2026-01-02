@@ -54,7 +54,7 @@ Use the `setMultipleAdmins.ts` script to set admin roles for one or more users:
 
 ```bash
 # Set multiple admins at once
-ADMIN_EMAILS="ezra@readyaimgo.biz,dayvin@example.com" npx tsx scripts/setMultipleAdmins.ts
+ADMIN_EMAILS="ezra@beamtink.institute,dayvin@example.com" npx tsx scripts/setMultipleAdmins.ts
 
 # Or set a single admin
 ADMIN_EMAIL=dayvin@example.com npx tsx scripts/setAdminRole.ts

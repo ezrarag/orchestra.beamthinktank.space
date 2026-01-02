@@ -144,3 +144,7 @@ Enable detailed logging by checking browser console. The code logs:
 4. Verify events have `projectId` set
 5. Test ticket display
 
+
+
+
+

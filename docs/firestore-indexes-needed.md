@@ -41,3 +41,7 @@ This index is used by:
 
 **Note:** The admin media library has fallback logic to query without `orderBy` if the index is missing, then sorts client-side.
 
+
+
+
+

@@ -42,3 +42,7 @@ This fixes the "Missing or insufficient permissions" error on partner admin dash
 1. Partner admin users should **sign out and sign back in** to refresh their ID token
 2. The partner admin dashboard should now load ticket data without errors
 
+
+
+
+

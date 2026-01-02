@@ -133,3 +133,7 @@ The project dashboard (`/admin/projects/[id]`) only shows tickets for events whe
 4. Try creating a new RSVP and watching the console logs
 5. Check if the event's `projectId` field is set correctly
 
+
+
+
+

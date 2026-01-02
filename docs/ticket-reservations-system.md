@@ -177,3 +177,7 @@ See `firestore.rules` for complete security rules.
 - **Project Dashboard**: `app/admin/projects/[id]/page.tsx`
 - **Firestore Rules**: `firestore.rules`
 
+
+
+
+

@@ -116,6 +116,7 @@ export default function AdminLayout({
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
   const { hasAccess, loading, redirect } = useRequireRole('beam_admin')
+  const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
   
   // Redirect partner admins to their project page
   useEffect(() => {
@@ -152,7 +153,15 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-orchestra-dark flex overflow-hidden">
+    <div className={`min-h-screen bg-orchestra-dark flex overflow-hidden ${isStaging ? 'border-t-4 border-purple-500' : ''} relative`}>
+      {/* Staging Watermark */}
+      {isStaging && (
+        <div className="fixed inset-0 pointer-events-none z-[9999] opacity-5">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-purple-400 text-9xl font-bold transform -rotate-45">STAGING</div>
+          </div>
+        </div>
+      )}
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -330,7 +339,7 @@ export default function AdminLayout({
 
         {/* Page content */}
         <main className="p-4 lg:p-6 flex-1 overflow-y-auto overflow-x-auto">
-          <div className="w-full max-w-full">
+          <div className="max-w-7xl mx-auto px-6 w-full">
             {children}
           </div>
         </main>

@@ -121,3 +121,7 @@ Pulse can now query multiple Gmail accounts by:
 3. **Add usage statistics** per account
 4. **Add account labels** for easier identification
 
+
+
+
+

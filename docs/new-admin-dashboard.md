@@ -125,3 +125,7 @@ Clicking the "Total Tickets Sold" card opens a modal showing:
 - Loading states are shown during initial data fetch
 - Real-time updates via Firestore `onSnapshot`
 
+
+
+
+

@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import Footer from '@/components/Footer'
 import AuthButtons from '@/components/AuthButtons'
-import { Play, ArrowRight, ExternalLink, Calendar, Lock, User, LogOut } from 'lucide-react'
+import { Play, ArrowRight, ExternalLink, Calendar, Lock, User, LogOut, Music, Users } from 'lucide-react'
 import Link from 'next/link'
 
 /**
@@ -480,8 +480,74 @@ export default function StudioPage() {
         </div>
       </section>
 
-      {/* Featured Project Section */}
+      {/* Content Categories */}
       <section className="px-4 sm:px-6 lg:px-8 py-16">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-8">Explore Content</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Link
+              href="#rehearsal-gallery"
+              className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-all group"
+            >
+              <Play className="h-12 w-12 text-[#D4AF37] mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold text-white mb-2">Rehearsals</h3>
+              <p className="text-white/60 text-sm">Full orchestra and sectional rehearsal footage</p>
+            </Link>
+            <Link
+              href="/studio/chamber"
+              className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-all group"
+            >
+              <Music className="h-12 w-12 text-[#D4AF37] mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold text-white mb-2">Chamber Projects</h3>
+              <p className="text-white/60 text-sm">Intimate chamber music performances and projects</p>
+            </Link>
+            <Link
+              href="/studio/interviews"
+              className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-all group"
+            >
+              <Users className="h-12 w-12 text-[#D4AF37] mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold text-white mb-2">Interviews</h3>
+              <p className="text-white/60 text-sm">Conversations with musicians and artists</p>
+            </Link>
+            <Link
+              href="/watch/partners/dayvin-hallmon-interview"
+              className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-all group"
+            >
+              <Play className="h-12 w-12 text-[#D4AF37] mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-xl font-bold text-white mb-2">Dayvin Hallmon Interview</h3>
+              <p className="text-white/60 text-sm">Interactive video with chapter navigation</p>
+            </Link>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 opacity-50">
+              <Play className="h-12 w-12 text-white/30 mb-4" />
+              <h3 className="text-xl font-bold text-white/50 mb-2">Behind the Scenes</h3>
+              <p className="text-white/40 text-sm">Coming soon</p>
+            </div>
+          </div>
+          
+          {/* Featured Interview */}
+          <div className="mt-8 bg-gradient-to-r from-[#D4AF37]/10 to-transparent border border-[#D4AF37]/30 rounded-xl p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-white mb-2">Featured Interview</h3>
+                <p className="text-white/70 mb-4">
+                  Watch our interactive interview with Dayvin Hallmon, featuring chapter navigation, topic filtering, and shareable timestamps.
+                </p>
+              </div>
+              <Link
+                href="/watch/partners/dayvin-hallmon-interview"
+                className="inline-flex items-center justify-center px-6 py-3 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-lg transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 whitespace-nowrap"
+              >
+                <Play className="mr-2 h-5 w-5" />
+                Watch Interview
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Project Section */}
+      <section className="px-4 sm:px-6 lg:px-8 py-16 border-t border-white/10">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-8">Featured Projects</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">

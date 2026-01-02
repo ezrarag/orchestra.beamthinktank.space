@@ -335,6 +335,52 @@ service cloud.firestore {
       allow write: if isAdmin() || isPartnerAdmin();
     }
     
+    // Chamber Projects - Studio chamber project content
+    match /chamberProjects/{projectId} {
+      // Admins can read/write all projects
+      allow read, write: if isAdmin();
+      
+      // Partner admins can read/write projects
+      allow read, write: if isPartnerAdmin();
+      
+      // Board members can read all projects (read-only)
+      allow read: if isAuthenticated() && request.auth.token.role == 'board';
+      
+      // Subscribers can read projects
+      allow read: if isAuthenticated() && (
+        request.auth.token.role == 'subscriber' ||
+        request.auth.token.beam_subscriber == true ||
+        request.auth.token.subscriber == true ||
+        true
+      );
+      
+      // Only admins can write
+      allow write: if isAdmin() || isPartnerAdmin();
+    }
+    
+    // Interviews - Studio interview content
+    match /interviews/{interviewId} {
+      // Admins can read/write all interviews
+      allow read, write: if isAdmin();
+      
+      // Partner admins can read/write interviews
+      allow read, write: if isPartnerAdmin();
+      
+      // Board members can read all interviews (read-only)
+      allow read: if isAuthenticated() && request.auth.token.role == 'board';
+      
+      // Subscribers can read interviews
+      allow read: if isAuthenticated() && (
+        request.auth.token.role == 'subscriber' ||
+        request.auth.token.beam_subscriber == true ||
+        request.auth.token.subscriber == true ||
+        true
+      );
+      
+      // Only admins can write
+      allow write: if isAdmin() || isPartnerAdmin();
+    }
+    
     // Integrations - Google OAuth tokens and other integrations
     match /integrations/{integrationId} {
       // Only admins can read/write integrations

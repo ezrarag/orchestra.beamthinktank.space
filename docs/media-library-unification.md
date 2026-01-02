@@ -71,3 +71,7 @@ Previously, the admin media library used `projectMedia` collection with a differ
 3. **Easier Maintenance** - One collection to manage
 4. **Better Performance** - Fewer collections to query
 
+
+
+
+
