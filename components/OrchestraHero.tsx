@@ -88,7 +88,7 @@ export default function OrchestraHero() {
 
             {/* CTA Buttons */}
             <motion.div
-              className="flex flex-col sm:flex-row gap-4 pt-4"
+              className="flex flex-col sm:flex-row sm:flex-wrap gap-3 pt-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.8 }}
@@ -98,8 +98,30 @@ export default function OrchestraHero() {
                 whileTap={{ scale: 0.95 }}
               >
                 <Link
+                  href="/studio/chamber"
+                  className="inline-block w-full sm:w-auto px-8 py-4 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 hover:shadow-2xl text-center"
+                >
+                  View Chamber Submissions
+                </Link>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Link
+                  href="/studio/recordings"
+                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
+                >
+                  Studio Recordings
+                </Link>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Link
                   href="/tickets"
-                  className="inline-block px-8 py-4 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 hover:shadow-2xl text-center"
+                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
                 >
                   Buy Tickets
                 </Link>
@@ -110,9 +132,9 @@ export default function OrchestraHero() {
               >
                 <Link
                   href="/studio"
-                  className="inline-block px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
+                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-white/40 hover:bg-white/10 text-white font-bold rounded-xl transition-all duration-300 text-center"
                 >
-                  Watch & Explore
+                  Explore Studio
                 </Link>
               </motion.div>
             </motion.div>
@@ -124,7 +146,7 @@ export default function OrchestraHero() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 1 }}
             >
-              For audiences, musicians, and partner organizations.
+              Chamber submissions are one click away.
             </motion.p>
           </motion.div>
 
@@ -159,18 +181,18 @@ export default function OrchestraHero() {
         </div>
         <div>
           <Link
-            href="/musician"
+            href="/signup"
             className="hover:text-[#D4AF37] transition-colors"
           >
-            Musician
+            Signup
           </Link>
         </div>
         <div>
           <Link
-            href="/subscriber"
+            href="/sign-in"
             className="hover:text-[#D4AF37] transition-colors"
           >
-            Subscriber
+            Sign In
           </Link>
         </div>
       </motion.div>
@@ -224,4 +246,3 @@ export default function OrchestraHero() {
     </section>
   )
 }
-

@@ -1,137 +1,130 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import Footer from '@/components/Footer'
-import { Music, Calendar, ArrowRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-
-interface ChamberProject {
-  id: string
-  title: string
-  slug: string
-  description: string
-  createdAt?: any
-  tags?: string[]
-  videos?: any[]
-  thumbnailUrl?: string
-}
+import { Calendar, Music, ArrowRight, MapPin } from 'lucide-react'
+import Footer from '@/components/Footer'
+import {
+  CHAMBER_SERIES_FILTERS,
+  listChamberSeriesProjects,
+  type ChamberProject,
+} from '@/lib/chamberProjects'
 
 export default function ChamberProjectsPage() {
   const [projects, setProjects] = useState<ChamberProject[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!db) return
+    let mounted = true
 
-    const q = query(collection(db, 'chamberProjects'), orderBy('createdAt', 'desc'))
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items: ChamberProject[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as ChamberProject[]
+    const loadProjects = async () => {
+      try {
+        const items = await listChamberSeriesProjects()
+        if (!mounted) return
         setProjects(items)
-        setLoading(false)
-      },
-      (error) => {
-        console.error('Error loading projects:', error)
-        setLoading(false)
+      } catch (error) {
+        console.error('Error loading chamber projects:', error)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
       }
-    )
+    }
 
-    return () => unsubscribe()
+    loadProjects()
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
-  const formatDate = (date?: any): string => {
-    if (!date) return ''
-    const d = date?.toDate?.() || date
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'Date TBD'
     return new Intl.DateTimeFormat('en-US', {
-      month: 'long',
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
-    }).format(d)
+    }).format(date)
   }
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Header */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
-            Chamber Projects
+      <section className="border-b border-white/10 px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <h1 className="mb-6 text-4xl font-bold text-white md:text-5xl lg:text-6xl">
+            Chamber Series
           </h1>
-          <p className="text-lg md:text-xl text-white/80 max-w-2xl">
-            Intimate chamber music performances, masterclasses, and collaborative projects.
+          <p className="max-w-3xl text-lg text-white/80 md:text-xl">
+            Session archive for chamber projects with multi-version recordings and switchable mixes.
           </p>
+          <div className="mt-6 flex flex-wrap items-center gap-2 text-sm text-white/70">
+            <span className="rounded-full border border-white/20 px-3 py-1">series: {CHAMBER_SERIES_FILTERS.series}</span>
+            <span className="rounded-full border border-white/20 px-3 py-1">discipline: {CHAMBER_SERIES_FILTERS.discipline}</span>
+            <span className="rounded-full border border-white/20 px-3 py-1">location: {CHAMBER_SERIES_FILTERS.location}</span>
+          </div>
         </div>
       </section>
 
-      {/* Projects Grid */}
-      <section className="px-4 sm:px-6 lg:px-8 py-16">
-        <div className="max-w-7xl mx-auto">
+      <section className="px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
           {loading ? (
-            <div className="text-center py-16">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37]"></div>
+            <div className="py-16 text-center">
+              <div className="inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-[#D4AF37]" />
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-white/60 text-lg">No chamber projects available yet.</p>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-10 text-center">
+              <p className="text-lg text-white/70">No published chamber projects match these filters yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project, idx) => (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project, index) => (
                 <motion.div
                   key={project.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
+                  transition={{ delay: index * 0.08 }}
                 >
                   <Link
-                    href={`/studio/chamber/${project.slug}`}
-                    className="block bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-all h-full"
+                    href={`/studio/chamber/${project.id}`}
+                    className="block h-full rounded-xl border border-white/10 bg-white/5 p-6 transition-all hover:border-[#D4AF37]/50"
                   >
                     {project.thumbnailUrl ? (
                       <img
                         src={project.thumbnailUrl}
                         alt={project.title}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
+                        className="mb-4 h-48 w-full rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="w-full h-48 bg-white/10 rounded-lg mb-4 flex items-center justify-center">
-                        <Music className="h-16 w-16 text-white/30" />
+                      <div className="mb-4 flex h-48 w-full items-center justify-center rounded-lg bg-white/10">
+                        <Music className="h-14 w-14 text-white/30" />
                       </div>
                     )}
-                    <h3 className="text-xl font-bold text-white mb-2">{project.title}</h3>
-                    <p className="text-white/70 text-sm mb-4 line-clamp-3">{project.description}</p>
-                    {project.tags && project.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {project.tags.slice(0, 3).map((tag, tagIdx) => (
-                          <span
-                            key={tagIdx}
-                            className="px-2 py-1 bg-white/10 text-white/60 text-xs rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+
+                    <h2 className="mb-2 text-2xl font-bold text-white">{project.title}</h2>
+                    {project.composer && (
+                      <p className="mb-2 text-sm text-white/70">Composer: {project.composer}</p>
                     )}
-                    {project.videos && project.videos.length > 0 && (
-                      <p className="text-sm text-white/60 mb-2">
-                        {project.videos.length} video{project.videos.length !== 1 ? 's' : ''}
+                    {project.instrumentation && (
+                      <p className="mb-3 text-sm text-white/70">Instrumentation: {project.instrumentation}</p>
+                    )}
+                    {project.description && (
+                      <p className="line-clamp-3 text-sm text-white/70">{project.description}</p>
+                    )}
+
+                    <div className="mt-5 space-y-1 text-xs text-white/50">
+                      <p className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5" />
+                        Updated {formatDate(project.updatedAt ?? project.createdAt)}
                       </p>
-                    )}
-                    {project.createdAt && (
-                      <p className="text-xs text-white/40 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(project.createdAt)}
+                      <p className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {project.location || CHAMBER_SERIES_FILTERS.location}
                       </p>
-                    )}
-                    <div className="mt-4 flex items-center text-[#D4AF37] text-sm font-medium">
-                      View Project <ArrowRight className="ml-2 h-4 w-4" />
+                    </div>
+
+                    <div className="mt-4 flex items-center text-sm font-medium text-[#D4AF37]">
+                      Open Project <ArrowRight className="ml-2 h-4 w-4" />
                     </div>
                   </Link>
                 </motion.div>
@@ -145,4 +138,3 @@ export default function ChamberProjectsPage() {
     </div>
   )
 }
-

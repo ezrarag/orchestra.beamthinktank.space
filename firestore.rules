@@ -48,6 +48,29 @@ service cloud.firestore {
       // Allow partner admins to read/write projects for their organization
       allow read, write: if isPartnerAdmin() && 
         resource.data.organizationId == request.auth.token.organizationId;
+
+      // Public read for published Chamber Series project pages.
+      allow read: if (
+        resource.data.series == 'chamber' &&
+        resource.data.discipline == 'orchestra' &&
+        resource.data.location == 'milwaukee' &&
+        (resource.data.status == 'published' || resource.data.published == true)
+      );
+
+      // Versioned media under projects/{projectId}/versions/{versionId}
+      match /versions/{versionId} {
+        allow read, write: if isAdmin();
+        allow read, write: if isPartnerAdmin();
+        allow read: if (
+          get(/databases/$(database)/documents/projects/$(projectId)).data.series == 'chamber' &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.discipline == 'orchestra' &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.location == 'milwaukee' &&
+          (
+            get(/databases/$(database)/documents/projects/$(projectId)).data.status == 'published' ||
+            get(/databases/$(database)/documents/projects/$(projectId)).data.published == true
+          )
+        );
+      }
     }
     
     // Musicians - Admins and the musician themselves
