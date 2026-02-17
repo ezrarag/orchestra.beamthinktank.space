@@ -16,7 +16,6 @@ import {
   X,
 } from 'lucide-react'
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
-import { orchestraConfig } from '@/lib/config/orchestraConfig'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 
@@ -77,7 +76,7 @@ type ActiveVideo = {
   contentId?: string
 }
 
-const placeholderVideoUrl = orchestraConfig.homeSlides[0]?.videoUrl ?? ''
+const placeholderVideoUrl = ''
 const OVERLAY_RESTORE_DELAY_MS = 1600
 const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
