@@ -1,0 +1,524 @@
+{
+  "areas": [
+    {
+      "id": "professional",
+      "title": "Professional Orchestra",
+      "tag": "Flagship Series",
+      "locked": false,
+      "narrative": "Premier narrative tracks led by contracted professional players. This area is intentionally locked while release and access logic are finalized.",
+      "locationHint": "Release windows by metro and partner institutions.",
+      "visual": "from-[#293241]/80 via-[#1B1E2B]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "community",
+      "title": "Community Orchestra",
+      "tag": "Neighborhood Stories",
+      "locked": false,
+      "narrative": "Narratives rooted in local players, schools, and cultural partners. Built to flex by city, state, and institutional collaboration.",
+      "locationHint": "Filtered by city, region, and verified institutions.",
+      "visual": "from-[#0B5D6E]/75 via-[#12344D]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "chamber",
+      "title": "Chamber Series",
+      "tag": "Intimate Format",
+      "locked": false,
+      "narrative": "Small ensemble narratives where participants shape each chapter from rehearsal draft to polished release.",
+      "locationHint": "Programmed by city scene and ensemble roster.",
+      "visual": "from-[#83580B]/72 via-[#3B2A14]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "publishing",
+      "title": "Publishing",
+      "tag": "Publishing",
+      "locked": false,
+      "narrative": "Compose, arrange, and share new and classic works.",
+      "locationHint": "Scores, recordings, and scholarship.",
+      "visual": "from-[#395B64]/75 via-[#233138]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 4,
+      "active": true
+    },
+    {
+      "id": "business",
+      "title": "The Business",
+      "tag": "Operations + Impact",
+      "locked": false,
+      "narrative": "The operational narrative: sponsorship, production decisions, contracts, and audience growth by market.",
+      "locationHint": "Data visibility scales by subscription and role.",
+      "visual": "from-[#4D3C77]/78 via-[#2B2D42]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 5,
+      "active": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "pro-origin",
+      "areaId": "professional",
+      "title": "Origin Stories",
+      "format": "Episode Arc",
+      "summary": "How each professional ensemble season is built from concept through live launch.",
+      "availability": "subscriber",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "pro-rehearsal",
+      "areaId": "professional",
+      "title": "Rehearsal Intelligence",
+      "format": "Behind The Score",
+      "summary": "Conductor-player collaboration cuts with score overlays and rehearsal notes.",
+      "availability": "subscriber",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "pro-premieres",
+      "areaId": "professional",
+      "title": "Premiere Nights",
+      "format": "Live Capture",
+      "summary": "Curated multicam cuts from premiere events with participant commentary.",
+      "availability": "regional",
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "community-lead",
+      "areaId": "community",
+      "title": "Community Leads",
+      "format": "Docu Stories",
+      "summary": "Participant-led stories from rehearsal rooms and neighborhood performance spaces.",
+      "availability": "open",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "community-stages",
+      "areaId": "community",
+      "title": "Regional Stages",
+      "format": "Performance Rail",
+      "summary": "Location-aware cuts from city and state partner performances.",
+      "availability": "regional",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "community-youth",
+      "areaId": "community",
+      "title": "Youth + Mentor Tracks",
+      "format": "Journey Series",
+      "summary": "Intergenerational storytelling through rehearsal milestones and outcomes.",
+      "availability": "institution",
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "chamber-cycle",
+      "areaId": "chamber",
+      "title": "Cycle Releases",
+      "format": "Mini Seasons",
+      "summary": "Program arcs delivered in chapters with score notes and player interviews.",
+      "availability": "subscriber",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "chamber-process",
+      "areaId": "chamber",
+      "title": "Process Room",
+      "format": "Studio Cut",
+      "summary": "Versioned rehearsal clips highlighting arrangement and interpretation changes.",
+      "availability": "institution",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "chamber-archive",
+      "areaId": "chamber",
+      "title": "Archive Selects",
+      "format": "Curated Library",
+      "summary": "Region-specific anthology content curated by local artistic teams.",
+      "availability": "regional",
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "publishing-main",
+      "areaId": "publishing",
+      "title": "Publishing Main",
+      "format": "Publishing Stories",
+      "summary": "Scores, recordings, and scholarship.",
+      "availability": "open",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "publishing-catalog",
+      "areaId": "publishing",
+      "title": "Catalog Highlights",
+      "format": "Project Cards",
+      "summary": "Current publishing releases and collaborations.",
+      "availability": "open",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "publishing-scholarship",
+      "areaId": "publishing",
+      "title": "Scholarship Notes",
+      "format": "Context Cards",
+      "summary": "Educational notes, references, and score context.",
+      "availability": "open",
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "business-partnerships",
+      "areaId": "business",
+      "title": "Partnership Diaries",
+      "format": "Case Stories",
+      "summary": "How institutions and sponsors shape local programming strategy.",
+      "availability": "subscriber",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "business-production",
+      "areaId": "business",
+      "title": "Production Logic",
+      "format": "Workflow Story",
+      "summary": "Planning and release logic from intake to published content.",
+      "availability": "institution",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "business-impact",
+      "areaId": "business",
+      "title": "Impact Reports",
+      "format": "Insight Feed",
+      "summary": "Audience, education, and community metrics framed as story chapters.",
+      "availability": "regional",
+      "order": 3,
+      "active": true
+    }
+  ],
+  "content": [
+    {
+      "id": "professional-origin-placeholder",
+      "areaId": "professional",
+      "sectionId": "pro-origin",
+      "title": "Professional Orchestra: Origin Story Placeholder",
+      "description": "Replace with a flagship professional orchestra origin story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fprofessional-origin-story.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "subscriber",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "professional-rehearsal-placeholder",
+      "areaId": "professional",
+      "sectionId": "pro-rehearsal",
+      "title": "Professional Orchestra: Rehearsal Intelligence Placeholder",
+      "description": "Replace with a professional rehearsal process story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fprofessional-rehearsal-intelligence.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "subscriber",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "professional-premieres-placeholder",
+      "areaId": "professional",
+      "sectionId": "pro-premieres",
+      "title": "Professional Orchestra: Premiere Night Placeholder",
+      "description": "Replace with a premiere-night capture story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fprofessional-premiere-night.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "regional",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "bds-atlanta-showcase",
+      "areaId": "community",
+      "sectionId": "community-lead",
+      "title": "Black Diaspora Symphony: Atlanta Showcase",
+      "description": "See BEAM participants join Atlanta's community orchestra in a fundraising concert supporting local arts initiatives.",
+      "institutionName": "Atlanta Community Orchestra Network",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Released",
+      "participantNames": ["BEAM Community Artists"],
+      "relatedVersionIds": ["bds-milwaukee-collaboration"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fcommunity-atlanta-showcase.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "open",
+      "isNew": false,
+      "confirmed": true,
+      "geo": {
+        "regions": ["Southeast"],
+        "states": ["GA"],
+        "cities": ["Atlanta"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "bds-milwaukee-collaboration",
+      "areaId": "community",
+      "sectionId": "community-stages",
+      "title": "Black Diaspora Symphony: Milwaukee Collaboration",
+      "description": "BEAM Orchestra participants join Milwaukee's community orchestra for cross-city collaboration and mentorship.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Released",
+      "participantNames": ["BEAM Community Artists"],
+      "relatedVersionIds": ["bds-atlanta-showcase"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fcommunity-milwaukee-collaboration.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "open",
+      "isNew": false,
+      "confirmed": true,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "publishing-milwaukee-recording",
+      "areaId": "publishing",
+      "sectionId": "publishing-main",
+      "title": "Publishing: Milwaukee Recording Session",
+      "description": "Milwaukee publishing release featuring score development and recorded ensemble interpretation.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Open for pedagogical input",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-catalog-chapter", "publishing-scholarship-brief"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fpublishing-milwaukee-recording.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "publishing-catalog-chapter",
+      "areaId": "publishing",
+      "sectionId": "publishing-catalog",
+      "title": "Publishing: Catalog Chapter One",
+      "description": "Featured publication card for a new orchestral score with rehearsal-to-release context.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Catalog curation",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-milwaukee-recording", "publishing-scholarship-brief"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fpublishing-catalog-chapter-one.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "publishing-scholarship-brief",
+      "areaId": "publishing",
+      "sectionId": "publishing-scholarship",
+      "title": "Publishing: Scholarship Brief",
+      "description": "Program notes and scholarly framing for community and conservatory readers.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Peer review in progress",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-milwaukee-recording", "publishing-catalog-chapter"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fpublishing-scholarship-brief.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "chamber-cycle-placeholder",
+      "areaId": "chamber",
+      "sectionId": "chamber-cycle",
+      "title": "Chamber Series: Cycle Release Placeholder",
+      "description": "Replace with a chamber cycle release story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fchamber-cycle-release.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "subscriber",
+      "geo": {
+        "regions": ["Regional"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "chamber-process-placeholder",
+      "areaId": "chamber",
+      "sectionId": "chamber-process",
+      "title": "Chamber Series: Process Room Placeholder",
+      "description": "Replace with a chamber rehearsal process story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fchamber-process-room.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "institution",
+      "geo": {
+        "regions": ["Regional"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "chamber-archive-placeholder",
+      "areaId": "chamber",
+      "sectionId": "chamber-archive",
+      "title": "Chamber Series: Archive Select Placeholder",
+      "description": "Replace with a chamber archive highlight story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fchamber-archive-select.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "regional",
+      "geo": {
+        "regions": ["Regional"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "business-partnership-placeholder",
+      "areaId": "business",
+      "sectionId": "business-partnerships",
+      "title": "The Business: Partnership Diaries Placeholder",
+      "description": "Replace with a partnership case-study story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fbusiness-partnership-diaries.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "subscriber",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "business-production-placeholder",
+      "areaId": "business",
+      "sectionId": "business-production",
+      "title": "The Business: Production Logic Placeholder",
+      "description": "Replace with a production workflow story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fbusiness-production-logic.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "institution",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "business-impact-placeholder",
+      "areaId": "business",
+      "sectionId": "business-impact",
+      "title": "The Business: Impact Report Placeholder",
+      "description": "Replace with an impact analytics story video from Firebase Storage.",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/YOUR_FIREBASE_STORAGE_BUCKET/o/viewer%2Fbusiness-impact-report.mp4?alt=media&token=REPLACE_WITH_FILE_TOKEN",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "regional",
+      "geo": {
+        "regions": ["National"],
+        "states": [],
+        "cities": []
+      },
+      "institutions": [],
+      "participants": []
+    }
+  ]
+}
