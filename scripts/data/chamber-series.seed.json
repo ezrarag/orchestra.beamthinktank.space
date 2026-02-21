@@ -1,0 +1,111 @@
+{
+  "areas": [
+    {
+      "id": "chamber",
+      "title": "Chamber Series",
+      "tag": "Intimate Format",
+      "locked": false,
+      "narrative": "Small ensemble narratives where participants shape each chapter from rehearsal draft to polished release.",
+      "locationHint": "Programmed by city scene and ensemble roster.",
+      "visual": "from-[#83580B]/72 via-[#3B2A14]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 3,
+      "active": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "chamber-series",
+      "areaId": "chamber",
+      "title": "Chamber Series",
+      "format": "Performance Cards",
+      "summary": "Milwaukee chamber recordings and supporting score context.",
+      "availability": "open",
+      "order": 1,
+      "active": true
+    }
+  ],
+  "content": [
+    {
+      "id": "brahms-sonata-mke",
+      "areaId": "chamber",
+      "sectionId": "chamber-series",
+      "title": "Brahms Sonata (Milwaukee)",
+      "description": "Recorded live at UWM.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Active analysis",
+      "participantNames": ["BEAM Chamber Ensemble"],
+      "relatedVersionIds": ["schumann-sonata-mke", "pachelbel-sonata-mke"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "/images/chamber/brahms-thumb.jpg",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fbrahms_sonata.mp4?alt=media",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": ["uwm"],
+      "participants": []
+    },
+    {
+      "id": "schumann-sonata-mke",
+      "areaId": "chamber",
+      "sectionId": "chamber-series",
+      "title": "Schumann Sonata (Milwaukee)",
+      "description": "Recorded live at UWM.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "In peer review",
+      "participantNames": ["BEAM Chamber Ensemble"],
+      "relatedVersionIds": ["brahms-sonata-mke", "pachelbel-sonata-mke"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "/images/chamber/schumann-thumb.jpg",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fschumann_sonata.mp4?alt=media",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": ["uwm"],
+      "participants": []
+    },
+    {
+      "id": "pachelbel-sonata-mke",
+      "areaId": "chamber",
+      "sectionId": "chamber-series",
+      "title": "Pachelbel Sonata (Milwaukee)",
+      "description": "Recorded live at UWM.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Draft annotations",
+      "participantNames": ["BEAM Chamber Ensemble"],
+      "relatedVersionIds": ["brahms-sonata-mke", "schumann-sonata-mke"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "/images/chamber/pachelbel-thumb.jpg",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fpachelbel_sonata.mp4?alt=media",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": ["uwm"],
+      "participants": []
+    }
+  ]
+}

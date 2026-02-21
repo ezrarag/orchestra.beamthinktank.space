@@ -31,6 +31,12 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+
+    // Temporary bypass for viewer admin testing without sign-in.
+    // Set to false once auth-based admin testing is restored.
+    function viewerAdminBypassEnabled() {
+      return true;
+    }
     
     // Organizations - Only BEAM admins can read/write
     match /organizations/{orgId} {
@@ -158,6 +164,27 @@ service cloud.firestore {
       
       // Allow users to read/update/create their own data
       allow read, update, create: if isOwner(userId);
+    }
+
+    // Page guides (helper overlay configuration)
+    match /pageGuides/{pageId} {
+      // Public read so onboarding helpers can render for all visitors
+      allow read: if true;
+
+      // Admin-managed write access for editing/adding/removing steps
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Publishing applications
+    match /publishingApplications/{applicationId} {
+      // Admins can read/write all applications
+      allow read, write: if isAdmin();
+
+      // Users can create their own application documents
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Users can read their own application documents
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
     // Documents collection (for user documents like W9, contracts, etc.)
@@ -411,6 +438,86 @@ service cloud.firestore {
       
       // No other access allowed
       allow read, write: if false;
+    }
+
+    // Viewer Areas - top-level area rails and visuals
+    match /viewerAreas/{areaId} {
+      // Public can read active viewer areas
+      allow read: if resource.data.active == true;
+
+      // Admins can manage viewer areas
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Viewer Sections - narrative arc sections per area
+    match /viewerSections/{sectionId} {
+      // Public can read active sections
+      allow read: if resource.data.active == true;
+
+      // Admins can manage viewer sections
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Viewer Content - city/institution/role-filtered playable content
+    match /viewerContent/{contentId} {
+      // Public can read all published viewer content.
+      // Access-level filtering is currently handled in app logic.
+      allow read: if resource.data.isPublished == true;
+
+      // Temporary bypass for local admin tooling without sign-in.
+      allow read: if viewerAdminBypassEnabled();
+
+      // Admins can manage all viewer content
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+
+      // Authenticated participants can submit viewer entries they own
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdByUid == request.auth.uid;
+
+      // Owners can update their own submissions
+      allow update: if isAuthenticated() &&
+        resource.data.createdByUid == request.auth.uid &&
+        request.resource.data.createdByUid == request.auth.uid;
+
+      // Owners can delete their own submissions
+      allow delete: if isAuthenticated() &&
+        resource.data.createdByUid == request.auth.uid;
+    }
+
+    // Booking requests (viewer booking flow)
+    match /bookingRequests/{bookingId} {
+      // Admins can read/write all bookings
+      allow read, write: if isAdmin();
+
+      // Temporary bypass for local admin tooling without sign-in.
+      allow read, write: if viewerAdminBypassEnabled();
+
+      // Partner admins can read bookings
+      allow read: if isPartnerAdmin();
+
+      // Users can read their own bookings
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Creates are handled by secure API route.
+      allow create: if false;
+    }
+
+    // Viewer state for continue-watching
+    match /users/{userId}/viewerState/{stateId} {
+      // Owner can read/write their own viewer state
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+
+      // Admins can read/write all viewer state
+      allow read, write: if isAdmin();
+    }
+
+    // Viewer area role templates (avatar slots per area)
+    match /viewerAreaRoles/{areaId} {
+      // Allow reads for viewer popup role rail
+      allow read: if true;
+
+      // Admin management + temporary bypass for testing
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
     }
     
     // Default deny rule for any unmatched paths

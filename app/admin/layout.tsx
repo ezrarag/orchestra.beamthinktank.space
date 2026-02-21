@@ -5,36 +5,18 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  LayoutDashboard, 
-  Zap, 
-  FolderOpen, 
-  Users, 
-  Settings, 
   Menu, 
   X,
   Music,
-  Calendar,
-  QrCode,
   ChevronDown,
   MoreVertical,
-  LogOut
+  LogOut,
 } from 'lucide-react'
-import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
+import { adminNavGroups } from '@/lib/config/adminNav'
+import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-
-const navLinks = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Pulse', href: '/admin/pulse', icon: Zap },
-  { label: 'Projects', href: '/admin/projects', icon: FolderOpen },
-  { label: 'Musicians', href: '/admin/musicians', icon: Users },
-  { label: 'Events', href: '/admin/events', icon: Calendar },
-  { label: 'Attendance', href: '/admin/attendance', icon: Calendar },
-  { label: 'Studio Videos', href: '/admin/studio', icon: Music },
-  { label: 'QR Codes', href: '/admin/qr-codes', icon: QrCode },
-  { label: 'Settings', href: '/admin/settings', icon: Settings },
-]
 
 function AccessDeniedPage() {
   const router = useRouter()
@@ -115,7 +97,6 @@ export default function AdminLayout({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
-  const { hasAccess, loading, redirect } = useRequireRole('beam_admin')
   const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
   
   // Redirect partner admins to their project page
@@ -137,19 +118,6 @@ export default function AdminLayout({
       console.error('Error signing out:', error)
       setSigningOut(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-orchestra-dark flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orchestra-gold"></div>
-      </div>
-    )
-  }
-
-  // Allow partner admins to access admin area (they'll be redirected to their project)
-  if (redirect && role !== 'partner_admin') {
-    return <AccessDeniedPage />
   }
 
   return (
@@ -200,27 +168,51 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-3 space-y-1">
-            {navLinks.map((link) => {
-              const Icon = link.icon
-              const isActive = pathname === link.href
-              
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
-                    isActive
-                      ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/30'
-                      : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span className="font-medium truncate">{link.label}</span>
-                </Link>
-              )
-            })}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-3">
+            {adminNavGroups.map((group) => (
+              <div key={group.key} className="space-y-1.5">
+                {group.title && (
+                  <p className="px-2 text-[10px] font-semibold tracking-[0.14em] text-orchestra-gold/70">
+                    {group.title}
+                  </p>
+                )}
+                {group.items.map((link) => {
+                  const Icon = link.icon
+                  const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+
+                  if (!link.enabled) {
+                    return (
+                      <div
+                        key={link.key}
+                        className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-orchestra-cream/55 border border-orchestra-gold/10 bg-orchestra-gold/5"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="font-medium truncate">{link.label}</span>
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wide text-orchestra-gold/70">Soon</span>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={link.key}
+                      href={link.href}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
+                        isActive
+                          ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/30'
+                          : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
+                      }`}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Icon className="h-4 w-4 flex-shrink-0" />
+                      <span className="font-medium truncate">{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
           </nav>
 
           {/* Footer */}
@@ -287,27 +279,51 @@ export default function AdminLayout({
                     style={{ pointerEvents: 'auto' }}
                   >
                     <div className="py-2">
-                      {navLinks.map((link) => {
-                        const Icon = link.icon
-                        const isActive = pathname === link.href
-                        
-                        return (
-                          <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={() => setDropdownOpen(false)}
-                            className={`flex items-center space-x-3 px-4 py-3 transition-colors relative z-[10000] ${
-                              isActive
-                                ? 'bg-orchestra-gold/20 text-orchestra-gold border-l-2 border-orchestra-gold'
-                                : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
-                            }`}
-                            style={{ pointerEvents: 'auto' }}
-                          >
-                            <Icon className="h-5 w-5 flex-shrink-0" />
-                            <span className="font-medium">{link.label}</span>
-                          </Link>
-                        )
-                      })}
+                      {adminNavGroups.map((group) => (
+                        <div key={`dropdown-group-${group.key}`}>
+                          {group.title && (
+                            <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-orchestra-gold/70">
+                              {group.title}
+                            </p>
+                          )}
+                          {group.items.map((link) => {
+                            const Icon = link.icon
+                            const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+
+                            if (!link.enabled) {
+                              return (
+                                <div
+                                  key={`dropdown-${link.key}`}
+                                  className="flex items-center justify-between space-x-3 px-4 py-2.5 text-orchestra-cream/60"
+                                >
+                                  <div className="flex items-center space-x-3">
+                                    <Icon className="h-5 w-5 flex-shrink-0" />
+                                    <span className="font-medium">{link.label}</span>
+                                  </div>
+                                  <span className="text-[10px] uppercase tracking-wide text-orchestra-gold/70">Soon</span>
+                                </div>
+                              )
+                            }
+
+                            return (
+                              <Link
+                                key={`dropdown-${link.key}`}
+                                href={link.href}
+                                onClick={() => setDropdownOpen(false)}
+                                className={`flex items-center space-x-3 px-4 py-3 transition-colors relative z-[10000] ${
+                                  isActive
+                                    ? 'bg-orchestra-gold/20 text-orchestra-gold border-l-2 border-orchestra-gold'
+                                    : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
+                                }`}
+                                style={{ pointerEvents: 'auto' }}
+                              >
+                                <Icon className="h-5 w-5 flex-shrink-0" />
+                                <span className="font-medium">{link.label}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ))}
                       
                       {/* Divider */}
                       <div className="border-t border-orchestra-gold/20 my-2" />

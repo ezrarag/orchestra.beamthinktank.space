@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "home": "Home",
+    "recordings": "Recordings",
+    "projects": "Projects",
+    "dashboard": "Dashboard",
+    "admin": "Admin"
+  },
+  "home": {
+    "kicker": "Public Portal",
+    "next": "Next",
+    "prev": "Prev"
+  },
+  "projects": {
+    "title": "BEAM Projects",
+    "subtitle": "Current and upcoming collaborations.",
+    "submitCta": "Submit Opportunity"
+  },
+  "dashboard": {
+    "title": "Participant Dashboard",
+    "schedule": "My Schedule",
+    "openCalls": "Open Calls",
+    "profile": "My Profile"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "requests": "Requests",
+    "sessions": "Sessions",
+    "participants": "Participants",
+    "reports": "Reports"
+  }
+}

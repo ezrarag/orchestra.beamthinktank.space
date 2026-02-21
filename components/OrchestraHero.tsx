@@ -5,14 +5,37 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { X } from 'lucide-react'
+import { X, ChevronRight } from 'lucide-react'
 import AuthButtons from '@/components/AuthButtons'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export default function OrchestraHero() {
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showMoreActions, setShowMoreActions] = useState(false)
   const router = useRouter()
-  const { user } = useUserRole()
+  const { user, role } = useUserRole()
+
+  const isPerformerOrAdmin =
+    role === 'musician' ||
+    role === 'beam_admin' ||
+    role === 'partner_admin' ||
+    role === 'board'
+
+  const primaryAction = isPerformerOrAdmin
+    ? { label: 'Join as Participant', href: '/join/participant' }
+    : { label: 'Watch & Support', href: '/viewer' }
+
+  const secondaryActions = isPerformerOrAdmin
+    ? [
+        { label: 'Recording Sessions', href: '/studio/recordings' },
+        { label: 'Mix Review', href: '/studio' },
+        { label: 'Admin Dashboard', href: '/admin/dashboard', adminOnly: true },
+      ]
+    : [
+        { label: 'Explore Performances', href: '/viewer' },
+        { label: 'Book BEAM Talent', href: '/viewer/book' },
+        { label: user ? 'Open Subscriber Area' : 'Subscribe / Log In', href: user ? '/viewer' : '/subscriber' },
+      ]
 
   const handleSignInSuccess = () => {
     setShowAuthModal(false)
@@ -88,55 +111,67 @@ export default function OrchestraHero() {
 
             {/* CTA Buttons */}
             <motion.div
-              className="flex flex-col sm:flex-row sm:flex-wrap gap-3 pt-4"
+              className="pt-4 space-y-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.8 }}
             >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link
-                  href="/studio/chamber"
-                  className="inline-block w-full sm:w-auto px-8 py-4 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 hover:shadow-2xl text-center"
+              <div className="flex w-full sm:w-auto items-stretch gap-2">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link
+                    href={primaryAction.href}
+                    className="inline-flex h-full items-center justify-center px-8 py-4 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/50 hover:shadow-2xl text-center"
+                  >
+                    {primaryAction.label}
+                  </Link>
+                </motion.div>
+                <motion.button
+                  type="button"
+                  onClick={() => setShowMoreActions((prev) => !prev)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  aria-expanded={showMoreActions}
+                  aria-label="Show more actions"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-[#D4AF37] px-4 text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all duration-300"
                 >
-                  View Chamber Submissions
-                </Link>
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link
-                  href="/studio/recordings"
-                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
-                >
-                  Studio Recordings
-                </Link>
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link
-                  href="/tickets"
-                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
-                >
-                  Buy Tickets
-                </Link>
-              </motion.div>
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link
-                  href="/studio"
-                  className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-white/40 hover:bg-white/10 text-white font-bold rounded-xl transition-all duration-300 text-center"
-                >
-                  Explore Studio
-                </Link>
-              </motion.div>
+                  <motion.span
+                    animate={{ rotate: showMoreActions ? 90 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </motion.span>
+                </motion.button>
+              </div>
+
+              <AnimatePresence initial={false}>
+                {showMoreActions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -8, height: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+                      {secondaryActions
+                        .filter((action) => {
+                          if (!('adminOnly' in action)) return true
+                          return role === 'beam_admin' || role === 'partner_admin'
+                        })
+                        .map((action) => (
+                          <motion.div key={action.label} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                            <Link
+                              href={action.href}
+                              className="inline-block w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-[#D4AF37]/30 hover:shadow-xl text-center"
+                            >
+                              {action.label}
+                            </Link>
+                          </motion.div>
+                        ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
 
             {/* Subtext under buttons */}
@@ -146,7 +181,9 @@ export default function OrchestraHero() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 1 }}
             >
-              Chamber submissions are one click away.
+              {isPerformerOrAdmin
+                ? 'Participant and admin controls are grouped here.'
+                : 'Explore performances, subscribe, and book talent from one place.'}
             </motion.p>
           </motion.div>
 

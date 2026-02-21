@@ -20,6 +20,25 @@ service firebase.storage {
       // Allow public read access to event posters
       allow read: if true;
     }
+
+    // Publishing application uploads
+    match /publishing-applications/{userId}/{fileName} {
+      // Allow authenticated users to upload their own publishing materials
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && (
+          request.resource.contentType.matches('audio/.*') ||
+          request.resource.contentType == 'application/pdf'
+        );
+
+      // Allow users to read their own files and admins to read all
+      allow read: if request.auth != null
+        && (
+          request.auth.uid == userId ||
+          request.auth.token.role == 'beam_admin' ||
+          request.auth.token.beam_admin == true
+        );
+    }
     
     // Default deny rule for any unmatched paths
     match /{allPaths=**} {
@@ -27,4 +46,3 @@ service firebase.storage {
     }
   }
 }
-

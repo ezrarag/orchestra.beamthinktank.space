@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowRight,
   ChevronDown,
@@ -10,7 +10,6 @@ import {
   Pause,
   Play,
   PlayCircle,
-  SlidersHorizontal,
   Volume2,
   VolumeX,
   X,
@@ -18,6 +17,8 @@ import {
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
+import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 
 type AreaSection = {
   id: string
@@ -28,7 +29,7 @@ type AreaSection = {
 }
 
 type ViewerArea = {
-  id: 'professional' | 'community' | 'chamber' | 'publishing' | 'business'
+  id: ViewerAreaId
   title: string
   tag: string
   locked: boolean
@@ -57,6 +58,8 @@ type ViewerContent = {
   confirmed?: boolean
   confirmedAt?: string
   createdByUid?: string
+  createdAt?: unknown
+  updatedAt?: unknown
   isPublished: boolean
   sortOrder: number
   accessLevel: 'open' | 'subscriber' | 'regional' | 'institution'
@@ -74,12 +77,14 @@ type ActiveVideo = {
   overlayClass: string
   sectionId?: string
   contentId?: string
+  sourceType?: 'area-default' | 'content' | 'role-explainer'
 }
 
 const placeholderVideoUrl = ''
 const OVERLAY_RESTORE_DELAY_MS = 1600
 const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
+const LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY = 'viewer-last-active-video'
 const PROGRESS_SAVE_INTERVAL_MS = 1200
 
 type ContentProgress = {
@@ -290,6 +295,9 @@ const viewerAreas: ViewerArea[] = [
 ]
 
 export default function ViewerPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { user } = useUserRole()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -299,6 +307,7 @@ export default function ViewerPage() {
     title: viewerAreas[0].title,
     areaId: viewerAreas[0].id,
     overlayClass: viewerAreas[0].visual,
+    sourceType: 'area-default',
   })
   const [isPlayerOverlayVisible, setIsPlayerOverlayVisible] = useState(true)
   const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -317,9 +326,32 @@ export default function ViewerPage() {
   const [isVideoPaused, setIsVideoPaused] = useState(false)
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0)
   const [videoDuration, setVideoDuration] = useState(0)
-  const [isMuted, setIsMuted] = useState(true)
-  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [volume, setVolume] = useState(0.85)
   const [areaNewBadgeMap, setAreaNewBadgeMap] = useState<Record<string, boolean>>({})
+  const [viewerAreaRolesMap, setViewerAreaRolesMap] = useState<Record<ViewerAreaId, ViewerAreaRolesDoc> | null>(null)
+  const [hasRestoredLastActiveVideo, setHasRestoredLastActiveVideo] = useState(false)
+  const [hasAutoSelectedInitialContent, setHasAutoSelectedInitialContent] = useState(false)
+  const [moduleBannerVisible, setModuleBannerVisible] = useState(false)
+  const [allPublishedContent, setAllPublishedContent] = useState<ViewerContent[]>([])
+
+  const requestedAreaFilter = useMemo(() => {
+    const area = searchParams.get('area')
+    if (!area) return null
+    return viewerAreas.some((item) => item.id === area) ? (area as ViewerAreaId) : null
+  }, [searchParams])
+  const moduleMode = searchParams.get('module') === '1'
+
+  const setAreaFilterInUrl = (areaId: ViewerAreaId | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (areaId) {
+      params.set('area', areaId)
+    } else {
+      params.delete('area')
+    }
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
 
   useEffect(() => {
     document.body.style.overflow = isLibraryOpen ? 'hidden' : ''
@@ -339,6 +371,46 @@ export default function ViewerPage() {
       console.error('Error restoring story progress:', error)
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || hasRestoredLastActiveVideo) return
+    try {
+      const saved = window.localStorage.getItem(LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY)
+      if (!saved) {
+        setHasRestoredLastActiveVideo(true)
+        return
+      }
+
+      const parsed = JSON.parse(saved) as ActiveVideo
+      if (!parsed || !parsed.url || !parsed.areaId) {
+        setHasRestoredLastActiveVideo(true)
+        return
+      }
+
+      const matchingArea = viewerAreas.find((area) => area.id === parsed.areaId)
+      if (!matchingArea) {
+        setHasRestoredLastActiveVideo(true)
+        return
+      }
+
+      const inferredSourceType: ActiveVideo['sourceType'] =
+        parsed.sourceType ?? (parsed.contentId ? 'content' : 'area-default')
+
+      setSelectedAreaId(parsed.areaId)
+      setActiveVideo({
+        ...parsed,
+        sourceType: inferredSourceType,
+      })
+      if (inferredSourceType !== 'area-default') {
+        setHasAutoSelectedInitialContent(true)
+      }
+      setHasRestoredLastActiveVideo(true)
+      setIsPlayerOverlayVisible(false)
+    } catch (error) {
+      console.error('Error restoring last active video:', error)
+      setHasRestoredLastActiveVideo(true)
+    }
+  }, [hasRestoredLastActiveVideo])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -372,6 +444,14 @@ export default function ViewerPage() {
     () => selectedAreaCatalog.find((item) => item.id === activeVideo.contentId) ?? null,
     [selectedAreaCatalog, activeVideo.contentId]
   )
+
+  const selectedAreaRoleDoc = useMemo(() => {
+    return viewerAreaRolesMap?.[selectedAreaId] ?? null
+  }, [selectedAreaId, viewerAreaRolesMap])
+
+  const selectedAreaRoles = useMemo<ViewerRoleTemplate[]>(() => {
+    return selectedAreaRoleDoc?.roles ?? []
+  }, [selectedAreaRoleDoc])
 
   const recentWatchedStories = useMemo(() => {
     return [...watchedHistory]
@@ -425,10 +505,32 @@ export default function ViewerPage() {
         title: selectedArea.title,
         areaId: selectedArea.id,
         overlayClass: selectedArea.visual,
+        sourceType: 'area-default',
       }
     })
     setIsPlayerOverlayVisible(true)
   }, [selectedArea])
+
+  useEffect(() => {
+    if (!requestedAreaFilter || requestedAreaFilter === selectedAreaId) return
+    const area = viewerAreas.find((item) => item.id === requestedAreaFilter)
+    if (!area) return
+
+    setSelectedAreaId(area.id)
+    setActiveVideo({
+      url: area.videoUrl,
+      title: area.title,
+      areaId: area.id,
+      overlayClass: area.visual,
+      sourceType: 'area-default',
+    })
+  }, [requestedAreaFilter, selectedAreaId])
+
+  useEffect(() => {
+    if (!moduleMode || !requestedAreaFilter) return
+    setIsLibraryOpen(true)
+    setModuleBannerVisible(true)
+  }, [moduleMode, requestedAreaFilter])
 
   useEffect(() => {
     if (!db) return
@@ -504,6 +606,27 @@ export default function ViewerPage() {
     if (!db) return
     let mounted = true
 
+    const loadAllPublishedContent = async () => {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'viewerContent'), where('isPublished', '==', true)))
+        if (!mounted) return
+        const rows = snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<ViewerContent, 'id'>) }))
+        setAllPublishedContent(rows)
+      } catch (error) {
+        console.error('Error loading all published viewer content:', error)
+      }
+    }
+
+    void loadAllPublishedContent()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!db) return
+    let mounted = true
+
     const loadAreaBadges = async () => {
       try {
         const badgeQuery = query(collection(db, 'viewerContent'), where('isPublished', '==', true))
@@ -546,6 +669,26 @@ export default function ViewerPage() {
   }, [db, selectedAreaId])
 
   useEffect(() => {
+    if (!db) return
+    let mounted = true
+
+    const loadAreaRoles = async () => {
+      try {
+        const rolesMap = await loadViewerAreaRolesMap(db)
+        if (!mounted) return
+        setViewerAreaRolesMap(rolesMap)
+      } catch (error) {
+        console.error('Error loading viewer area roles:', error)
+      }
+    }
+
+    void loadAreaRoles()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     const filtered = selectedAreaCatalog
       .filter((item) => {
         if (selectedAreaId !== 'community') return true
@@ -556,6 +699,75 @@ export default function ViewerPage() {
 
     setSelectedAreaStories(filtered)
   }, [selectedAreaCatalog, selectedAreaId, selectedCity])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!activeVideo.url) return
+    if (activeVideo.sourceType === 'area-default' && !activeVideo.contentId) return
+    window.localStorage.setItem(LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY, JSON.stringify(activeVideo))
+  }, [activeVideo])
+
+  const getTimestampMillis = (value: unknown): number => {
+    if (!value) return 0
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value)
+      return Number.isNaN(parsed) ? 0 : parsed
+    }
+    if (typeof value === 'object' && value && 'toMillis' in value && typeof (value as any).toMillis === 'function') {
+      try {
+        return (value as any).toMillis()
+      } catch {
+        return 0
+      }
+    }
+    return 0
+  }
+
+  const pickLatestOrTopSeeded = (items: ViewerContent[]): ViewerContent | null => {
+    if (items.length === 0) return null
+    const newest = [...items].sort((a, b) => {
+      const bTs = Math.max(getTimestampMillis(b.updatedAt), getTimestampMillis(b.createdAt), Date.parse(b.confirmedAt ?? '') || 0)
+      const aTs = Math.max(getTimestampMillis(a.updatedAt), getTimestampMillis(a.createdAt), Date.parse(a.confirmedAt ?? '') || 0)
+      if (bTs !== aTs) return bTs - aTs
+      return (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+    })[0]
+
+    const newestTs = Math.max(
+      getTimestampMillis(newest.updatedAt),
+      getTimestampMillis(newest.createdAt),
+      Date.parse(newest.confirmedAt ?? '') || 0
+    )
+    if (newestTs > 0) return newest
+
+    return [...items].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))[0]
+  }
+
+  useEffect(() => {
+    if (hasAutoSelectedInitialContent) return
+    if (!hasRestoredLastActiveVideo) return
+    if (activeVideo.sourceType && activeVideo.sourceType !== 'area-default') {
+      setHasAutoSelectedInitialContent(true)
+      return
+    }
+    const preferredFromArea = pickLatestOrTopSeeded(selectedAreaCatalog)
+    if (preferredFromArea) {
+      void handleOpenContent(preferredFromArea, preferredFromArea.areaId as ViewerArea['id'])
+      setHasAutoSelectedInitialContent(true)
+      return
+    }
+
+    const preferredGlobal = pickLatestOrTopSeeded(allPublishedContent)
+    if (preferredGlobal) {
+      void handleOpenContent(preferredGlobal, preferredGlobal.areaId as ViewerArea['id'])
+      setHasAutoSelectedInitialContent(true)
+    }
+  }, [
+    activeVideo.sourceType,
+    allPublishedContent,
+    hasAutoSelectedInitialContent,
+    hasRestoredLastActiveVideo,
+    selectedAreaCatalog,
+  ])
 
   useEffect(() => {
     if (!activeVideo.contentId || !videoRef.current) return
@@ -669,7 +881,7 @@ export default function ViewerPage() {
     }
   }, [activeVideo, contentProgress, db, user])
 
-  const handleOpenContent = async (content: ViewerContent, areaId: ViewerArea['id']) => {
+  async function handleOpenContent(content: ViewerContent, areaId: ViewerArea['id']) {
     const area = viewerAreas.find((item) => item.id === areaId)
     const fallbackOverlay = area?.visual ?? viewerAreas[0].visual
 
@@ -680,11 +892,14 @@ export default function ViewerPage() {
       overlayClass: contentOverlayClass(content, fallbackOverlay),
       sectionId: content.sectionId,
       contentId: content.id,
+      sourceType: 'content',
     })
     setSelectedAreaId(areaId)
     setIsLibraryOpen(false)
     setIsPlayerOverlayVisible(false)
     setShowMoreInfo(false)
+    setIsMuted(false)
+    setVolume((current) => (current > 0 ? current : 0.85))
 
     setWatchedHistory((current) => {
       const deduped = current.filter((item) => item.contentId !== content.id)
@@ -722,7 +937,7 @@ export default function ViewerPage() {
 
   const handlePlayerInteraction = () => {
     // Keep the initial landing overlay persistent until a specific content video is selected.
-    if (!activeVideo.contentId) return
+    if (activeVideo.sourceType === 'area-default' && !activeVideo.contentId) return
 
     setIsPlayerOverlayVisible(true)
 
@@ -735,6 +950,23 @@ export default function ViewerPage() {
     }, OVERLAY_RESTORE_DELAY_MS)
   }
 
+  const handlePlayRoleExplainer = () => {
+    const explainerUrl = selectedAreaRoleDoc?.explainerVideoUrl?.trim() ?? ''
+    if (!explainerUrl) return
+
+    setActiveVideo({
+      url: explainerUrl,
+      title: `${selectedArea.title}: Role Overview`,
+      areaId: selectedAreaId,
+      overlayClass: selectedArea.visual,
+      sourceType: 'role-explainer',
+    })
+    setIsLibraryOpen(false)
+    setIsPlayerOverlayVisible(false)
+    setIsMuted(false)
+    setVolume((current) => (current > 0 ? current : 0.85))
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07080B] text-white">
       <section
@@ -742,6 +974,22 @@ export default function ViewerPage() {
         onMouseMove={handlePlayerInteraction}
         onTouchStart={handlePlayerInteraction}
       >
+        {moduleBannerVisible ? (
+          <div className="absolute left-1/2 top-4 z-30 w-[min(95%,640px)] -translate-x-1/2 rounded-xl border border-[#D4AF37]/40 bg-black/75 px-4 py-3 text-center backdrop-blur-sm">
+            <p className="text-xs uppercase tracking-[0.14em] text-[#F5D37A]">Focused Module</p>
+            <p className="mt-1 text-sm text-white">
+              You are viewing the <span className="font-semibold">{selectedArea.title}</span> module.
+            </p>
+            <button
+              type="button"
+              onClick={() => setModuleBannerVisible(false)}
+              className="mt-2 text-xs font-semibold text-white/80 underline underline-offset-4 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
         {activeVideo.url ? (
           <video
             ref={videoRef}
@@ -817,19 +1065,27 @@ export default function ViewerPage() {
                 ) : null}
               </div>
 
-              {activeVideo.contentId ? (
+              {activeVideo.contentId || activeVideo.sourceType === 'role-explainer' ? (
                 <div className="mt-3 space-y-2 text-xs text-white/85">
-                  <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                    Institution: {activeStory?.institutionName ?? 'Not listed'}
-                  </p>
-                  <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                    Recorded: {recordedLabel}
-                  </p>
-                  <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                    Research Status: {activeStory?.researchStatus ?? 'General release'}
-                  </p>
+                  {activeVideo.sourceType === 'role-explainer' ? (
+                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                      Role overview for {selectedArea.title}. Browse content to return to story playback.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                        Institution: {activeStory?.institutionName ?? 'Not listed'}
+                      </p>
+                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                        Recorded: {recordedLabel}
+                      </p>
+                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                        Research Status: {activeStory?.researchStatus ?? 'General release'}
+                      </p>
+                    </>
+                  )}
 
-                  {showMoreInfo ? (
+                  {showMoreInfo && activeVideo.sourceType !== 'role-explainer' ? (
                     <div className="space-y-2 rounded-xl border border-white/15 bg-black/30 p-3">
                       <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
                       <p>
@@ -880,8 +1136,8 @@ export default function ViewerPage() {
                         ))}
                       </div>
                     </div>
-                  ) : null}
-                </div>
+                ) : null}
+              </div>
               ) : null}
             </div>
           </div>
@@ -909,7 +1165,7 @@ export default function ViewerPage() {
               </Link>
             </div>
 
-            {activeVideo.contentId ? (
+            {activeVideo.url ? (
               <div className="mt-5 w-full max-w-3xl rounded-2xl border border-white/20 bg-black/35 p-3">
                 <div className="mb-2 flex items-center justify-between text-xs text-white/70">
                   <span>{formatDuration(currentPlaybackTime)}</span>
@@ -971,6 +1227,21 @@ export default function ViewerPage() {
                     </select>
                   ) : null}
                 </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  >
+                    Browse Content
+                  </button>
+                  <Link
+                    href="/home"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  >
+                    Home
+                  </Link>
+                </div>
               </div>
             ) : null}
           </div>
@@ -995,49 +1266,31 @@ export default function ViewerPage() {
               </button>
             </div>
 
-            <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-              <div className="mb-4 flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4 text-[#F5D37A]" />
-                <h3 className="text-lg font-semibold">Viewer Context Filters</h3>
-              </div>
-
-              <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:grid-cols-2">
-                <label className="text-xs uppercase tracking-[0.12em] text-white/70">
-                  City
-                  <select
-                    value={selectedCity}
-                    onChange={(event) => setSelectedCity(event.target.value)}
-                    disabled={selectedAreaId !== 'community' || availableCities.length === 0}
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-black/50 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-                  >
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                    {availableCities.length === 0 ? (
-                      <option value="">
-                        {selectedAreaId === 'community' ? 'No cities available' : 'City filter for community stories'}
-                      </option>
-                    ) : null}
-                  </select>
-                </label>
-                <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70">
-                  {selectedAreaId === 'community'
-                    ? 'Filter values are generated from published Firebase community documents.'
-                    : 'Select Community Orchestra to filter stories by city.'}
-                </div>
-              </div>
-            </section>
-
             <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-xl font-semibold">Areas</h3>
-                <p className="text-xs uppercase tracking-[0.14em] text-white/60">Streaming Home Rail</p>
+                {requestedAreaFilter ? (
+                  <div className="flex items-center gap-2">
+                    <p className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#F5D37A]">
+                      Filtered Module: {requestedAreaFilter}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setAreaFilterInUrl(null)}
+                      className="rounded-full border border-white/25 bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      Show All Areas
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs uppercase tracking-[0.14em] text-white/60">Streaming Home Rail</p>
+                )}
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-2">
-                {viewerAreas.map((area, index) => {
+                {(requestedAreaFilter
+                  ? viewerAreas.filter((area) => area.id === requestedAreaFilter)
+                  : viewerAreas).map((area, index) => {
                   const isSelected = area.id === selectedAreaId
 
                   return (
@@ -1045,11 +1298,13 @@ export default function ViewerPage() {
                       key={area.id}
                       onClick={() => {
                         setSelectedAreaId(area.id)
+                        setAreaFilterInUrl(area.id)
                         setActiveVideo({
                           url: area.videoUrl,
                           title: area.title,
                           areaId: area.id,
                           overlayClass: area.visual,
+                          sourceType: 'area-default',
                         })
                       }}
                       className={`group relative min-w-[260px] flex-1 rounded-2xl border p-4 text-left transition ${
@@ -1164,35 +1419,69 @@ export default function ViewerPage() {
             <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-xl font-semibold">{selectedArea.title} Narrative Arcs</h3>
-                <p className="text-xs text-white/65">City: {selectedCity || 'N/A'}</p>
+                <p className="text-xs text-white/65">Location: {selectedCity || 'All / N/A'}</p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                {selectedArea.sections.map((section, index) => (
-                  <motion.article
+                {selectedArea.sections.map((section) => (
+                  <article
                     key={section.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.06 }}
                     className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
                   >
                     <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">{section.format}</p>
                     <h4 className="mb-2 text-lg font-semibold">{section.title}</h4>
                     <p className="text-sm text-white/75">{section.summary}</p>
-                    <div className="mt-5 flex items-center justify-between">
+                    <div className="mt-5">
                       <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/75">
                         {section.availability}
                       </span>
-                      <Link
-                        href="/studio"
-                        aria-label={`Play ${section.title}`}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/20"
-                      >
-                        <Play className="h-4 w-4 fill-current" />
-                      </Link>
                     </div>
-                  </motion.article>
+                  </article>
                 ))}
+              </div>
+            </section>
+
+            <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold">{selectedArea.title} Role Avatars</h3>
+                <button
+                  type="button"
+                  onClick={handlePlayRoleExplainer}
+                  disabled={!selectedAreaRoleDoc?.explainerVideoUrl}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3.5 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  Play Roles Overview
+                </button>
+              </div>
+
+              <div className="mb-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/65">
+                Role slots only. Participant names remain hidden here and are set through onboarding/dashboard flows.
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {selectedAreaRoles.map((role) => {
+                  const initials = role.title
+                    .split(' ')
+                    .map((word) => word.charAt(0))
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()
+                  return (
+                    <article key={role.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                      <div className="mb-2 flex items-center gap-3">
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#D4AF37]/45 bg-[#D4AF37]/15 text-sm font-semibold text-[#F5D37A]">
+                          {initials}
+                        </span>
+                        <div>
+                          <h4 className="text-sm font-semibold">{role.title}</h4>
+                          <p className="text-[11px] uppercase tracking-[0.1em] text-white/60">Open Role Slot</p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-white/75">{role.description || 'Role description not provided.'}</p>
+                    </article>
+                  )
+                })}
               </div>
             </section>
 

@@ -1,0 +1,131 @@
+{
+  "areas": [
+    {
+      "id": "publishing",
+      "title": "Publishing",
+      "tag": "Publishing",
+      "locked": false,
+      "narrative": "Compose, arrange, and share new and classic works.",
+      "locationHint": "Scores, recordings, and scholarship.",
+      "visual": "from-[#395B64]/75 via-[#233138]/70 to-[#090A0F]/92",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "order": 4,
+      "active": true
+    }
+  ],
+  "sections": [
+    {
+      "id": "publishing-main",
+      "areaId": "publishing",
+      "title": "Publishing Main",
+      "format": "Publishing Stories",
+      "summary": "Scores, recordings, and scholarship.",
+      "availability": "open",
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "publishing-catalog",
+      "areaId": "publishing",
+      "title": "Catalog Highlights",
+      "format": "Project Cards",
+      "summary": "Current publishing releases and collaborations.",
+      "availability": "open",
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "publishing-scholarship",
+      "areaId": "publishing",
+      "title": "Scholarship Notes",
+      "format": "Context Cards",
+      "summary": "Educational notes, references, and score context.",
+      "availability": "open",
+      "order": 3,
+      "active": true
+    }
+  ],
+  "content": [
+    {
+      "id": "publishing-milwaukee-recording",
+      "areaId": "publishing",
+      "sectionId": "publishing-main",
+      "title": "Publishing: Milwaukee Recording Session",
+      "description": "Milwaukee publishing release featuring score development and recorded ensemble interpretation.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Open for pedagogical input",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-catalog-chapter", "publishing-scholarship-brief"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "publishing-catalog-chapter",
+      "areaId": "publishing",
+      "sectionId": "publishing-catalog",
+      "title": "Publishing: Catalog Chapter One",
+      "description": "Featured publication card for a new orchestral score with rehearsal-to-release context.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Catalog curation",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-milwaukee-recording", "publishing-scholarship-brief"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "isPublished": true,
+      "sortOrder": 2,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    },
+    {
+      "id": "publishing-scholarship-brief",
+      "areaId": "publishing",
+      "sectionId": "publishing-scholarship",
+      "title": "Publishing: Scholarship Brief",
+      "description": "Program notes and scholarly framing for community and conservatory readers.",
+      "institutionName": "University of Wisconsin-Milwaukee",
+      "recordedAt": "2025-12-05",
+      "researchStatus": "Peer review in progress",
+      "participantNames": ["BEAM Publishing Collective"],
+      "relatedVersionIds": ["publishing-milwaukee-recording", "publishing-catalog-chapter"],
+      "infoUrl": "/studio/viewer-submissions",
+      "thumbnailUrl": "",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "isPublished": true,
+      "sortOrder": 3,
+      "accessLevel": "open",
+      "isNew": true,
+      "confirmed": false,
+      "geo": {
+        "regions": ["Midwest"],
+        "states": ["WI"],
+        "cities": ["Milwaukee"]
+      },
+      "institutions": [],
+      "participants": []
+    }
+  ]
+}

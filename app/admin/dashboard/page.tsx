@@ -67,6 +67,14 @@ interface ProjectSnapshot {
   missingTasks: number
 }
 
+interface ParticipantSnapshot {
+  id: string
+  name: string
+  sources: string[]
+  contexts: string[]
+  entryCount: number
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, role } = useUserRole()
@@ -104,6 +112,8 @@ export default function AdminDashboard() {
   })
 
   const [projects, setProjects] = useState<ProjectSnapshot[]>([])
+  const [participantRows, setParticipantRows] = useState<ParticipantSnapshot[]>([])
+  const [snapshotTab, setSnapshotTab] = useState<'projects' | 'participants'>('projects')
   const [loading, setLoading] = useState(true)
   const [showTicketBreakdownModal, setShowTicketBreakdownModal] = useState(false)
   const [ticketBreakdown, setTicketBreakdown] = useState<any[]>([])
@@ -387,6 +397,71 @@ export default function AdminDashboard() {
     }
     fetchPulseAlerts()
 
+    // Fetch participant snapshots from project + viewer models
+    const fetchParticipantsOverview = async () => {
+      try {
+        const [projectMusiciansSnapshot, viewerContentSnapshot] = await Promise.all([
+          getDocs(collection(db, 'projectMusicians')),
+          getDocs(collection(db, 'viewerContent')),
+        ])
+
+        const participantMap = new Map<string, ParticipantSnapshot>()
+        const upsertParticipant = (
+          rawName: unknown,
+          source: 'projectMusicians' | 'viewerContent',
+          context?: string,
+        ) => {
+          if (typeof rawName !== 'string') return
+          const name = rawName.trim()
+          if (!name) return
+
+          const key = name.toLowerCase()
+          const existing = participantMap.get(key)
+          if (!existing) {
+            participantMap.set(key, {
+              id: key,
+              name,
+              sources: [source],
+              contexts: context ? [context] : [],
+              entryCount: 1,
+            })
+            return
+          }
+
+          if (!existing.sources.includes(source)) {
+            existing.sources.push(source)
+          }
+          if (context && !existing.contexts.includes(context)) {
+            existing.contexts.push(context)
+          }
+          existing.entryCount += 1
+        }
+
+        projectMusiciansSnapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as any
+          const participantName = data.email || data.name || data.displayName || data.musicianId
+          const context = data.projectId ? `project:${data.projectId}` : undefined
+          upsertParticipant(participantName, 'projectMusicians', context)
+        })
+
+        viewerContentSnapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as any
+          const context = data.areaId ? `area:${data.areaId}` : undefined
+          const participantNames = Array.isArray(data.participantNames) ? data.participantNames : []
+          const participantIds = Array.isArray(data.participants) ? data.participants : []
+
+          participantNames.forEach((name: unknown) => upsertParticipant(name, 'viewerContent', context))
+          participantIds.forEach((name: unknown) => upsertParticipant(name, 'viewerContent', context))
+        })
+
+        const rows = Array.from(participantMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+        setParticipantRows(rows)
+      } catch (error) {
+        console.error('Error fetching participant overview:', error)
+      }
+    }
+    fetchParticipantsOverview()
+
     setLoading(false)
 
     return () => {
@@ -596,10 +671,70 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Projects Snapshot Table */}
+      {/* Snapshot */}
       <section>
-        <h2 className="text-2xl font-bold text-orchestra-gold mb-6">Projects Snapshot</h2>
-        <ProjectsTable projects={projects} />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold text-orchestra-gold">
+            {snapshotTab === 'projects' ? 'Projects Snapshot' : 'Participants Snapshot'}
+          </h2>
+          <div className="inline-flex rounded-lg border border-orchestra-gold/30 bg-orchestra-cream/5 p-1">
+            <button
+              type="button"
+              onClick={() => setSnapshotTab('projects')}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                snapshotTab === 'projects'
+                  ? 'bg-orchestra-gold text-orchestra-dark'
+                  : 'text-orchestra-cream/80 hover:text-orchestra-gold'
+              }`}
+            >
+              Projects
+            </button>
+            <button
+              type="button"
+              onClick={() => setSnapshotTab('participants')}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                snapshotTab === 'participants'
+                  ? 'bg-orchestra-gold text-orchestra-dark'
+                  : 'text-orchestra-cream/80 hover:text-orchestra-gold'
+              }`}
+            >
+              Participants ({participantRows.length})
+            </button>
+          </div>
+        </div>
+
+        {snapshotTab === 'projects' ? (
+          <ProjectsTable projects={projects} />
+        ) : (
+          <div className="rounded-xl border border-orchestra-gold/20 bg-orchestra-cream/5 p-4">
+            {participantRows.length === 0 ? (
+              <p className="py-10 text-center text-orchestra-cream/70">No participant records found yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left">
+                  <thead>
+                    <tr className="border-b border-orchestra-gold/20 text-xs uppercase tracking-[0.14em] text-orchestra-gold/90">
+                      <th className="px-3 py-3">Participant</th>
+                      <th className="px-3 py-3">Sources</th>
+                      <th className="px-3 py-3">Contexts</th>
+                      <th className="px-3 py-3 text-right">Entry Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participantRows.map((row) => (
+                      <tr key={row.id} className="border-b border-orchestra-gold/10 text-sm text-orchestra-cream/90">
+                        <td className="px-3 py-3 font-medium">{row.name}</td>
+                        <td className="px-3 py-3">{row.sources.join(', ')}</td>
+                        <td className="px-3 py-3">{row.contexts.slice(0, 3).join(', ') || 'n/a'}</td>
+                        <td className="px-3 py-3 text-right">{row.entryCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Ticket Breakdown Modal */}
