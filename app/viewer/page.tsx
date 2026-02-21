@@ -14,7 +14,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react'
-import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
@@ -49,6 +49,7 @@ type ViewerContent = {
   description: string
   thumbnailUrl?: string
   videoUrl: string
+  hlsUrl?: string
   institutionName?: string
   recordedAt?: string
   researchStatus?: string
@@ -73,6 +74,7 @@ type ViewerContent = {
 
 type ActiveVideo = {
   url: string
+  fallbackUrl?: string
   title: string
   areaId: ViewerArea['id']
   overlayClass: string
@@ -139,6 +141,7 @@ function normalizeViewerContent(id: string, data: Partial<ViewerContent>): Viewe
     description: data.description ?? '',
     thumbnailUrl: data.thumbnailUrl,
     videoUrl: data.videoUrl ?? '',
+    hlsUrl: data.hlsUrl,
     institutionName: data.institutionName,
     recordedAt: data.recordedAt,
     researchStatus: data.researchStatus,
@@ -355,14 +358,21 @@ export default function ViewerPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { user } = useUserRole()
+  const areaFromUrl = searchParams.get('area')
+  const initialAreaId: ViewerAreaId =
+    areaFromUrl && viewerAreas.some((item) => item.id === areaFromUrl)
+      ? (areaFromUrl as ViewerAreaId)
+      : 'professional'
+  const initialArea = viewerAreas.find((area) => area.id === initialAreaId) ?? viewerAreas[0]
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const hlsRef = useRef<any>(null)
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [selectedAreaId, setSelectedAreaId] = useState<ViewerArea['id']>('professional')
+  const [selectedAreaId, setSelectedAreaId] = useState<ViewerArea['id']>(initialArea.id)
   const [activeVideo, setActiveVideo] = useState<ActiveVideo>({
-    url: '',
-    title: viewerAreas[0].title,
-    areaId: viewerAreas[0].id,
-    overlayClass: viewerAreas[0].visual,
+    url: initialArea.videoUrl || '',
+    title: initialArea.title,
+    areaId: initialArea.id,
+    overlayClass: initialArea.visual,
     sourceType: 'area-default',
   })
   const [isPlayerOverlayVisible, setIsPlayerOverlayVisible] = useState(true)
@@ -374,6 +384,8 @@ export default function ViewerPage() {
   const [selectedAreaStories, setSelectedAreaStories] = useState<ViewerContent[]>([])
   const [storiesLoadState, setStoriesLoadState] = useState<StoriesLoadState>('idle')
   const [storiesError, setStoriesError] = useState<string | null>(null)
+  const [playbackNotice, setPlaybackNotice] = useState<string | null>(null)
+  const [firestoreNarrativeSections, setFirestoreNarrativeSections] = useState<AreaSection[] | null>(null)
   const [contentProgress, setContentProgress] = useState<Record<string, ContentProgress>>({})
   const [watchedHistory, setWatchedHistory] = useState<WatchedHistoryItem[]>([])
   const [viewerIntent, setViewerIntent] = useState<ViewerIntent>('subscriber')
@@ -459,6 +471,10 @@ export default function ViewerPage() {
         setHasRestoredLastActiveVideo(true)
         return
       }
+      if (requestedAreaFilter && parsed.areaId !== requestedAreaFilter) {
+        setHasRestoredLastActiveVideo(true)
+        return
+      }
 
       const matchingArea = viewerAreas.find((area) => area.id === parsed.areaId)
       if (!matchingArea) {
@@ -483,7 +499,7 @@ export default function ViewerPage() {
       console.error('Error restoring last active video:', error)
       setHasRestoredLastActiveVideo(true)
     }
-  }, [hasRestoredLastActiveVideo])
+  }, [hasRestoredLastActiveVideo, requestedAreaFilter])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -521,6 +537,11 @@ export default function ViewerPage() {
   const selectedAreaRoleDoc = useMemo(() => {
     return viewerAreaRolesMap?.[selectedAreaId] ?? null
   }, [selectedAreaId, viewerAreaRolesMap])
+  const hasNoDefaultAreaVideoConfigured = !selectedArea.videoUrl?.trim()
+  const activeNarrativeSections = useMemo(() => {
+    if (firestoreNarrativeSections) return firestoreNarrativeSections
+    return selectedArea.sections
+  }, [firestoreNarrativeSections, selectedArea.sections])
 
   const selectedAreaRoles = useMemo<ViewerRoleTemplate[]>(() => {
     return selectedAreaRoleDoc?.roles ?? []
@@ -556,6 +577,11 @@ export default function ViewerPage() {
     const mins = Math.floor(total / 60)
     const secs = total % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const isHlsSource = (url: string): boolean => {
+    const normalized = url.toLowerCase()
+    return normalized.includes('.m3u8') || normalized.includes('format=m3u8')
   }
 
   const saveProgressToStorage = (next: Record<string, ContentProgress>) => {
@@ -610,11 +636,11 @@ export default function ViewerPage() {
     if (!db) {
       setStoriesLoadState('error')
       setStoriesError('Firebase is not configured.')
-      setIsUsingFallbackContent(true)
+      setIsUsingFallbackContent(Boolean(selectedArea.videoUrl))
       setActiveVideo((current) => {
         if (current.contentId) return current
         return {
-          url: selectedArea.videoUrl,
+          url: selectedArea.videoUrl || '',
           title: selectedArea.title,
           areaId: selectedArea.id,
           overlayClass: selectedArea.visual,
@@ -628,11 +654,11 @@ export default function ViewerPage() {
 
     const applyFallbackForArea = () => {
       if (!mounted) return
-      setIsUsingFallbackContent(true)
+      setIsUsingFallbackContent(Boolean(selectedArea.videoUrl))
       setActiveVideo((current) => {
         if (current.areaId === selectedAreaId && current.contentId) return current
         return {
-          url: selectedArea.videoUrl,
+          url: selectedArea.videoUrl || '',
           title: selectedArea.title,
           areaId: selectedArea.id,
           overlayClass: selectedArea.visual,
@@ -827,6 +853,49 @@ export default function ViewerPage() {
     }
 
     loadAreaBadges()
+    return () => {
+      mounted = false
+    }
+  }, [db, selectedAreaId])
+
+  useEffect(() => {
+    if (!db) {
+      setFirestoreNarrativeSections(null)
+      return
+    }
+    let mounted = true
+
+    const loadNarrativeSections = async () => {
+      try {
+        const sectionsQuery = query(
+          collection(db, 'viewerSections'),
+          where('areaId', '==', selectedAreaId),
+          where('active', '==', true),
+          orderBy('order', 'asc')
+        )
+        const snapshot = await getDocs(sectionsQuery)
+        if (!mounted) return
+        const sections = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as Partial<AreaSection> & { availability?: string }
+          const availabilityRaw = data.availability ?? 'open'
+          const availability =
+            availabilityRaw.charAt(0).toUpperCase() + availabilityRaw.slice(1)
+          return {
+            id: docSnap.id,
+            title: data.title ?? 'Untitled Arc',
+            format: data.format ?? 'Narrative Arc',
+            summary: data.summary ?? '',
+            availability: availability as AreaSection['availability'],
+          }
+        })
+        setFirestoreNarrativeSections(sections.length > 0 ? sections : [])
+      } catch (error) {
+        console.error('Error loading narrative arcs from Firestore:', error)
+        if (mounted) setFirestoreNarrativeSections(null)
+      }
+    }
+
+    void loadNarrativeSections()
     return () => {
       mounted = false
     }
@@ -1071,12 +1140,129 @@ export default function ViewerPage() {
     }
   }, [activeVideo, contentProgress, db, user])
 
+  useEffect(() => {
+    const element = videoRef.current
+    if (!element || !activeVideo.url) return
+
+    let canceled = false
+    setPlaybackNotice(null)
+
+    const clearHls = () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+
+    const applyDirectSource = (url: string) => {
+      clearHls()
+      element.src = url
+      element.load()
+    }
+
+    const setupSource = async () => {
+      const sourceUrl = activeVideo.url
+      if (!isHlsSource(sourceUrl)) {
+        applyDirectSource(sourceUrl)
+        return
+      }
+
+      if (element.canPlayType('application/vnd.apple.mpegurl')) {
+        applyDirectSource(sourceUrl)
+        return
+      }
+
+      try {
+        const getHlsCtor = async () => {
+          const win = window as Window & { Hls?: any }
+          if (win.Hls) return win.Hls
+          await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector('script[data-hlsjs-cdn="1"]') as HTMLScriptElement | null
+            if (existing) {
+              existing.addEventListener('load', () => resolve(), { once: true })
+              existing.addEventListener('error', () => reject(new Error('hls.js CDN failed to load')), { once: true })
+              return
+            }
+
+            const script = document.createElement('script')
+            script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
+            script.async = true
+            script.dataset.hlsjsCdn = '1'
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error('hls.js CDN failed to load'))
+            document.head.appendChild(script)
+          })
+          return win.Hls
+        }
+
+        const HlsCtor = await getHlsCtor()
+        if (canceled || !HlsCtor) return
+        if (!HlsCtor.isSupported()) {
+          if (activeVideo.fallbackUrl) {
+            applyDirectSource(activeVideo.fallbackUrl)
+          } else {
+            applyDirectSource(sourceUrl)
+            setPlaybackNotice('This browser may not support adaptive stream playback for this video.')
+          }
+          return
+        }
+
+        clearHls()
+        const hls = new HlsCtor({
+          enableWorker: true,
+          backBufferLength: 90,
+          maxBufferLength: 30,
+          lowLatencyMode: false,
+        })
+        hlsRef.current = hls
+        hls.loadSource(sourceUrl)
+        hls.attachMedia(element)
+        hls.on(HlsCtor.Events.ERROR, (_event: unknown, data: any) => {
+          if (!data?.fatal) return
+          if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad()
+            return
+          }
+          if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError()
+            return
+          }
+          if (activeVideo.fallbackUrl) {
+            applyDirectSource(activeVideo.fallbackUrl)
+            setPlaybackNotice('Stream quality fallback activated.')
+          } else {
+            setPlaybackNotice('Adaptive stream failed to recover for this video.')
+          }
+        })
+      } catch (error) {
+        console.error('Error initializing HLS playback:', error)
+        if (activeVideo.fallbackUrl) {
+          applyDirectSource(activeVideo.fallbackUrl)
+          setPlaybackNotice('Adaptive stream unavailable, using fallback video source.')
+        } else {
+          applyDirectSource(sourceUrl)
+          setPlaybackNotice('Adaptive stream library unavailable in this environment.')
+        }
+      }
+    }
+
+    void setupSource()
+    return () => {
+      canceled = true
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+  }, [activeVideo.url, activeVideo.fallbackUrl])
+
   async function handleOpenContent(content: ViewerContent, areaId: ViewerArea['id']) {
     const area = viewerAreas.find((item) => item.id === areaId)
     const fallbackOverlay = area?.visual ?? viewerAreas[0].visual
 
     setActiveVideo({
-      url: content.videoUrl,
+      url: (content.hlsUrl && content.hlsUrl.trim()) || content.videoUrl,
+      fallbackUrl: content.hlsUrl ? content.videoUrl : undefined,
       title: content.title,
       areaId,
       overlayClass: contentOverlayClass(content, fallbackOverlay),
@@ -1189,7 +1375,6 @@ export default function ViewerPage() {
             ref={videoRef}
             key={`${activeVideo.areaId}-${activeVideo.contentId ?? 'area-default'}`}
             className="absolute inset-0 h-full w-full object-cover"
-            src={activeVideo.url}
             autoPlay
             loop
             muted={isMuted}
@@ -1349,6 +1534,16 @@ export default function ViewerPage() {
                 Using fallback content after Firestore returned no playable items.
               </p>
             ) : null}
+            {playbackNotice ? (
+              <p className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs text-white/85">
+                {playbackNotice}
+              </p>
+            ) : null}
+            {hasNoDefaultAreaVideoConfigured && activeVideo.sourceType === 'area-default' ? (
+              <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
+                No default area video configured.
+              </p>
+            ) : null}
             {isMuted && !hasUserEnabledAudio ? (
               <button
                 type="button"
@@ -1482,22 +1677,7 @@ export default function ViewerPage() {
             <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-xl font-semibold">Areas</h3>
-                {requestedAreaFilter ? (
-                  <div className="flex items-center gap-2">
-                    <p className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#F5D37A]">
-                      Filtered Module: {requestedAreaFilter}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setAreaFilterInUrl(null)}
-                      className="rounded-full border border-white/25 bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-                    >
-                      Show All Areas
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-xs uppercase tracking-[0.14em] text-white/60">Streaming Home Rail</p>
-                )}
+                <p className="text-xs uppercase tracking-[0.14em] text-white/60">Streaming Home Rail</p>
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-2">
@@ -1541,6 +1721,18 @@ export default function ViewerPage() {
                           </span>
                         ) : null}
                       </div>
+                      {requestedAreaFilter ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setAreaFilterInUrl(null)
+                          }}
+                          className="mt-3 rounded-full border border-white/25 bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                        >
+                          Show All Areas
+                        </button>
+                      ) : null}
                       {area.locked ? (
                         <p className="mt-3 inline-flex items-center rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#F5D37A]">
                           Locked for now
@@ -1582,9 +1774,9 @@ export default function ViewerPage() {
                 </div>
               ) : null}
 
-              {storiesLoadState === 'empty' ? (
+              {storiesLoadState === 'empty' || storiesLoadState === 'error' ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
-                  No published content found. Showing fallback.
+                  No published content found for {selectedArea.title}.
                 </div>
               ) : null}
 
@@ -1646,7 +1838,7 @@ export default function ViewerPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                {selectedArea.sections.map((section) => (
+                {activeNarrativeSections.map((section) => (
                   <article
                     key={section.id}
                     className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"

@@ -27,6 +27,7 @@ type ViewerEntry = {
   title: string
   description: string
   videoUrl: string
+  hlsUrl?: string
   thumbnailUrl?: string
   accessLevel: AccessLevel
   isPublished: boolean
@@ -62,6 +63,17 @@ type BookingRequest = {
   createdAt?: unknown
 }
 
+type ViewerSectionDoc = {
+  id: string
+  areaId: string
+  title: string
+  format: string
+  summary: string
+  availability: 'open' | 'subscriber' | 'regional' | 'institution'
+  order: number
+  active: boolean
+}
+
 type Props = {
   mode: 'admin' | 'participant'
 }
@@ -81,6 +93,7 @@ type FormState = {
   title: string
   description: string
   videoUrl: string
+  hlsUrl: string
   thumbnailUrl: string
   accessLevel: AccessLevel
   isPublished: boolean
@@ -113,6 +126,7 @@ const DEFAULT_FORM: FormState = {
   title: '',
   description: '',
   videoUrl: '',
+  hlsUrl: '',
   thumbnailUrl: '',
   accessLevel: 'open',
   isPublished: true,
@@ -228,6 +242,18 @@ export default function ViewerEntryManager({ mode }: Props) {
   const [submissionGuideDisabled, setSubmissionGuideDisabled] = useState(false)
   const [submissionGuideIndex, setSubmissionGuideIndex] = useState(0)
   const [focusCooling, setFocusCooling] = useState(false)
+  const [sections, setSections] = useState<ViewerSectionDoc[]>([])
+  const [sectionId, setSectionId] = useState('')
+  const [sectionForm, setSectionForm] = useState<Omit<ViewerSectionDoc, 'id'>>({
+    areaId: 'community',
+    title: '',
+    format: '',
+    summary: '',
+    availability: 'open',
+    order: 1,
+    active: true,
+  })
+  const [sectionSaving, setSectionSaving] = useState(false)
 
   const canManageAll = mode === 'admin'
   const guideStep = PARTICIPANT_SUBMISSION_GUIDE_STEPS[submissionGuideIndex] ?? null
@@ -316,6 +342,13 @@ export default function ViewerEntryManager({ mode }: Props) {
           ...(docSnap.data() as Omit<BookingRequest, 'id'>),
         }))
         setBookings(bookingRows)
+
+        const sectionsSnapshot = await getDocs(query(collection(db, 'viewerSections'), orderBy('order', 'asc')))
+        const nextSections = sectionsSnapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ViewerSectionDoc, 'id'>),
+        }))
+        setSections(nextSections)
       }
     } catch (error) {
       console.error('Error loading viewer manager data:', error)
@@ -359,6 +392,7 @@ export default function ViewerEntryManager({ mode }: Props) {
       title: entry.title,
       description: entry.description,
       videoUrl: entry.videoUrl,
+      hlsUrl: entry.hlsUrl ?? '',
       thumbnailUrl: entry.thumbnailUrl ?? '',
       accessLevel: entry.accessLevel,
       isPublished: entry.isPublished,
@@ -393,6 +427,7 @@ export default function ViewerEntryManager({ mode }: Props) {
       title: form.title.trim(),
       description: form.description.trim(),
       videoUrl: form.videoUrl.trim(),
+      hlsUrl: form.hlsUrl.trim(),
       thumbnailUrl: form.thumbnailUrl.trim(),
       accessLevel: form.accessLevel,
       isPublished: form.isPublished,
@@ -510,6 +545,62 @@ export default function ViewerEntryManager({ mode }: Props) {
     setSectionOpen((current) => ({ ...current, [section]: !current[section] }))
   }
 
+  const pickSection = (item: ViewerSectionDoc) => {
+    setSectionId(item.id)
+    setSectionForm({
+      areaId: item.areaId,
+      title: item.title,
+      format: item.format,
+      summary: item.summary,
+      availability: item.availability,
+      order: item.order,
+      active: item.active,
+    })
+  }
+
+  const clearSectionForm = () => {
+    setSectionId('')
+    setSectionForm({
+      areaId: 'community',
+      title: '',
+      format: '',
+      summary: '',
+      availability: 'open',
+      order: 1,
+      active: true,
+    })
+  }
+
+  const saveSection = async () => {
+    if (!db || !canManageAll) return
+    if (!sectionForm.areaId.trim() || !sectionForm.title.trim()) return
+    setSectionSaving(true)
+    try {
+      const targetRef = sectionId
+        ? doc(db, 'viewerSections', sectionId)
+        : doc(collection(db, 'viewerSections'))
+      await setDoc(
+        targetRef,
+        {
+          ...sectionForm,
+          areaId: sectionForm.areaId.trim(),
+          title: sectionForm.title.trim(),
+          format: sectionForm.format.trim(),
+          summary: sectionForm.summary.trim(),
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      )
+      await loadData()
+      clearSectionForm()
+    } catch (error) {
+      console.error('Error saving viewer section:', error)
+    } finally {
+      setSectionSaving(false)
+    }
+  }
+
   const confirmDeleteEntry = async () => {
     if (!db || !deleteTarget) return
     setDeleteError(null)
@@ -553,6 +644,7 @@ export default function ViewerEntryManager({ mode }: Props) {
         sectionId: nextSectionId,
         description: source.description ?? '',
         videoUrl: cloneCopyMediaUrls ? source.videoUrl ?? '' : '',
+        hlsUrl: cloneCopyMediaUrls ? source.hlsUrl ?? '' : '',
         thumbnailUrl: cloneCopyMediaUrls ? source.thumbnailUrl ?? '' : '',
         institutionName: source.institutionName ?? '',
         recordedAt: source.recordedAt ?? '',
@@ -606,6 +698,7 @@ export default function ViewerEntryManager({ mode }: Props) {
         sectionId: nextSectionId,
         description: String(payload.description ?? ''),
         videoUrl: String(payload.videoUrl ?? ''),
+        hlsUrl: String(payload.hlsUrl ?? ''),
         thumbnailUrl: String(payload.thumbnailUrl ?? ''),
         accessLevel: (payload.accessLevel as AccessLevel) ?? 'open',
         isPublished: Boolean(payload.isPublished),
@@ -793,6 +886,7 @@ export default function ViewerEntryManager({ mode }: Props) {
               {sectionOpen.media ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
                   <input value={form.videoUrl} onChange={(e) => setForm((p) => ({ ...p, videoUrl: e.target.value }))} placeholder="videoUrl" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
+                  <input value={form.hlsUrl} onChange={(e) => setForm((p) => ({ ...p, hlsUrl: e.target.value }))} placeholder="hlsUrl (optional .m3u8 for adaptive playback)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <input value={form.thumbnailUrl} onChange={(e) => setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))} placeholder="thumbnailUrl" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <input value={form.institutionName} onChange={(e) => setForm((p) => ({ ...p, institutionName: e.target.value }))} placeholder="institutionName" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                   <input value={form.recordedAt} onChange={(e) => setForm((p) => ({ ...p, recordedAt: e.target.value }))} placeholder="recordedAt (YYYY-MM-DD)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
@@ -895,6 +989,68 @@ export default function ViewerEntryManager({ mode }: Props) {
               </div>
             ))}
             {!loading && bookings.length === 0 ? <p className="text-sm text-white/70">No booking requests found.</p> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {canManageAll ? (
+        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Narrative Arcs (viewerSections)</h2>
+            <button
+              type="button"
+              onClick={clearSectionForm}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1 text-xs hover:border-[#D4AF37] hover:text-[#F5D37A]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Arc
+            </button>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr,1.3fr]">
+            <div className="space-y-2">
+              {sections.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => pickSection(item)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                    sectionId === item.id
+                      ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                      : 'border-white/15 bg-black/25 hover:border-white/30'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  <p className="mt-1 text-xs text-white/70">{item.areaId} • {item.availability} • order {item.order}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <input value={sectionForm.areaId} onChange={(e) => setSectionForm((p) => ({ ...p, areaId: e.target.value }))} placeholder="areaId" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+              <input value={sectionForm.title} onChange={(e) => setSectionForm((p) => ({ ...p, title: e.target.value }))} placeholder="title" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+              <input value={sectionForm.format} onChange={(e) => setSectionForm((p) => ({ ...p, format: e.target.value }))} placeholder="format" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+              <select value={sectionForm.availability} onChange={(e) => setSectionForm((p) => ({ ...p, availability: e.target.value as ViewerSectionDoc['availability'] }))} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
+                <option value="open">open</option>
+                <option value="subscriber">subscriber</option>
+                <option value="regional">regional</option>
+                <option value="institution">institution</option>
+              </select>
+              <textarea value={sectionForm.summary} onChange={(e) => setSectionForm((p) => ({ ...p, summary: e.target.value }))} placeholder="summary" rows={3} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
+              <input type="number" value={sectionForm.order} onChange={(e) => setSectionForm((p) => ({ ...p, order: Number(e.target.value) || 1 }))} placeholder="order" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+              <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={sectionForm.active} onChange={(e) => setSectionForm((p) => ({ ...p, active: e.target.checked }))} /> active</label>
+              <div className="md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => void saveSection()}
+                  disabled={sectionSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black hover:bg-[#E6C86A] disabled:opacity-70"
+                >
+                  <Save className="h-4 w-4" />
+                  {sectionSaving ? 'Saving Arc...' : sectionId ? 'Save Arc' : 'Add Arc'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

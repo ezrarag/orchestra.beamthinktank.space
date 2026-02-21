@@ -454,6 +454,9 @@ service cloud.firestore {
       // Public can read active sections
       allow read: if resource.data.active == true;
 
+      // Admin tooling read access (including inactive sections)
+      allow read: if isAdmin() || viewerAdminBypassEnabled();
+
       // Admins can manage viewer sections
       allow write: if isAdmin() || viewerAdminBypassEnabled();
     }

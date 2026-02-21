@@ -7,6 +7,7 @@ import {
   Settings,
   Smartphone,
   Users,
+  Video,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
@@ -135,6 +136,13 @@ export const adminNavGroups: AdminNavGroup[] = [
         label: 'Public Platform',
         href: '/admin/viewer',
         icon: Globe,
+        enabled: true,
+      },
+      {
+        key: 'narrative-arcs',
+        label: 'Narrative Arcs',
+        href: '/admin/viewer-sections',
+        icon: Video,
         enabled: true,
       },
     ],

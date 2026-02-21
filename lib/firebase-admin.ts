@@ -2,6 +2,8 @@ import { initializeApp, getApps, applicationDefault, cert, App } from 'firebase-
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
+import fs from 'fs'
+import path from 'path'
 
 let app: App | null = null
 let adminDb: ReturnType<typeof getFirestore> | null = null
@@ -18,34 +20,85 @@ function initializeAdminSDK() {
     if (existingApps.length > 0) {
       app = existingApps[0]
     } else {
-      // Try to initialize with service account credentials from env (for Vercel)
-      if (process.env.FIREBASE_ADMIN_PRIVATE_KEY && process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+      // In local development prefer service-account.json so routes hit the same project as local tooling.
+      // In production prefer env-based credentials.
+      const shouldPreferLocalFile = process.env.NODE_ENV !== 'production'
+
+      const initFromLocalServiceAccount = () => {
         try {
+          const serviceAccountPath = path.join(process.cwd(), 'service-account.json')
+          if (fs.existsSync(serviceAccountPath)) {
+            const raw = fs.readFileSync(serviceAccountPath, 'utf8')
+            const parsed = JSON.parse(raw) as {
+              project_id?: string
+              private_key?: string
+              client_email?: string
+            }
+
+            if (parsed.private_key && parsed.client_email) {
+              const localProjectId =
+                parsed.project_id ||
+                process.env.GOOGLE_CLOUD_PROJECT ||
+                process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+                'beam-orchestra-platform'
+
+              app = initializeApp({
+                credential: cert({
+                  projectId: localProjectId,
+                  privateKey: parsed.private_key,
+                  clientEmail: parsed.client_email,
+                }),
+                projectId: localProjectId,
+                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+              })
+              console.info(`Firebase Admin SDK initialized from local service-account.json (${localProjectId})`)
+            }
+          }
+        } catch (localFileError) {
+          console.warn('Failed to initialize with local service-account.json:', localFileError)
+        }
+      }
+
+      const initFromEnvServiceAccount = () => {
+        if (!process.env.FIREBASE_ADMIN_PRIVATE_KEY || !process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+          return
+        }
+        try {
+          const envProjectId =
+            process.env.GOOGLE_CLOUD_PROJECT ||
+            process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+            'beam-orchestra-platform'
           app = initializeApp({
             credential: cert({
-              projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+              projectId: envProjectId,
               privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY.replace(/\\n/g, '\n'),
               clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
             }),
-            projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+            projectId: envProjectId,
             storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
           })
+          console.info(`Firebase Admin SDK initialized from env service account (${envProjectId})`)
         } catch (certError) {
-          console.warn('Failed to initialize with service account cert, trying applicationDefault:', certError)
-          // Fallback to applicationDefault
-          app = initializeApp({
-            credential: applicationDefault(),
-            projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          })
+          console.warn('Failed to initialize with env service account cert:', certError)
         }
+      }
+
+      if (shouldPreferLocalFile) {
+        initFromLocalServiceAccount()
+        if (!app) initFromEnvServiceAccount()
       } else {
-        // Use applicationDefault (works locally with gcloud auth)
+        initFromEnvServiceAccount()
+        if (!app) initFromLocalServiceAccount()
+      }
+
+      // Final fallback: application default credentials.
+      if (!app) {
         app = initializeApp({
           credential: applicationDefault(),
           projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
           storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
         })
+        console.info('Firebase Admin SDK initialized from application default credentials')
       }
     }
 
