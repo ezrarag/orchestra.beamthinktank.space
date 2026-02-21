@@ -14,7 +14,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react'
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
@@ -43,6 +43,7 @@ type ViewerArea = {
 type ViewerContent = {
   id: string
   areaId: string
+  status?: string
   sectionId: string
   title: string
   description: string
@@ -62,7 +63,7 @@ type ViewerContent = {
   updatedAt?: unknown
   isPublished: boolean
   sortOrder: number
-  accessLevel: 'open' | 'subscriber' | 'regional' | 'institution'
+  accessLevel: 'public' | 'open' | 'subscriber' | 'regional' | 'institution'
   geo?: {
     regions?: string[]
     states?: string[]
@@ -86,6 +87,19 @@ const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
 const LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY = 'viewer-last-active-video'
 const PROGRESS_SAVE_INTERVAL_MS = 1200
+const BROAD_FETCH_LIMIT = 50
+const VIEWER_CONTENT_DEFAULTS = {
+  status: 'open',
+  isPublished: false,
+  confirmed: false,
+  accessLevel: 'public',
+} as const
+const VIEWER_CONTENT_FILTERS = {
+  status: 'open',
+  isPublished: true,
+  confirmed: false,
+  accessLevel: ['public', 'open'] as readonly string[],
+} as const
 
 type ContentProgress = {
   positionSeconds: number
@@ -101,6 +115,48 @@ type WatchedHistoryItem = {
 }
 
 type ViewerIntent = 'subscriber' | 'student' | 'instructor' | 'partner'
+type StoriesLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
+
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const withCode = error as { code?: unknown; message?: unknown }
+    const code = typeof withCode.code === 'string' ? withCode.code : null
+    const message = typeof withCode.message === 'string' ? withCode.message : null
+    if (code && message) return `${code}: ${message}`
+    if (message) return message
+  }
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+function normalizeViewerContent(id: string, data: Partial<ViewerContent>): ViewerContent {
+  return {
+    id,
+    areaId: data.areaId ?? '',
+    status: data.status ?? VIEWER_CONTENT_DEFAULTS.status,
+    sectionId: data.sectionId ?? '',
+    title: data.title ?? '',
+    description: data.description ?? '',
+    thumbnailUrl: data.thumbnailUrl,
+    videoUrl: data.videoUrl ?? '',
+    institutionName: data.institutionName,
+    recordedAt: data.recordedAt,
+    researchStatus: data.researchStatus,
+    participantNames: data.participantNames,
+    relatedVersionIds: data.relatedVersionIds,
+    infoUrl: data.infoUrl,
+    isNew: data.isNew,
+    confirmed: data.confirmed ?? VIEWER_CONTENT_DEFAULTS.confirmed,
+    confirmedAt: data.confirmedAt,
+    createdByUid: data.createdByUid,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+    isPublished: data.isPublished ?? VIEWER_CONTENT_DEFAULTS.isPublished,
+    sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : 999,
+    accessLevel: data.accessLevel ?? VIEWER_CONTENT_DEFAULTS.accessLevel,
+    geo: data.geo,
+  }
+}
 
 function contentOverlayClass(content: ViewerContent, fallback: string): string {
   const cities = content.geo?.cities ?? []
@@ -303,7 +359,7 @@ export default function ViewerPage() {
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<ViewerArea['id']>('professional')
   const [activeVideo, setActiveVideo] = useState<ActiveVideo>({
-    url: viewerAreas[0].videoUrl,
+    url: '',
     title: viewerAreas[0].title,
     areaId: viewerAreas[0].id,
     overlayClass: viewerAreas[0].visual,
@@ -316,7 +372,7 @@ export default function ViewerPage() {
   const [availableCities, setAvailableCities] = useState<string[]>([])
   const [selectedAreaCatalog, setSelectedAreaCatalog] = useState<ViewerContent[]>([])
   const [selectedAreaStories, setSelectedAreaStories] = useState<ViewerContent[]>([])
-  const [isStoriesLoading, setIsStoriesLoading] = useState(false)
+  const [storiesLoadState, setStoriesLoadState] = useState<StoriesLoadState>('idle')
   const [storiesError, setStoriesError] = useState<string | null>(null)
   const [contentProgress, setContentProgress] = useState<Record<string, ContentProgress>>({})
   const [watchedHistory, setWatchedHistory] = useState<WatchedHistoryItem[]>([])
@@ -326,7 +382,8 @@ export default function ViewerPage() {
   const [isVideoPaused, setIsVideoPaused] = useState(false)
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0)
   const [videoDuration, setVideoDuration] = useState(0)
-  const [isMuted, setIsMuted] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [hasUserEnabledAudio, setHasUserEnabledAudio] = useState(false)
   const [volume, setVolume] = useState(0.85)
   const [areaNewBadgeMap, setAreaNewBadgeMap] = useState<Record<string, boolean>>({})
   const [viewerAreaRolesMap, setViewerAreaRolesMap] = useState<Record<ViewerAreaId, ViewerAreaRolesDoc> | null>(null)
@@ -334,6 +391,7 @@ export default function ViewerPage() {
   const [hasAutoSelectedInitialContent, setHasAutoSelectedInitialContent] = useState(false)
   const [moduleBannerVisible, setModuleBannerVisible] = useState(false)
   const [allPublishedContent, setAllPublishedContent] = useState<ViewerContent[]>([])
+  const [isUsingFallbackContent, setIsUsingFallbackContent] = useState(false)
 
   const requestedAreaFilter = useMemo(() => {
     const area = searchParams.get('area')
@@ -341,6 +399,21 @@ export default function ViewerPage() {
     return viewerAreas.some((item) => item.id === area) ? (area as ViewerAreaId) : null
   }, [searchParams])
   const moduleMode = searchParams.get('module') === '1'
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  const devProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unknown'
+  const firestoreEmulatorHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST
+  const isUsingEmulators =
+    Boolean(firestoreEmulatorHost) || process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS === 'true'
+  const activeFirestoreFilters = useMemo(
+    () => ({
+      areaId: selectedAreaId,
+      status: VIEWER_CONTENT_FILTERS.status,
+      isPublished: VIEWER_CONTENT_FILTERS.isPublished,
+      confirmed: VIEWER_CONTENT_FILTERS.confirmed,
+      accessLevel: [...VIEWER_CONTENT_FILTERS.accessLevel],
+    }),
+    [selectedAreaId]
+  )
 
   const setAreaFilterInUrl = (areaId: ViewerAreaId | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -501,13 +574,14 @@ export default function ViewerPage() {
         return current
       }
       return {
-        url: selectedArea.videoUrl,
+        url: '',
         title: selectedArea.title,
         areaId: selectedArea.id,
         overlayClass: selectedArea.visual,
         sourceType: 'area-default',
       }
     })
+    setIsUsingFallbackContent(false)
     setIsPlayerOverlayVisible(true)
   }, [selectedArea])
 
@@ -518,7 +592,7 @@ export default function ViewerPage() {
 
     setSelectedAreaId(area.id)
     setActiveVideo({
-      url: area.videoUrl,
+      url: '',
       title: area.title,
       areaId: area.id,
       overlayClass: area.visual,
@@ -533,35 +607,125 @@ export default function ViewerPage() {
   }, [moduleMode, requestedAreaFilter])
 
   useEffect(() => {
-    if (!db) return
+    if (!db) {
+      setStoriesLoadState('error')
+      setStoriesError('Firebase is not configured.')
+      setIsUsingFallbackContent(true)
+      setActiveVideo((current) => {
+        if (current.contentId) return current
+        return {
+          url: selectedArea.videoUrl,
+          title: selectedArea.title,
+          areaId: selectedArea.id,
+          overlayClass: selectedArea.visual,
+          sourceType: 'area-default',
+        }
+      })
+      return
+    }
 
     let mounted = true
 
+    const applyFallbackForArea = () => {
+      if (!mounted) return
+      setIsUsingFallbackContent(true)
+      setActiveVideo((current) => {
+        if (current.areaId === selectedAreaId && current.contentId) return current
+        return {
+          url: selectedArea.videoUrl,
+          title: selectedArea.title,
+          areaId: selectedArea.id,
+          overlayClass: selectedArea.visual,
+          sourceType: 'area-default',
+        }
+      })
+    }
+
+    if (isDevelopment) {
+      console.info('[viewer] Firestore query filters', activeFirestoreFilters)
+    }
+
     const loadAreaStories = async () => {
-      setIsStoriesLoading(true)
+      setStoriesLoadState('loading')
       setStoriesError(null)
+      setIsUsingFallbackContent(false)
 
       try {
-        const contentQuery = query(
+        const strictQuery = query(
           collection(db, 'viewerContent'),
           where('areaId', '==', selectedAreaId),
-          where('isPublished', '==', true)
+          where('status', '==', VIEWER_CONTENT_FILTERS.status),
+          where('isPublished', '==', VIEWER_CONTENT_FILTERS.isPublished),
+          where('confirmed', '==', VIEWER_CONTENT_FILTERS.confirmed),
+          where('accessLevel', 'in', [...VIEWER_CONTENT_FILTERS.accessLevel])
         )
 
-        const snapshot = await getDocs(contentQuery)
+        let strictSnapshot
+        try {
+          strictSnapshot = await getDocs(strictQuery)
+        } catch (strictError) {
+          const code =
+            strictError && typeof strictError === 'object' && 'code' in strictError
+              ? String((strictError as { code?: unknown }).code)
+              : ''
+          if (code === 'permission-denied' || code.endsWith('/permission-denied')) {
+            throw strictError
+          }
+          if (isDevelopment) {
+            console.warn('[viewer] strict query failed, trying broader query', strictError)
+          }
+          const broaderQuery = query(
+            collection(db, 'viewerContent'),
+            where('areaId', '==', selectedAreaId),
+            where('isPublished', '==', VIEWER_CONTENT_FILTERS.isPublished),
+            limit(BROAD_FETCH_LIMIT)
+          )
+          strictSnapshot = await getDocs(broaderQuery)
+        }
         if (!mounted) return
 
-        const catalog = snapshot.docs
-          .map((item) => {
-            const data = item.data() as Omit<ViewerContent, 'id'>
-            return {
-              id: item.id,
-              ...data,
-            } as ViewerContent
+        if (strictSnapshot.empty) {
+          try {
+            const broaderQuery = query(
+              collection(db, 'viewerContent'),
+              where('areaId', '==', selectedAreaId),
+              where('isPublished', '==', VIEWER_CONTENT_FILTERS.isPublished),
+              limit(BROAD_FETCH_LIMIT)
+            )
+            strictSnapshot = await getDocs(broaderQuery)
+          } catch (broaderError) {
+            throw broaderError
+          }
+        }
+
+        if (!mounted) return
+
+        let catalog = strictSnapshot.docs
+          .map((item) => normalizeViewerContent(item.id, item.data() as Partial<ViewerContent>))
+          .filter((item) => {
+            const status = item.status ?? VIEWER_CONTENT_DEFAULTS.status
+            const confirmed = item.confirmed ?? VIEWER_CONTENT_DEFAULTS.confirmed
+            const accessLevel = item.accessLevel ?? VIEWER_CONTENT_DEFAULTS.accessLevel
+            return (
+              status === VIEWER_CONTENT_FILTERS.status &&
+              item.isPublished === VIEWER_CONTENT_FILTERS.isPublished &&
+              confirmed === VIEWER_CONTENT_FILTERS.confirmed &&
+              VIEWER_CONTENT_FILTERS.accessLevel.includes(accessLevel)
+            )
           })
           .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
 
         setSelectedAreaCatalog(catalog)
+
+        if (catalog.length === 0) {
+          setStoriesLoadState('empty')
+          setAvailableCities([])
+          setSelectedCity('')
+          applyFallbackForArea()
+          return
+        }
+
+        setStoriesLoadState('ready')
 
         if (selectedAreaId !== 'community') {
           setAvailableCities([])
@@ -583,24 +747,22 @@ export default function ViewerPage() {
       } catch (error) {
         console.error('Error loading viewer stories:', error)
         if (!mounted) return
-        setStoriesError(`Unable to load ${selectedArea.title.toLowerCase()} stories right now.`)
+        setStoriesError(getErrorMessage(error))
+        setStoriesLoadState('error')
         setSelectedAreaCatalog([])
         setSelectedAreaStories([])
         setAvailableCities([])
         setSelectedCity('')
-      } finally {
-        if (mounted) {
-          setIsStoriesLoading(false)
-        }
+        applyFallbackForArea()
       }
     }
 
-    loadAreaStories()
+    void loadAreaStories()
 
     return () => {
       mounted = false
     }
-  }, [selectedAreaId, selectedArea.title])
+  }, [activeFirestoreFilters, isDevelopment, selectedArea, selectedAreaId, selectedArea.title])
 
   useEffect(() => {
     if (!db) return
@@ -610,7 +772,9 @@ export default function ViewerPage() {
       try {
         const snapshot = await getDocs(query(collection(db, 'viewerContent'), where('isPublished', '==', true)))
         if (!mounted) return
-        const rows = snapshot.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<ViewerContent, 'id'>) }))
+        const rows = snapshot.docs.map((item) =>
+          normalizeViewerContent(item.id, item.data() as Partial<ViewerContent>)
+        )
         setAllPublishedContent(rows)
       } catch (error) {
         console.error('Error loading all published viewer content:', error)
@@ -745,8 +909,12 @@ export default function ViewerPage() {
   useEffect(() => {
     if (hasAutoSelectedInitialContent) return
     if (!hasRestoredLastActiveVideo) return
+    if (storiesLoadState === 'idle' || storiesLoadState === 'loading') return
     if (activeVideo.sourceType && activeVideo.sourceType !== 'area-default') {
       setHasAutoSelectedInitialContent(true)
+      return
+    }
+    if (storiesLoadState === 'empty' || storiesLoadState === 'error') {
       return
     }
     const preferredFromArea = pickLatestOrTopSeeded(selectedAreaCatalog)
@@ -766,6 +934,7 @@ export default function ViewerPage() {
     allPublishedContent,
     hasAutoSelectedInitialContent,
     hasRestoredLastActiveVideo,
+    storiesLoadState,
     selectedAreaCatalog,
   ])
 
@@ -849,6 +1018,9 @@ export default function ViewerPage() {
     element.muted = clamped === 0
     setVolume(clamped)
     setIsMuted(clamped === 0)
+    if (clamped > 0) {
+      setHasUserEnabledAudio(true)
+    }
   }
 
   const toggleMute = () => {
@@ -861,6 +1033,24 @@ export default function ViewerPage() {
       element.volume = 0.6
       setVolume(0.6)
     }
+    if (!nextMuted) {
+      setHasUserEnabledAudio(true)
+    }
+  }
+
+  const handleEnableAudio = () => {
+    const element = videoRef.current
+    if (!element) return
+    if (element.volume === 0) {
+      element.volume = 0.6
+      setVolume(0.6)
+    }
+    element.muted = false
+    setIsMuted(false)
+    setHasUserEnabledAudio(true)
+    void element.play().catch((error) => {
+      console.error('Unable to continue playback with audio enabled:', error)
+    })
   }
 
   useEffect(() => {
@@ -898,7 +1088,9 @@ export default function ViewerPage() {
     setIsLibraryOpen(false)
     setIsPlayerOverlayVisible(false)
     setShowMoreInfo(false)
-    setIsMuted(false)
+    setIsUsingFallbackContent(false)
+    setIsMuted(true)
+    setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
 
     setWatchedHistory((current) => {
@@ -963,7 +1155,9 @@ export default function ViewerPage() {
     })
     setIsLibraryOpen(false)
     setIsPlayerOverlayVisible(false)
-    setIsMuted(false)
+    setIsUsingFallbackContent(false)
+    setIsMuted(true)
+    setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
   }
 
@@ -1007,6 +1201,9 @@ export default function ViewerPage() {
               setIsVideoPaused(element.paused)
               setVolume(element.volume)
               setIsMuted(element.muted)
+              if (!element.muted) {
+                setHasUserEnabledAudio(true)
+              }
               saveCurrentVideoProgress()
             }}
             onTimeUpdate={(event) => {
@@ -1043,7 +1240,7 @@ export default function ViewerPage() {
           }`}
         >
           <div className="absolute right-4 top-8 sm:right-6 lg:right-8 md:static md:flex md:justify-end">
-            <div className="w-full max-w-sm rounded-2xl border border-white/20 bg-black/35 p-3 text-white md:w-[360px]">
+            <div className="w-[min(100%,22rem)] max-h-[44vh] overflow-y-auto rounded-2xl border border-white/20 bg-black/35 p-3 text-white md:w-[360px] md:max-h-none md:overflow-visible">
               <div className="flex items-center justify-between gap-3">
                 <Link
                   href={user ? '/studio' : '/subscriber'}
@@ -1147,6 +1344,20 @@ export default function ViewerPage() {
             <p className="mt-3 text-sm text-white/85 md:text-base">
               Now Playing: {activeStory?.title ?? activeVideo.title}
             </p>
+            {isUsingFallbackContent ? (
+              <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
+                Using fallback content after Firestore returned no playable items.
+              </p>
+            ) : null}
+            {isMuted && !hasUserEnabledAudio ? (
+              <button
+                type="button"
+                onClick={handleEnableAudio}
+                className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+              >
+                Tap to enable audio
+              </button>
+            ) : null}
 
             <div className="mt-7 flex flex-wrap justify-start gap-3">
               <button
@@ -1180,21 +1391,23 @@ export default function ViewerPage() {
                   onChange={(event) => handleSeek(Number(event.target.value))}
                   className="w-full accent-[#D4AF37]"
                 />
-                <div className="mt-3 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePlayPause}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
-                  >
-                    {isVideoPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleMute}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
-                  >
-                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                  </button>
+                <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePlayPause}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      {isVideoPaused ? <Play className="h-4 w-4 fill-current" /> : <Pause className="h-4 w-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleMute}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <input
                     type="range"
                     min={0}
@@ -1202,12 +1415,12 @@ export default function ViewerPage() {
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={(event) => handleVolumeChange(Number(event.target.value))}
-                    className="w-36 accent-[#D4AF37]"
+                    className="w-full accent-[#D4AF37] sm:w-36"
                   />
                   <select
                     value={viewerIntent}
                     onChange={(event) => setViewerIntent(event.target.value as ViewerIntent)}
-                    className="rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                    className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
                   >
                     <option value="subscriber">Subscriber</option>
                     <option value="student">Student Learner</option>
@@ -1218,7 +1431,7 @@ export default function ViewerPage() {
                     <select
                       value={partnerType}
                       onChange={(event) => setPartnerType(event.target.value)}
-                      className="rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37]"
+                      className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
                     >
                       <option>Community Partner</option>
                       <option>Institutional Partner</option>
@@ -1300,12 +1513,13 @@ export default function ViewerPage() {
                         setSelectedAreaId(area.id)
                         setAreaFilterInUrl(area.id)
                         setActiveVideo({
-                          url: area.videoUrl,
+                          url: '',
                           title: area.title,
                           areaId: area.id,
                           overlayClass: area.visual,
                           sourceType: 'area-default',
                         })
+                        setIsUsingFallbackContent(false)
                       }}
                       className={`group relative min-w-[260px] flex-1 rounded-2xl border p-4 text-left transition ${
                         isSelected
@@ -1346,10 +1560,19 @@ export default function ViewerPage() {
                   {selectedAreaId === 'community' ? `City Filter: ${selectedCity || 'All'}` : 'All Markets'}
                 </p>
               </div>
+              {isDevelopment ? (
+                <div className="mb-4 rounded-xl border border-white/20 bg-black/35 p-3 text-xs text-white/80">
+                  <p>Firebase projectId: {devProjectId}</p>
+                  <p>
+                    Emulators: {isUsingEmulators ? 'enabled' : 'disabled'}
+                    {firestoreEmulatorHost ? ` (${firestoreEmulatorHost})` : ''}
+                  </p>
+                </div>
+              ) : null}
 
-              {isStoriesLoading ? (
+              {storiesLoadState === 'loading' ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
-                  Loading stories...
+                  Loading Firestore content…
                 </div>
               ) : null}
 
@@ -1359,13 +1582,13 @@ export default function ViewerPage() {
                 </div>
               ) : null}
 
-              {!isStoriesLoading && !storiesError && selectedAreaStories.length === 0 ? (
+              {storiesLoadState === 'empty' ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
-                  No stories are published for {selectedArea.title} yet.
+                  No published content found. Showing fallback.
                 </div>
               ) : null}
 
-              {!isStoriesLoading && !storiesError && selectedAreaStories.length > 0 ? (
+              {storiesLoadState === 'ready' && selectedAreaStories.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   {selectedAreaStories.map((content) => {
                     const progressPercent = getStoryProgressPercent(content.id)

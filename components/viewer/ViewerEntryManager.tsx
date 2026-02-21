@@ -11,10 +11,11 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { CheckCircle2, ChevronDown, ChevronUp, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
 import { db } from '@/lib/firebase'
 
 type AccessLevel = 'open' | 'subscriber' | 'regional' | 'institution'
@@ -47,6 +48,7 @@ type ViewerEntry = {
   confirmed?: boolean
   confirmedAt?: string
   createdByUid?: string
+  status?: 'open' | 'archived'
 }
 
 type BookingRequest = {
@@ -100,6 +102,10 @@ type FormState = {
 }
 
 type DeleteTarget = Pick<ViewerEntry, 'id' | 'title'>
+
+type CloneTarget = Pick<ViewerEntry, 'id' | 'title' | 'areaId' | 'sectionId'> & {
+  source: ViewerEntry
+}
 
 const DEFAULT_FORM: FormState = {
   areaId: 'community',
@@ -194,11 +200,21 @@ export default function ViewerEntryManager({ mode }: Props) {
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleteCheckboxConfirmed, setDeleteCheckboxConfirmed] = useState(false)
+  const [cloneTarget, setCloneTarget] = useState<CloneTarget | null>(null)
+  const [cloneTitle, setCloneTitle] = useState('')
+  const [cloneAreaId, setCloneAreaId] = useState('')
+  const [cloneSectionId, setCloneSectionId] = useState('')
+  const [cloneCopyMediaUrls, setCloneCopyMediaUrls] = useState(true)
+  const [cloneCopyAdvancedMetadata, setCloneCopyAdvancedMetadata] = useState(true)
+  const [cloneCopyPublishingFlags, setCloneCopyPublishingFlags] = useState(false)
+  const [cloneError, setCloneError] = useState<string | null>(null)
+  const [isCloning, setIsCloning] = useState(false)
   const [entriesSearch, setEntriesSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
@@ -237,6 +253,23 @@ export default function ViewerEntryManager({ mode }: Props) {
       return haystack.includes(queryText)
     })
   }, [entries, entriesSearch])
+
+  const areaOptions = useMemo(() => {
+    const values = new Set(entries.map((entry) => entry.areaId).filter(Boolean))
+    if (cloneTarget?.areaId) values.add(cloneTarget.areaId)
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [cloneTarget?.areaId, entries])
+
+  const sectionOptions = useMemo(() => {
+    const values = new Set(
+      entries
+        .filter((entry) => !cloneAreaId || entry.areaId === cloneAreaId)
+        .map((entry) => entry.sectionId)
+        .filter(Boolean),
+    )
+    if (cloneTarget?.sectionId) values.add(cloneTarget.sectionId)
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [cloneAreaId, cloneTarget?.sectionId, entries])
 
   const loadData = async () => {
     if (!db) {
@@ -350,6 +383,7 @@ export default function ViewerEntryManager({ mode }: Props) {
   const clearForm = () => {
     setSelectedId(null)
     setForm(DEFAULT_FORM)
+    setSubmitError(null)
   }
 
   const toPayload = () => {
@@ -387,9 +421,14 @@ export default function ViewerEntryManager({ mode }: Props) {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!db) return
+    if (!db) {
+      setSubmitError('Database is not initialized in this environment.')
+      return
+    }
+    setSubmitError(null)
 
     if (!form.title.trim() || !form.description.trim() || !form.areaId.trim() || !form.sectionId.trim()) {
+      setSubmitError('Required fields missing: areaId, sectionId, title, and description are all required.')
       return
     }
 
@@ -410,6 +449,8 @@ export default function ViewerEntryManager({ mode }: Props) {
       clearForm()
     } catch (error) {
       console.error('Error saving viewer entry:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setSubmitError(`Save failed: ${message}`)
     } finally {
       setSaving(false)
     }
@@ -437,6 +478,34 @@ export default function ViewerEntryManager({ mode }: Props) {
     setDeleteError(null)
   }
 
+  const openCloneModal = (entry: ViewerEntry) => {
+    setCloneTarget({
+      id: entry.id,
+      title: entry.title,
+      areaId: entry.areaId,
+      sectionId: entry.sectionId,
+      source: entry,
+    })
+    setCloneTitle(`Copy of ${entry.title}`)
+    setCloneAreaId(entry.areaId)
+    setCloneSectionId(entry.sectionId)
+    setCloneCopyMediaUrls(true)
+    setCloneCopyAdvancedMetadata(true)
+    setCloneCopyPublishingFlags(false)
+    setCloneError(null)
+  }
+
+  const resetCloneModal = () => {
+    setCloneTarget(null)
+    setCloneTitle('')
+    setCloneAreaId('')
+    setCloneSectionId('')
+    setCloneCopyMediaUrls(true)
+    setCloneCopyAdvancedMetadata(true)
+    setCloneCopyPublishingFlags(false)
+    setCloneError(null)
+  }
+
   const toggleFormSection = (section: 'required' | 'media' | 'publishing' | 'advanced') => {
     setSectionOpen((current) => ({ ...current, [section]: !current[section] }))
   }
@@ -458,6 +527,113 @@ export default function ViewerEntryManager({ mode }: Props) {
       setDeleteError('Delete failed. Verify permissions and try again.')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const confirmCloneEntry = async () => {
+    if (!db || !cloneTarget) return
+
+    const nextTitle = cloneTitle.trim()
+    const nextAreaId = cloneAreaId.trim()
+    const nextSectionId = cloneSectionId.trim()
+    if (!nextTitle || !nextAreaId || !nextSectionId) {
+      setCloneError('Title, area, and section are required to clone.')
+      return
+    }
+
+    setIsCloning(true)
+    setCloneError(null)
+    try {
+      const source = cloneTarget.source
+      const cloneRef = doc(collection(db, 'viewerContent'))
+
+      const payload: Record<string, unknown> = {
+        title: nextTitle,
+        areaId: nextAreaId,
+        sectionId: nextSectionId,
+        description: source.description ?? '',
+        videoUrl: cloneCopyMediaUrls ? source.videoUrl ?? '' : '',
+        thumbnailUrl: cloneCopyMediaUrls ? source.thumbnailUrl ?? '' : '',
+        institutionName: source.institutionName ?? '',
+        recordedAt: source.recordedAt ?? '',
+        createdByUid: source.createdByUid ?? '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+
+      if (cloneCopyAdvancedMetadata) {
+        payload.geo = source.geo ?? { regions: [], states: [], cities: [] }
+        payload.institutions = source.institutions ?? []
+        payload.participants = source.participants ?? []
+        payload.participantNames = source.participantNames ?? []
+        payload.relatedVersionIds = source.relatedVersionIds ?? []
+        payload.infoUrl = source.infoUrl ?? ''
+        payload.researchStatus = source.researchStatus ?? ''
+      } else {
+        payload.geo = { regions: [], states: [], cities: [] }
+        payload.institutions = []
+        payload.participants = []
+        payload.participantNames = []
+        payload.relatedVersionIds = []
+        payload.infoUrl = ''
+        payload.researchStatus = ''
+      }
+
+      if (cloneCopyPublishingFlags) {
+        payload.status = source.status ?? 'open'
+        payload.isPublished = source.isPublished ?? false
+        payload.confirmed = source.confirmed ?? false
+        payload.isNew = source.isNew ?? false
+        payload.sortOrder = Number.isFinite(source.sortOrder) ? source.sortOrder : 0
+        payload.accessLevel = source.accessLevel ?? 'open'
+        payload.confirmedAt = source.confirmedAt ?? ''
+      } else {
+        payload.status = 'open'
+        payload.isPublished = false
+        payload.confirmed = false
+        payload.isNew = true
+        payload.sortOrder = 0
+        payload.accessLevel = 'open'
+        payload.confirmedAt = ''
+      }
+
+      await setDoc(cloneRef, payload)
+
+      const optimisticEntry: ViewerEntry = {
+        id: cloneRef.id,
+        title: nextTitle,
+        areaId: nextAreaId,
+        sectionId: nextSectionId,
+        description: String(payload.description ?? ''),
+        videoUrl: String(payload.videoUrl ?? ''),
+        thumbnailUrl: String(payload.thumbnailUrl ?? ''),
+        accessLevel: (payload.accessLevel as AccessLevel) ?? 'open',
+        isPublished: Boolean(payload.isPublished),
+        sortOrder: Number(payload.sortOrder ?? 0),
+        geo: (payload.geo as ViewerEntry['geo']) ?? { regions: [], states: [], cities: [] },
+        institutions: (payload.institutions as string[]) ?? [],
+        participants: (payload.participants as string[]) ?? [],
+        institutionName: String(payload.institutionName ?? ''),
+        recordedAt: String(payload.recordedAt ?? ''),
+        researchStatus: String(payload.researchStatus ?? ''),
+        participantNames: (payload.participantNames as string[]) ?? [],
+        relatedVersionIds: (payload.relatedVersionIds as string[]) ?? [],
+        infoUrl: String(payload.infoUrl ?? ''),
+        isNew: Boolean(payload.isNew),
+        confirmed: Boolean(payload.confirmed),
+        confirmedAt: String(payload.confirmedAt ?? ''),
+        createdByUid: String(payload.createdByUid ?? ''),
+        status: (payload.status as 'open' | 'archived') ?? 'open',
+      }
+
+      setEntries((current) => [optimisticEntry, ...current])
+      selectEntry(optimisticEntry)
+      resetCloneModal()
+    } catch (error) {
+      console.error('Error cloning viewer entry:', error)
+      setCloneError('Clone failed. Verify permissions and try again.')
+    } finally {
+      setIsCloning(false)
     }
   }
 
@@ -550,6 +726,14 @@ export default function ViewerEntryManager({ mode }: Props) {
                   <div className="flex items-center gap-1">
                     {entry.isNew ? <span className="rounded-full bg-[#D4AF37]/20 px-2 py-0.5 text-[10px] uppercase text-[#F5D37A]">New</span> : null}
                     {entry.confirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : null}
+                    <button
+                      type="button"
+                      onClick={() => openCloneModal(entry)}
+                      className="ml-1 rounded-md border border-blue-400/35 bg-blue-500/10 p-1.5 text-blue-200 hover:bg-blue-500/20"
+                      aria-label={`Duplicate ${entry.title}`}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -688,6 +872,11 @@ export default function ViewerEntryManager({ mode }: Props) {
               </button>
             ) : null}
           </div>
+          {submitError ? (
+            <p className="mt-3 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {submitError}
+            </p>
+          ) : null}
         </form>
       </div>
 
@@ -781,6 +970,115 @@ export default function ViewerEntryManager({ mode }: Props) {
           >
             Open Helper
           </button>
+        </div>
+      ) : null}
+
+      {cloneTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-blue-400/35 bg-[#111111] p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-blue-200">Duplicate Viewer Entry</h3>
+                <p className="mt-1 text-sm text-white/75">
+                  Source: {cloneTarget.title} ({cloneTarget.id})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={resetCloneModal}
+                className="rounded-md border border-white/20 p-1.5 text-white/80 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.12em] text-white/70 md:col-span-2">
+                New Title
+                <input
+                  value={cloneTitle}
+                  onChange={(event) => setCloneTitle(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-[0.12em] text-white/70">
+                Area
+                <select
+                  value={cloneAreaId}
+                  onChange={(event) => {
+                    const nextAreaId = event.target.value
+                    setCloneAreaId(nextAreaId)
+                    const firstSection = entries.find((entry) => entry.areaId === nextAreaId)?.sectionId ?? cloneSectionId
+                    setCloneSectionId(firstSection)
+                  }}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                >
+                  {areaOptions.map((area) => (
+                    <option key={area} value={area}>{area}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs uppercase tracking-[0.12em] text-white/70">
+                Section
+                <select
+                  value={cloneSectionId}
+                  onChange={(event) => setCloneSectionId(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                >
+                  {sectionOptions.map((section) => (
+                    <option key={section} value={section}>{section}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 space-y-2 rounded-lg border border-white/10 bg-black/30 p-3">
+              <label className="inline-flex items-center gap-2 text-sm text-white/85">
+                <input
+                  type="checkbox"
+                  checked={cloneCopyMediaUrls}
+                  onChange={(event) => setCloneCopyMediaUrls(event.target.checked)}
+                />
+                Copy Media URLs
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-white/85">
+                <input
+                  type="checkbox"
+                  checked={cloneCopyAdvancedMetadata}
+                  onChange={(event) => setCloneCopyAdvancedMetadata(event.target.checked)}
+                />
+                Copy Advanced Metadata
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-white/85">
+                <input
+                  type="checkbox"
+                  checked={cloneCopyPublishingFlags}
+                  onChange={(event) => setCloneCopyPublishingFlags(event.target.checked)}
+                />
+                Copy Publishing Flags
+              </label>
+            </div>
+
+            {cloneError ? <p className="mt-3 text-sm text-red-300">{cloneError}</p> : null}
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={resetCloneModal}
+                className="rounded-lg border border-white/20 px-3 py-2 text-sm text-white/80"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmCloneEntry()}
+                disabled={isCloning}
+                className="rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {isCloning ? 'Duplicating...' : 'Create Duplicate'}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
