@@ -1,4 +1,4 @@
-import { initializeApp, getApps, applicationDefault, cert, App } from 'firebase-admin/app'
+import { initializeApp, getApp, getApps, applicationDefault, cert, App } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
@@ -9,16 +9,17 @@ let app: App | null = null
 let adminDb: ReturnType<typeof getFirestore> | null = null
 let adminAuth: ReturnType<typeof getAuth> | null = null
 let adminStorage: ReturnType<typeof getStorage> | null = null
+const ADMIN_APP_NAME = 'beam-admin-sdk'
 
 // Initialize Firebase Admin SDK with fallback options
 function initializeAdminSDK() {
   if (app) return app
 
   try {
-    // Try to use existing app
-    const existingApps = getApps()
-    if (existingApps.length > 0) {
-      app = existingApps[0]
+    // Reuse only our dedicated admin app so we do not inherit bad default credentials.
+    const existingNamedApp = getApps().find((existing) => existing.name === ADMIN_APP_NAME)
+    if (existingNamedApp) {
+      app = getApp(ADMIN_APP_NAME)
     } else {
       // In local development prefer service-account.json so routes hit the same project as local tooling.
       // In production prefer env-based credentials.
@@ -50,7 +51,7 @@ function initializeAdminSDK() {
                 }),
                 projectId: localProjectId,
                 storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-              })
+              }, ADMIN_APP_NAME)
               console.info(`Firebase Admin SDK initialized from local service-account.json (${localProjectId})`)
             }
           }
@@ -76,7 +77,7 @@ function initializeAdminSDK() {
             }),
             projectId: envProjectId,
             storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-          })
+          }, ADMIN_APP_NAME)
           console.info(`Firebase Admin SDK initialized from env service account (${envProjectId})`)
         } catch (certError) {
           console.warn('Failed to initialize with env service account cert:', certError)
@@ -97,7 +98,7 @@ function initializeAdminSDK() {
           credential: applicationDefault(),
           projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
           storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        })
+        }, ADMIN_APP_NAME)
         console.info('Firebase Admin SDK initialized from application default credentials')
       }
     }

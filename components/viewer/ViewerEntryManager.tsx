@@ -16,7 +16,8 @@ import {
   where,
 } from 'firebase/firestore'
 import { CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
+import { DEFAULT_VIEWER_AREA_ROLE_TEMPLATES } from '@/lib/config/viewerRoleTemplates'
 
 type AccessLevel = 'open' | 'subscriber' | 'regional' | 'institution'
 
@@ -70,6 +71,13 @@ type ViewerSectionDoc = {
   format: string
   summary: string
   availability: 'open' | 'subscriber' | 'regional' | 'institution'
+  order: number
+  active: boolean
+}
+
+type ViewerAreaOptionDoc = {
+  id: string
+  title: string
   order: number
   active: boolean
 }
@@ -209,12 +217,21 @@ function toMillis(value: unknown): number {
   return 0
 }
 
+function toSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export default function ViewerEntryManager({ mode }: Props) {
   const [entries, setEntries] = useState<ViewerEntry[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
@@ -243,6 +260,7 @@ export default function ViewerEntryManager({ mode }: Props) {
   const [submissionGuideIndex, setSubmissionGuideIndex] = useState(0)
   const [focusCooling, setFocusCooling] = useState(false)
   const [sections, setSections] = useState<ViewerSectionDoc[]>([])
+  const [areas, setAreas] = useState<ViewerAreaOptionDoc[]>([])
   const [sectionId, setSectionId] = useState('')
   const [sectionForm, setSectionForm] = useState<Omit<ViewerSectionDoc, 'id'>>({
     areaId: 'community',
@@ -254,6 +272,14 @@ export default function ViewerEntryManager({ mode }: Props) {
     active: true,
   })
   const [sectionSaving, setSectionSaving] = useState(false)
+  const [areaOptionId, setAreaOptionId] = useState('')
+  const [areaOptionForm, setAreaOptionForm] = useState<Omit<ViewerAreaOptionDoc, 'id'>>({
+    title: '',
+    order: 1,
+    active: true,
+  })
+  const [areaOptionSlug, setAreaOptionSlug] = useState('')
+  const [areaOptionSaving, setAreaOptionSaving] = useState(false)
 
   const canManageAll = mode === 'admin'
   const guideStep = PARTICIPANT_SUBMISSION_GUIDE_STEPS[submissionGuideIndex] ?? null
@@ -297,6 +323,40 @@ export default function ViewerEntryManager({ mode }: Props) {
     return Array.from(values).sort((a, b) => a.localeCompare(b))
   }, [cloneAreaId, cloneTarget?.sectionId, entries])
 
+  const formAreaOptions = useMemo(() => {
+    const labels = new Map<string, string>()
+    Object.keys(DEFAULT_VIEWER_AREA_ROLE_TEMPLATES).forEach((id) => labels.set(id, id))
+    areas.forEach((area) => labels.set(area.id, area.title || area.id))
+    sections.forEach((section) => {
+      if (!labels.has(section.areaId)) labels.set(section.areaId, section.areaId)
+    })
+    entries.forEach((entry) => {
+      if (entry.areaId && !labels.has(entry.areaId)) labels.set(entry.areaId, entry.areaId)
+    })
+    if (form.areaId && !labels.has(form.areaId)) labels.set(form.areaId, form.areaId)
+    return Array.from(labels.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [areas, entries, form.areaId, sections])
+
+  const formSectionOptions = useMemo(() => {
+    const options = new Map<string, string>()
+    sections
+      .filter((section) => section.areaId === form.areaId)
+      .forEach((section) => options.set(section.id, section.title || section.id))
+    entries
+      .filter((entry) => entry.areaId === form.areaId && Boolean(entry.sectionId))
+      .forEach((entry) => {
+        if (!options.has(entry.sectionId)) options.set(entry.sectionId, entry.sectionId)
+      })
+    if (form.sectionId && !options.has(form.sectionId)) {
+      options.set(form.sectionId, form.sectionId)
+    }
+    return Array.from(options.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [entries, form.areaId, form.sectionId, sections])
+
   const loadData = async () => {
     if (!db) {
       setLoading(false)
@@ -306,33 +366,50 @@ export default function ViewerEntryManager({ mode }: Props) {
     setLoading(true)
 
     try {
-      let snapshot
-      try {
-        const entriesQuery = canManageAll
-          ? query(collection(db, 'viewerContent'), orderBy('updatedAt', 'desc'))
-          : query(
-              collection(db, 'viewerContent'),
-              where('createdByUid', '==', '__participant__'),
-              orderBy('updatedAt', 'desc'),
-            )
-        snapshot = await getDocs(entriesQuery)
-      } catch (queryError) {
-        // Fallback path if indexes/order constraints are not available.
-        const fallbackQuery = canManageAll
-          ? query(collection(db, 'viewerContent'))
-          : query(collection(db, 'viewerContent'), where('createdByUid', '==', '__participant__'))
-        snapshot = await getDocs(fallbackQuery)
-        console.warn('Falling back to client-side sorting for viewer entries:', queryError)
+      let rows: ViewerEntry[] = []
+      if (canManageAll) {
+        const snapshot = await getDocs(query(collection(db, 'viewerContent')))
+        rows = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<ViewerEntry, 'id'>) }))
+      } else {
+        const publishedSnapshot = await getDocs(query(collection(db, 'viewerContent'), where('isPublished', '==', true)))
+        const ownDocs = auth?.currentUser
+          ? (await getDocs(query(collection(db, 'viewerContent'), where('createdByUid', '==', auth.currentUser.uid)))).docs
+          : []
+        const byId = new Map<string, ViewerEntry>()
+        publishedSnapshot.docs.forEach((docSnap) => {
+          byId.set(docSnap.id, { id: docSnap.id, ...(docSnap.data() as Omit<ViewerEntry, 'id'>) })
+        })
+        ownDocs.forEach((docSnap) => {
+          byId.set(docSnap.id, { id: docSnap.id, ...(docSnap.data() as Omit<ViewerEntry, 'id'>) })
+        })
+        rows = Array.from(byId.values())
       }
 
-      const rows = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<ViewerEntry, 'id'>) }))
+      rows = rows
         .sort((a, b) => {
           const updatedDelta = toMillis((b as any).updatedAt) - toMillis((a as any).updatedAt)
           if (updatedDelta !== 0) return updatedDelta
           return toMillis((b as any).createdAt) - toMillis((a as any).createdAt)
         })
       setEntries(rows)
+
+      const areasSnapshot = await getDocs(query(collection(db, 'viewerAreas'), where('active', '==', true)))
+      const areaRows = areasSnapshot.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ViewerAreaOptionDoc, 'id'>),
+        }))
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+      setAreas(areaRows)
+
+      const sectionsSnapshot = await getDocs(query(collection(db, 'viewerSections'), where('active', '==', true)))
+      const sectionRows = sectionsSnapshot.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ViewerSectionDoc, 'id'>),
+        }))
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+      setSections(sectionRows)
 
       if (canManageAll) {
         const bookingsQuery = query(collection(db, 'bookingRequests'), orderBy('createdAt', 'desc'), limit(50))
@@ -342,13 +419,6 @@ export default function ViewerEntryManager({ mode }: Props) {
           ...(docSnap.data() as Omit<BookingRequest, 'id'>),
         }))
         setBookings(bookingRows)
-
-        const sectionsSnapshot = await getDocs(query(collection(db, 'viewerSections'), orderBy('order', 'asc')))
-        const nextSections = sectionsSnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<ViewerSectionDoc, 'id'>),
-        }))
-        setSections(nextSections)
       }
     } catch (error) {
       console.error('Error loading viewer manager data:', error)
@@ -376,6 +446,15 @@ export default function ViewerEntryManager({ mode }: Props) {
     const timer = setTimeout(() => setFocusCooling(false), SUBMISSION_GUIDE_HIGHLIGHT_MS)
     return () => clearTimeout(timer)
   }, [mode, submissionGuideOpen, submissionGuideIndex])
+
+  useEffect(() => {
+    if (!form.areaId) return
+    if (formSectionOptions.length === 0) return
+    const exists = formSectionOptions.some((option) => option.id === form.sectionId)
+    if (!exists) {
+      setForm((prev) => ({ ...prev, sectionId: formSectionOptions[0].id }))
+    }
+  }, [form.areaId, form.sectionId, formSectionOptions])
 
   const sectionHighlightClass = (focus: SubmissionGuideFocus) => {
     if (mode !== 'participant') return ''
@@ -418,6 +497,7 @@ export default function ViewerEntryManager({ mode }: Props) {
     setSelectedId(null)
     setForm(DEFAULT_FORM)
     setSubmitError(null)
+    setSubmitSuccess(null)
   }
 
   const toPayload = () => {
@@ -449,7 +529,7 @@ export default function ViewerEntryManager({ mode }: Props) {
       isNew: form.isNew,
       confirmed: form.confirmed,
       confirmedAt: form.confirmed ? new Date().toISOString() : '',
-      createdByUid: selectedEntry?.createdByUid ?? '',
+      createdByUid: selectedEntry?.createdByUid ?? auth?.currentUser?.uid ?? '',
       updatedAt: serverTimestamp(),
     }
   }
@@ -461,6 +541,7 @@ export default function ViewerEntryManager({ mode }: Props) {
       return
     }
     setSubmitError(null)
+    setSubmitSuccess(null)
 
     if (!form.title.trim() || !form.description.trim() || !form.areaId.trim() || !form.sectionId.trim()) {
       setSubmitError('Required fields missing: areaId, sectionId, title, and description are all required.')
@@ -482,6 +563,7 @@ export default function ViewerEntryManager({ mode }: Props) {
       }
       await loadData()
       clearForm()
+      setSubmitSuccess(selectedId ? 'Entry updated successfully.' : 'Entry added successfully.')
     } catch (error) {
       console.error('Error saving viewer entry:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -571,6 +653,64 @@ export default function ViewerEntryManager({ mode }: Props) {
     })
   }
 
+  const pickAreaOption = (item: ViewerAreaOptionDoc) => {
+    setAreaOptionId(item.id)
+    setAreaOptionSlug(item.id)
+    setAreaOptionForm({
+      title: item.title ?? item.id,
+      order: item.order ?? 1,
+      active: item.active ?? true,
+    })
+  }
+
+  const clearAreaOptionForm = () => {
+    setAreaOptionId('')
+    setAreaOptionSlug('')
+    setAreaOptionForm({
+      title: '',
+      order: 1,
+      active: true,
+    })
+  }
+
+  const saveAreaOption = async () => {
+    if (!db || !canManageAll) return
+    const nextSlug = toSlug(areaOptionSlug)
+    if (!nextSlug || !areaOptionForm.title.trim()) return
+
+    setAreaOptionSaving(true)
+    try {
+      const nextData = {
+        title: areaOptionForm.title.trim(),
+        order: Number.isFinite(areaOptionForm.order) ? areaOptionForm.order : 1,
+        active: areaOptionForm.active,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      }
+      await setDoc(doc(db, 'viewerAreas', nextSlug), nextData, { merge: true })
+      if (areaOptionId && areaOptionId !== nextSlug) {
+        await deleteDoc(doc(db, 'viewerAreas', areaOptionId))
+      }
+      await loadData()
+      clearAreaOptionForm()
+    } catch (error) {
+      console.error('Error saving viewer area option:', error)
+    } finally {
+      setAreaOptionSaving(false)
+    }
+  }
+
+  const removeAreaOption = async () => {
+    if (!db || !canManageAll || !areaOptionId) return
+    try {
+      await deleteDoc(doc(db, 'viewerAreas', areaOptionId))
+      await loadData()
+      clearAreaOptionForm()
+    } catch (error) {
+      console.error('Error removing viewer area option:', error)
+    }
+  }
+
   const saveSection = async () => {
     if (!db || !canManageAll) return
     if (!sectionForm.areaId.trim() || !sectionForm.title.trim()) return
@@ -598,6 +738,17 @@ export default function ViewerEntryManager({ mode }: Props) {
       console.error('Error saving viewer section:', error)
     } finally {
       setSectionSaving(false)
+    }
+  }
+
+  const removeSection = async () => {
+    if (!db || !canManageAll || !sectionId) return
+    try {
+      await deleteDoc(doc(db, 'viewerSections', sectionId))
+      await loadData()
+      clearSectionForm()
+    } catch (error) {
+      console.error('Error removing viewer section:', error)
     }
   }
 
@@ -866,8 +1017,28 @@ export default function ViewerEntryManager({ mode }: Props) {
               </button>
               {sectionOpen.required ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
-                  <input value={form.areaId} onChange={(e) => setForm((p) => ({ ...p, areaId: e.target.value }))} placeholder="areaId" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
-                  <input value={form.sectionId} onChange={(e) => setForm((p) => ({ ...p, sectionId: e.target.value }))} placeholder="sectionId" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+                  <select
+                    value={form.areaId}
+                    onChange={(e) => setForm((p) => ({ ...p, areaId: e.target.value }))}
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  >
+                    {formAreaOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={form.sectionId}
+                    onChange={(e) => setForm((p) => ({ ...p, sectionId: e.target.value }))}
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  >
+                    {formSectionOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="title" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="description" rows={3} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                 </div>
@@ -971,8 +1142,99 @@ export default function ViewerEntryManager({ mode }: Props) {
               {submitError}
             </p>
           ) : null}
+          {submitSuccess ? (
+            <p className="mt-3 rounded-lg border border-green-400/35 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+              {submitSuccess}
+            </p>
+          ) : null}
         </form>
       </div>
+
+      {canManageAll ? (
+        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Submission Area Options (viewerAreas)</h2>
+            <button
+              type="button"
+              onClick={clearAreaOptionForm}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1 text-xs hover:border-[#D4AF37] hover:text-[#F5D37A]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Area
+            </button>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr,1.3fr]">
+            <div className="space-y-2">
+              {areas.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => pickAreaOption(item)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                    areaOptionId === item.id
+                      ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                      : 'border-white/15 bg-black/25 hover:border-white/30'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{item.title || item.id}</p>
+                  <p className="mt-1 text-xs text-white/70">{item.id} • order {item.order}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <input
+                value={areaOptionSlug}
+                onChange={(e) => setAreaOptionSlug(e.target.value)}
+                placeholder="areaId (slug)"
+                className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+              />
+              <input
+                value={areaOptionForm.title}
+                onChange={(e) => setAreaOptionForm((p) => ({ ...p, title: e.target.value }))}
+                placeholder="title"
+                className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                value={areaOptionForm.order}
+                onChange={(e) => setAreaOptionForm((p) => ({ ...p, order: Number(e.target.value) || 1 }))}
+                placeholder="order"
+                className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+              />
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={areaOptionForm.active}
+                  onChange={(e) => setAreaOptionForm((p) => ({ ...p, active: e.target.checked }))}
+                />
+                active
+              </label>
+              <div className="md:col-span-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveAreaOption()}
+                  disabled={areaOptionSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black hover:bg-[#E6C86A] disabled:opacity-70"
+                >
+                  <Save className="h-4 w-4" />
+                  {areaOptionSaving ? 'Saving Area...' : areaOptionId ? 'Save Area' : 'Add Area'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeAreaOption()}
+                  disabled={!areaOptionId}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove Area
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {canManageAll ? (
         <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
@@ -1027,7 +1289,17 @@ export default function ViewerEntryManager({ mode }: Props) {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <input value={sectionForm.areaId} onChange={(e) => setSectionForm((p) => ({ ...p, areaId: e.target.value }))} placeholder="areaId" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+              <select
+                value={sectionForm.areaId}
+                onChange={(e) => setSectionForm((p) => ({ ...p, areaId: e.target.value }))}
+                className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+              >
+                {formAreaOptions.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.label}
+                  </option>
+                ))}
+              </select>
               <input value={sectionForm.title} onChange={(e) => setSectionForm((p) => ({ ...p, title: e.target.value }))} placeholder="title" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
               <input value={sectionForm.format} onChange={(e) => setSectionForm((p) => ({ ...p, format: e.target.value }))} placeholder="format" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
               <select value={sectionForm.availability} onChange={(e) => setSectionForm((p) => ({ ...p, availability: e.target.value as ViewerSectionDoc['availability'] }))} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
@@ -1039,7 +1311,7 @@ export default function ViewerEntryManager({ mode }: Props) {
               <textarea value={sectionForm.summary} onChange={(e) => setSectionForm((p) => ({ ...p, summary: e.target.value }))} placeholder="summary" rows={3} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
               <input type="number" value={sectionForm.order} onChange={(e) => setSectionForm((p) => ({ ...p, order: Number(e.target.value) || 1 }))} placeholder="order" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
               <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={sectionForm.active} onChange={(e) => setSectionForm((p) => ({ ...p, active: e.target.checked }))} /> active</label>
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void saveSection()}
@@ -1048,6 +1320,15 @@ export default function ViewerEntryManager({ mode }: Props) {
                 >
                   <Save className="h-4 w-4" />
                   {sectionSaving ? 'Saving Arc...' : sectionId ? 'Save Arc' : 'Add Arc'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeSection()}
+                  disabled={!sectionId}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove Arc
                 </button>
               </div>
             </div>
