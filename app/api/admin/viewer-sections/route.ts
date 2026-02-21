@@ -72,6 +72,9 @@ export async function POST(request: NextRequest) {
     if (!sectionId) {
       return NextResponse.json({ error: 'sectionId is required' }, { status: 400 })
     }
+    const status = body.status === 'archived' ? 'archived' : 'open'
+    const isPublished = body.isPublished !== false
+    const active = typeof body.active === 'boolean' ? body.active : status === 'open' && isPublished
 
     await adminDb
       .collection('viewerSections')
@@ -84,7 +87,9 @@ export async function POST(request: NextRequest) {
           summary: body.summary ?? '',
           availability: body.availability ?? 'open',
           order: Number.isFinite(body.order) ? body.order : 1,
-          active: body.active !== false,
+          status,
+          isPublished,
+          active,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -116,6 +121,9 @@ export async function PATCH(request: NextRequest) {
     if (!sectionId) {
       return NextResponse.json({ error: 'sectionId is required' }, { status: 400 })
     }
+    const status = body.status === 'archived' ? 'archived' : 'open'
+    const isPublished = body.isPublished !== false
+    const active = typeof body.active === 'boolean' ? body.active : status === 'open' && isPublished
 
     await adminDb
       .collection('viewerSections')
@@ -128,7 +136,9 @@ export async function PATCH(request: NextRequest) {
           summary: body.summary ?? '',
           availability: body.availability ?? 'open',
           order: Number.isFinite(body.order) ? body.order : 1,
-          active: body.active !== false,
+          status,
+          isPublished,
+          active,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },

@@ -1,11 +1,12 @@
 'use client'
 
 import ViewerEntryManager from '@/components/viewer/ViewerEntryManager'
+import ParticipantShell from '@/components/participant/ParticipantShell'
 
 export default function ViewerSubmissionPage() {
   return (
-    <div className="min-h-screen bg-black p-4 md:p-6">
+    <ParticipantShell title="Submit To Viewer" subtitle="Add a participant entry with mapped area/section metadata and media links.">
       <ViewerEntryManager mode="participant" />
-    </div>
+    </ParticipantShell>
   )
 }

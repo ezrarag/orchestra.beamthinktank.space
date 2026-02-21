@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import ParticipantShell from '@/components/participant/ParticipantShell'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 import { createAdminStaffJoinRequest } from '@/lib/api/adminStaff'
 import type { ViewerAreaId } from '@/lib/config/viewerRoleTemplates'
@@ -174,16 +175,16 @@ export default function JoinAdminStaffPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+      <ParticipantShell title="Join Admin/Staff" subtitle="Select one or more areas and define your role intentions.">
         <div className="mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/5 p-8">
           <p className="text-white/80">Loading admin/staff onboarding...</p>
         </div>
-      </div>
+      </ParticipantShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+    <ParticipantShell title="Join Admin/Staff" subtitle="Build your role cart by area, then continue to your dashboard.">
       <div className="mx-auto max-w-5xl">
         <Link href="/join/participant" className="mb-6 inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#D4AF37]">
           <ArrowLeft className="h-4 w-4" />
@@ -315,6 +316,6 @@ export default function JoinAdminStaffPage() {
           ) : null}
         </section>
       </div>
-    </div>
+    </ParticipantShell>
   )
 }

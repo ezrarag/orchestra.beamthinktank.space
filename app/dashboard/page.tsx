@@ -1,15 +1,14 @@
-import PortalNav from '@/components/portal/PortalNav'
 import ParticipantDashboardClient from '@/components/portal/ParticipantDashboardClient'
+import ParticipantShell from '@/components/participant/ParticipantShell'
 import { DEFAULT_NGO } from '@/lib/config/ngoConfigs'
-import { getPortalContext, getPortalNav } from '@/lib/portal/page-data'
+import { getPortalContext } from '@/lib/portal/page-data'
 
 export default function DashboardPage() {
   const { config, locale } = getPortalContext(DEFAULT_NGO)
 
   return (
-    <div className="min-h-screen bg-white">
-      <PortalNav links={getPortalNav(config.id, false)} />
+    <ParticipantShell title="Participant Dashboard" subtitle="Schedule, calls, profile context, and role tracks in one workspace.">
       <ParticipantDashboardClient ngo={config.id} copy={locale.dashboard} scopedRoutes={false} />
-    </div>
+    </ParticipantShell>
   )
 }

@@ -867,27 +867,36 @@ export default function ViewerPage() {
 
     const loadNarrativeSections = async () => {
       try {
-        const sectionsQuery = query(
-          collection(db, 'viewerSections'),
-          where('areaId', '==', selectedAreaId),
-          where('active', '==', true),
-          orderBy('order', 'asc')
-        )
+        const sectionsQuery = query(collection(db, 'viewerSections'), where('active', '==', true))
         const snapshot = await getDocs(sectionsQuery)
         if (!mounted) return
-        const sections = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Partial<AreaSection> & { availability?: string }
-          const availabilityRaw = data.availability ?? 'open'
-          const availability =
-            availabilityRaw.charAt(0).toUpperCase() + availabilityRaw.slice(1)
-          return {
-            id: docSnap.id,
-            title: data.title ?? 'Untitled Arc',
-            format: data.format ?? 'Narrative Arc',
-            summary: data.summary ?? '',
-            availability: availability as AreaSection['availability'],
-          }
-        })
+        const sections = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as Partial<AreaSection> & {
+              availability?: string
+              areaId?: string
+              order?: number
+            }
+            return {
+              id: docSnap.id,
+              areaId: data.areaId ?? '',
+              order: typeof data.order === 'number' ? data.order : 999,
+              title: data.title ?? 'Untitled Arc',
+              format: data.format ?? 'Narrative Arc',
+              summary: data.summary ?? '',
+              availabilityRaw: data.availability ?? 'open',
+            }
+          })
+          .filter((item) => item.areaId === selectedAreaId)
+          .sort((a, b) => a.order - b.order)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            format: item.format,
+            summary: item.summary,
+            availability:
+              (item.availabilityRaw.charAt(0).toUpperCase() + item.availabilityRaw.slice(1)) as AreaSection['availability'],
+          }))
         setFirestoreNarrativeSections(sections.length > 0 ? sections : [])
       } catch (error) {
         console.error('Error loading narrative arcs from Firestore:', error)
@@ -1410,12 +1419,12 @@ export default function ViewerPage() {
 
         <div
           className={`absolute inset-0 bg-gradient-to-br ${activeVideo.overlayClass} transition-opacity duration-500 ${
-            isPlayerOverlayVisible ? 'opacity-100' : 'opacity-0'
+            isPlayerOverlayVisible ? 'opacity-65 md:opacity-100' : 'opacity-0'
           }`}
         />
         <div
           className={`absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),radial-gradient(circle_at_80%_10%,rgba(212,175,55,0.22),transparent_35%)] backdrop-blur-[2px] transition-opacity duration-500 ${
-            isPlayerOverlayVisible ? 'opacity-100' : 'opacity-0'
+            isPlayerOverlayVisible ? 'opacity-50 md:opacity-100' : 'opacity-0'
           }`}
         />
 
@@ -1424,8 +1433,29 @@ export default function ViewerPage() {
             isPlayerOverlayVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
-          <div className="absolute right-4 top-8 sm:right-6 lg:right-8 md:static md:flex md:justify-end">
-            <div className="w-[min(100%,22rem)] max-h-[44vh] overflow-y-auto rounded-2xl border border-white/20 bg-black/35 p-3 text-white md:w-[360px] md:max-h-none md:overflow-visible">
+          <div className="absolute right-4 top-8 flex items-center gap-2 sm:right-6 lg:right-8 md:hidden">
+            <Link
+              href={user ? '/studio' : '/subscriber'}
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-sm text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+            >
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/10 text-xs font-semibold uppercase">
+                {user?.displayName?.charAt(0) ?? 'U'}
+              </span>
+              <span>{user ? 'Studio' : 'Log In'}</span>
+            </Link>
+            {activeVideo.contentId || activeVideo.sourceType === 'role-explainer' ? (
+              <button
+                type="button"
+                onClick={() => setShowMoreInfo((current) => !current)}
+                className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/20"
+              >
+                Details <ChevronDown className={`h-3.5 w-3.5 transition ${showMoreInfo ? 'rotate-180' : ''}`} />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="hidden md:flex md:justify-end">
+            <div className="w-[360px] rounded-2xl border border-white/20 bg-black/35 p-3 text-white">
               <div className="flex items-center justify-between gap-3">
                 <Link
                   href={user ? '/studio' : '/subscriber'}
@@ -1570,6 +1600,29 @@ export default function ViewerPage() {
                 Back to Home <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+
+            {showMoreInfo && (activeVideo.contentId || activeVideo.sourceType === 'role-explainer') ? (
+              <div className="mt-3 max-h-[30vh] space-y-2 overflow-y-auto rounded-xl border border-white/20 bg-black/45 p-3 text-xs text-white/85 md:hidden">
+                {activeVideo.sourceType === 'role-explainer' ? (
+                  <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                    Role overview for {selectedArea.title}. Browse content to return to story playback.
+                  </p>
+                ) : (
+                  <>
+                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                      Institution: {activeStory?.institutionName ?? 'Not listed'}
+                    </p>
+                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                      Recorded: {recordedLabel}
+                    </p>
+                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                      Research Status: {activeStory?.researchStatus ?? 'General release'}
+                    </p>
+                    <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
+                  </>
+                )}
+              </div>
+            ) : null}
 
             {activeVideo.url ? (
               <div className="mt-5 w-full max-w-3xl rounded-2xl border border-white/20 bg-black/35 p-3">

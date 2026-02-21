@@ -463,6 +463,13 @@ service cloud.firestore {
 
     // Viewer Content - city/institution/role-filtered playable content
     match /viewerContent/{contentId} {
+      function hasPreAuthSubmissionIdentity() {
+        return request.resource.data.submissionSessionId is string &&
+          request.resource.data.submissionSessionId.size() >= 8 &&
+          request.resource.data.submissionDisplayName is string &&
+          request.resource.data.submissionDisplayName.size() > 0;
+      }
+
       // Public can read all published viewer content.
       // Access-level filtering is currently handled in app logic.
       allow read: if resource.data.isPublished == true;
@@ -477,10 +484,24 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.createdByUid == request.auth.uid;
 
+      // Pre-account submissions can be created with session + name identity
+      allow create: if !isAuthenticated() &&
+        request.resource.data.createdByUid == '' &&
+        hasPreAuthSubmissionIdentity();
+
       // Owners can update their own submissions
       allow update: if isAuthenticated() &&
         resource.data.createdByUid == request.auth.uid &&
         request.resource.data.createdByUid == request.auth.uid;
+
+      // Pre-account submissions can be updated by session identity until claimed
+      allow update: if !isAuthenticated() &&
+        resource.data.createdByUid == '' &&
+        request.resource.data.createdByUid == '' &&
+        resource.data.submissionSessionId is string &&
+        request.resource.data.submissionSessionId is string &&
+        resource.data.submissionSessionId == request.resource.data.submissionSessionId &&
+        hasPreAuthSubmissionIdentity();
 
       // Owners can delete their own submissions
       allow delete: if isAuthenticated() &&
@@ -520,6 +541,19 @@ service cloud.firestore {
       allow read: if true;
 
       // Admin management + temporary bypass for testing
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Viewer metadata option lists (cities, states, regions)
+    match /viewerMetadataOptions/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Viewer metadata suggestions from participants when options are missing
+    match /viewerMetadataSuggestions/{docId} {
+      allow read: if isAdmin() || viewerAdminBypassEnabled();
+      allow create: if true;
       allow write: if isAdmin() || viewerAdminBypassEnabled();
     }
     

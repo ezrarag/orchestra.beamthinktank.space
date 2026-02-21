@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   addDoc,
   collection,
@@ -50,6 +51,8 @@ type ViewerEntry = {
   confirmed?: boolean
   confirmedAt?: string
   createdByUid?: string
+  submissionSessionId?: string
+  submissionDisplayName?: string
   status?: 'open' | 'archived'
 }
 
@@ -84,7 +87,19 @@ type ViewerAreaOptionDoc = {
 
 type Props = {
   mode: 'admin' | 'participant'
+  scope?: 'all' | 'mine'
 }
+
+type MetadataCategory = 'cities' | 'states' | 'regions'
+
+type MetadataOptionItem = {
+  value: string
+  label: string
+  active: boolean
+  order: number
+}
+
+type MetadataOptionsMap = Record<MetadataCategory, MetadataOptionItem[]>
 
 type SubmissionGuideFocus = 'entries' | 'form_core' | 'form_meta' | 'submit'
 
@@ -96,6 +111,7 @@ type SubmissionGuideStep = {
 }
 
 type FormState = {
+  submissionDisplayName: string
   areaId: string
   sectionId: string
   title: string
@@ -129,6 +145,7 @@ type CloneTarget = Pick<ViewerEntry, 'id' | 'title' | 'areaId' | 'sectionId'> & 
 }
 
 const DEFAULT_FORM: FormState = {
+  submissionDisplayName: '',
   areaId: 'community',
   sectionId: 'community-lead',
   title: '',
@@ -157,6 +174,7 @@ const DEFAULT_FORM: FormState = {
 
 const SUBMISSION_GUIDE_DISABLED_KEY = 'guide-disabled:viewer-submissions'
 const SUBMISSION_GUIDE_HIGHLIGHT_MS = 1400
+const VIEWER_SUBMISSION_SESSION_KEY = 'viewer-submission-session-id'
 
 const PARTICIPANT_SUBMISSION_GUIDE_STEPS: SubmissionGuideStep[] = [
   {
@@ -225,7 +243,32 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-export default function ViewerEntryManager({ mode }: Props) {
+function createSessionId(): string {
+  return `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`
+}
+
+function normalizeMetadataOptions(value: unknown): MetadataOptionItem[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return null
+      const entry = item as Partial<MetadataOptionItem>
+      const rawValue = typeof entry.value === 'string' ? entry.value.trim() : ''
+      if (!rawValue) return null
+      return {
+        value: rawValue,
+        label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : rawValue,
+        active: entry.active !== false,
+        order: Number.isFinite(entry.order) ? Number(entry.order) : index + 1,
+      }
+    })
+    .filter((item): item is MetadataOptionItem => Boolean(item))
+    .sort((a, b) => a.order - b.order)
+}
+
+export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [entries, setEntries] = useState<ViewerEntry[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -280,8 +323,23 @@ export default function ViewerEntryManager({ mode }: Props) {
   })
   const [areaOptionSlug, setAreaOptionSlug] = useState('')
   const [areaOptionSaving, setAreaOptionSaving] = useState(false)
+  const [submissionSessionId, setSubmissionSessionId] = useState('')
+  const [metadataOptions, setMetadataOptions] = useState<MetadataOptionsMap>({
+    cities: [],
+    states: [],
+    regions: [],
+  })
+  const [metadataCategory, setMetadataCategory] = useState<MetadataCategory>('cities')
+  const [metadataOptionValue, setMetadataOptionValue] = useState('')
+  const [metadataOptionLabel, setMetadataOptionLabel] = useState('')
+  const [metadataOptionSaving, setMetadataOptionSaving] = useState(false)
+  const [customCity, setCustomCity] = useState('')
+  const [customState, setCustomState] = useState('')
+  const [customRegion, setCustomRegion] = useState('')
+  const [claimedSessionOwnership, setClaimedSessionOwnership] = useState(false)
 
   const canManageAll = mode === 'admin'
+  const mineOnly = mode === 'participant' && scope === 'mine'
   const guideStep = PARTICIPANT_SUBMISSION_GUIDE_STEPS[submissionGuideIndex] ?? null
 
   const selectedEntry = useMemo(
@@ -322,6 +380,21 @@ export default function ViewerEntryManager({ mode }: Props) {
     if (cloneTarget?.sectionId) values.add(cloneTarget.sectionId)
     return Array.from(values).sort((a, b) => a.localeCompare(b))
   }, [cloneAreaId, cloneTarget?.sectionId, entries])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const fromQuery = searchParams.get('sid')?.trim() ?? ''
+    const fromStorage = window.localStorage.getItem(VIEWER_SUBMISSION_SESSION_KEY)?.trim() ?? ''
+    const next = fromQuery || fromStorage || createSessionId()
+    window.localStorage.setItem(VIEWER_SUBMISSION_SESSION_KEY, next)
+    setSubmissionSessionId(next)
+  }, [searchParams])
+
+  useEffect(() => {
+    const displayName = auth?.currentUser?.displayName?.trim() ?? ''
+    if (!displayName) return
+    setForm((prev) => (prev.submissionDisplayName ? prev : { ...prev, submissionDisplayName: displayName }))
+  }, [auth?.currentUser?.displayName])
 
   const formAreaOptions = useMemo(() => {
     const labels = new Map<string, string>()
@@ -385,6 +458,10 @@ export default function ViewerEntryManager({ mode }: Props) {
         rows = Array.from(byId.values())
       }
 
+      if (mineOnly) {
+        rows = rows.filter((entry) => entry.createdByUid === auth?.currentUser?.uid || (entry as any).submissionSessionId === submissionSessionId)
+      }
+
       rows = rows
         .sort((a, b) => {
           const updatedDelta = toMillis((b as any).updatedAt) - toMillis((a as any).updatedAt)
@@ -411,6 +488,20 @@ export default function ViewerEntryManager({ mode }: Props) {
         .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
       setSections(sectionRows)
 
+      const metadataCategories: MetadataCategory[] = ['cities', 'states', 'regions']
+      const metadataPairs = await Promise.all(
+        metadataCategories.map(async (category) => {
+          const snap = await getDocs(query(collection(db, 'viewerMetadataOptions'), where('category', '==', category)))
+          const firstDoc = snap.docs[0]
+          return [category, normalizeMetadataOptions(firstDoc?.data()?.options)] as const
+        }),
+      )
+      const nextMetadata: MetadataOptionsMap = { cities: [], states: [], regions: [] }
+      metadataPairs.forEach(([category, options]) => {
+        nextMetadata[category] = options
+      })
+      setMetadataOptions(nextMetadata)
+
       if (canManageAll) {
         const bookingsQuery = query(collection(db, 'bookingRequests'), orderBy('createdAt', 'desc'), limit(50))
         const bookingsSnapshot = await getDocs(bookingsQuery)
@@ -428,8 +519,52 @@ export default function ViewerEntryManager({ mode }: Props) {
   }
 
   useEffect(() => {
+    if (mode === 'participant' && !submissionSessionId) return
     void loadData()
-  }, [canManageAll])
+  }, [canManageAll, mineOnly, mode, submissionSessionId])
+
+  useEffect(() => {
+    if (mode !== 'participant') return
+    if (!db || !submissionSessionId || claimedSessionOwnership) return
+    const currentUser = auth?.currentUser
+    if (!currentUser) return
+
+    let active = true
+    const claim = async () => {
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, 'viewerContent'), where('submissionSessionId', '==', submissionSessionId)),
+        )
+        if (!active) return
+        const toClaim = snapshot.docs.filter((docSnap) => {
+          const data = docSnap.data() as Partial<ViewerEntry>
+          return !data.createdByUid
+        })
+        if (toClaim.length === 0) {
+          setClaimedSessionOwnership(true)
+          return
+        }
+        await Promise.all(
+          toClaim.map((docSnap) =>
+            updateDoc(doc(db, 'viewerContent', docSnap.id), {
+              createdByUid: currentUser.uid,
+              claimedAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }),
+          ),
+        )
+        setClaimedSessionOwnership(true)
+        await loadData()
+      } catch (error) {
+        console.error('Error claiming pre-account submissions:', error)
+      }
+    }
+
+    void claim()
+    return () => {
+      active = false
+    }
+  }, [claimedSessionOwnership, mode, submissionSessionId])
 
   useEffect(() => {
     if (mode !== 'participant') return
@@ -466,6 +601,7 @@ export default function ViewerEntryManager({ mode }: Props) {
   const selectEntry = (entry: ViewerEntry) => {
     setSelectedId(entry.id)
     setForm({
+      submissionDisplayName: entry.submissionDisplayName ?? '',
       areaId: entry.areaId,
       sectionId: entry.sectionId,
       title: entry.title,
@@ -495,12 +631,14 @@ export default function ViewerEntryManager({ mode }: Props) {
 
   const clearForm = () => {
     setSelectedId(null)
-    setForm(DEFAULT_FORM)
+    setForm((prev) => ({ ...DEFAULT_FORM, submissionDisplayName: auth?.currentUser?.displayName?.trim() ?? prev.submissionDisplayName }))
     setSubmitError(null)
     setSubmitSuccess(null)
   }
 
   const toPayload = () => {
+    const participantManaged = mode === 'participant'
+    const forcedConfirmed = participantManaged ? true : form.confirmed
     return {
       areaId: form.areaId,
       sectionId: form.sectionId,
@@ -509,8 +647,8 @@ export default function ViewerEntryManager({ mode }: Props) {
       videoUrl: form.videoUrl.trim(),
       hlsUrl: form.hlsUrl.trim(),
       thumbnailUrl: form.thumbnailUrl.trim(),
-      accessLevel: form.accessLevel,
-      isPublished: form.isPublished,
+      accessLevel: participantManaged ? 'open' : form.accessLevel,
+      isPublished: participantManaged ? true : form.isPublished,
       sortOrder: Number.isFinite(form.sortOrder) ? form.sortOrder : 1,
       geo: {
         regions: parseCsv(form.regions),
@@ -525,11 +663,13 @@ export default function ViewerEntryManager({ mode }: Props) {
       participantNames: parseCsv(form.participantNames),
       relatedVersionIds: parseCsv(form.relatedVersionIds),
       infoUrl: form.infoUrl.trim(),
-      status: form.status,
+      status: participantManaged ? 'open' : form.status,
       isNew: form.isNew,
-      confirmed: form.confirmed,
-      confirmedAt: form.confirmed ? new Date().toISOString() : '',
+      confirmed: forcedConfirmed,
+      confirmedAt: forcedConfirmed ? new Date().toISOString() : '',
       createdByUid: selectedEntry?.createdByUid ?? auth?.currentUser?.uid ?? '',
+      submissionDisplayName: form.submissionDisplayName.trim(),
+      submissionSessionId,
       updatedAt: serverTimestamp(),
     }
   }
@@ -545,6 +685,10 @@ export default function ViewerEntryManager({ mode }: Props) {
 
     if (!form.title.trim() || !form.description.trim() || !form.areaId.trim() || !form.sectionId.trim()) {
       setSubmitError('Required fields missing: areaId, sectionId, title, and description are all required.')
+      return
+    }
+    if (!auth?.currentUser && !form.submissionDisplayName.trim()) {
+      setSubmitError('Name is required before account creation so your submissions can be tracked.')
       return
     }
 
@@ -564,6 +708,9 @@ export default function ViewerEntryManager({ mode }: Props) {
       await loadData()
       clearForm()
       setSubmitSuccess(selectedId ? 'Entry updated successfully.' : 'Entry added successfully.')
+      if (mode === 'participant') {
+        router.push(`/studio/viewer-submissions/mine?sid=${encodeURIComponent(submissionSessionId)}`)
+      }
     } catch (error) {
       console.error('Error saving viewer entry:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -752,6 +899,100 @@ export default function ViewerEntryManager({ mode }: Props) {
     }
   }
 
+  const addCsvToken = (field: 'cities' | 'states' | 'regions', raw: string) => {
+    const token = raw.trim()
+    if (!token) return
+    setForm((prev) => {
+      const current = parseCsv(prev[field])
+      if (current.some((item) => item.toLowerCase() === token.toLowerCase())) return prev
+      return { ...prev, [field]: [...current, token].join(', ') }
+    })
+  }
+
+  const removeCsvToken = (field: 'cities' | 'states' | 'regions', token: string) => {
+    setForm((prev) => {
+      const next = parseCsv(prev[field]).filter((item) => item.toLowerCase() !== token.toLowerCase())
+      return { ...prev, [field]: next.join(', ') }
+    })
+  }
+
+  const suggestMetadataOption = async (category: MetadataCategory, raw: string) => {
+    const value = raw.trim()
+    if (!value || !db) return
+    addCsvToken(category, value)
+    if (category === 'cities') setCustomCity('')
+    if (category === 'states') setCustomState('')
+    if (category === 'regions') setCustomRegion('')
+
+    try {
+      await addDoc(collection(db, 'viewerMetadataSuggestions'), {
+        category,
+        value,
+        createdByUid: auth?.currentUser?.uid ?? '',
+        submissionSessionId,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      })
+    } catch (error) {
+      console.error('Error suggesting metadata option:', error)
+    }
+  }
+
+  const saveMetadataOption = async () => {
+    if (!db || !canManageAll) return
+    const value = metadataOptionValue.trim()
+    const label = metadataOptionLabel.trim() || value
+    if (!value) return
+
+    setMetadataOptionSaving(true)
+    try {
+      const current = metadataOptions[metadataCategory]
+      const exists = current.some((item) => item.value.toLowerCase() === value.toLowerCase())
+      const next = exists
+        ? current.map((item) =>
+            item.value.toLowerCase() === value.toLowerCase()
+              ? { ...item, label, active: true }
+              : item,
+          )
+        : [...current, { value, label, active: true, order: current.length + 1 }]
+      await setDoc(
+        doc(db, 'viewerMetadataOptions', metadataCategory),
+        {
+          category: metadataCategory,
+          options: next,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+      setMetadataOptionValue('')
+      setMetadataOptionLabel('')
+      await loadData()
+    } catch (error) {
+      console.error('Error saving metadata option:', error)
+    } finally {
+      setMetadataOptionSaving(false)
+    }
+  }
+
+  const removeMetadataOption = async (category: MetadataCategory, value: string) => {
+    if (!db || !canManageAll) return
+    try {
+      const next = metadataOptions[category].filter((item) => item.value !== value)
+      await setDoc(
+        doc(db, 'viewerMetadataOptions', category),
+        {
+          category,
+          options: next,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+      await loadData()
+    } catch (error) {
+      console.error('Error removing metadata option:', error)
+    }
+  }
+
   const confirmDeleteEntry = async () => {
     if (!db || !deleteTarget) return
     setDeleteError(null)
@@ -884,7 +1125,13 @@ export default function ViewerEntryManager({ mode }: Props) {
   return (
     <div className="space-y-6 text-white">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{mode === 'admin' ? 'Viewer Content Admin' : 'Participant Viewer Submissions'}</h1>
+        <h1 className="text-2xl font-bold">
+          {mode === 'admin'
+            ? 'Viewer Content Admin'
+            : mineOnly
+              ? 'My Viewer Submissions'
+              : 'Participant Viewer Submissions'}
+        </h1>
         <button
           type="button"
           onClick={() => void loadData()}
@@ -894,6 +1141,12 @@ export default function ViewerEntryManager({ mode }: Props) {
           Refresh
         </button>
       </div>
+
+      {mineOnly ? (
+        <div className="rounded-xl border border-[#D4AF37]/35 bg-[#D4AF37]/10 p-3 text-sm text-[#F5D37A]">
+          Showing entries created in this browser session or linked account. Submissions keep your name + timestamp before account creation.
+        </div>
+      ) : null}
 
       <div className={`grid gap-4 md:grid-cols-3 ${sectionHighlightClass('entries')}`}>
         <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4">
@@ -910,7 +1163,7 @@ export default function ViewerEntryManager({ mode }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr,1.4fr]">
+      <div className={`grid gap-6 ${mineOnly ? '' : 'lg:grid-cols-[1fr,1.4fr]'}`}>
         <div className={`rounded-2xl border border-white/15 bg-white/[0.03] p-4 max-h-[72vh] flex flex-col ${sectionHighlightClass('entries')}`}>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Current Entries</h2>
@@ -966,6 +1219,9 @@ export default function ViewerEntryManager({ mode }: Props) {
                   >
                     <p className="truncate text-sm font-semibold">{entry.title}</p>
                     <p className="mt-1 text-xs text-white/70">{entry.areaId} / {entry.sectionId}</p>
+                    {entry.submissionDisplayName ? (
+                      <p className="mt-1 text-[11px] text-white/55">Submitted by: {entry.submissionDisplayName}</p>
+                    ) : null}
                   </button>
                   <div className="flex items-center gap-1">
                     {entry.isNew ? <span className="rounded-full bg-[#D4AF37]/20 px-2 py-0.5 text-[10px] uppercase text-[#F5D37A]">New</span> : null}
@@ -1003,7 +1259,8 @@ export default function ViewerEntryManager({ mode }: Props) {
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="rounded-2xl border border-white/15 bg-white/[0.03] p-4 max-h-[72vh] flex flex-col">
+        {!mineOnly ? (
+          <form onSubmit={onSubmit} className="rounded-2xl border border-white/15 bg-white/[0.03] p-4 max-h-[72vh] flex flex-col">
           <h2 className="mb-3 text-lg font-semibold">{selectedId ? 'Edit Entry' : 'Add Entry'}</h2>
           <div className="space-y-3 overflow-y-auto pr-1">
             <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_core')}`}>
@@ -1017,6 +1274,12 @@ export default function ViewerEntryManager({ mode }: Props) {
               </button>
               {sectionOpen.required ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
+                  <input
+                    value={form.submissionDisplayName}
+                    onChange={(e) => setForm((p) => ({ ...p, submissionDisplayName: e.target.value }))}
+                    placeholder="your name (used before account creation)"
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
+                  />
                   <select
                     value={form.areaId}
                     onChange={(e) => setForm((p) => ({ ...p, areaId: e.target.value }))}
@@ -1065,7 +1328,8 @@ export default function ViewerEntryManager({ mode }: Props) {
               ) : null}
             </div>
 
-            <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_meta')}`}>
+            {canManageAll ? (
+              <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_meta')}`}>
               <button
                 type="button"
                 onClick={() => toggleFormSection('publishing')}
@@ -1094,7 +1358,8 @@ export default function ViewerEntryManager({ mode }: Props) {
                   </div>
                 </div>
               ) : null}
-            </div>
+              </div>
+            ) : null}
 
             <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_meta')}`}>
               <button
@@ -1107,9 +1372,138 @@ export default function ViewerEntryManager({ mode }: Props) {
               </button>
               {sectionOpen.advanced ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
-                  <input value={form.cities} onChange={(e) => setForm((p) => ({ ...p, cities: e.target.value }))} placeholder="geo.cities (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
-                  <input value={form.states} onChange={(e) => setForm((p) => ({ ...p, states: e.target.value }))} placeholder="geo.states (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
-                  <input value={form.regions} onChange={(e) => setForm((p) => ({ ...p, regions: e.target.value }))} placeholder="geo.regions (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/70">Cities</p>
+                    <select
+                      onChange={(e) => {
+                        addCsvToken('cities', e.target.value)
+                        e.currentTarget.selectedIndex = 0
+                      }}
+                      className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                    >
+                      <option value="">Add city from list</option>
+                      {metadataOptions.cities.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        value={customCity}
+                        onChange={(e) => setCustomCity(e.target.value)}
+                        placeholder="City not listed? add it"
+                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void suggestMetadataOption('cities', customCity)}
+                        className="rounded-lg border border-white/25 px-3 py-2 text-xs font-semibold hover:border-[#D4AF37]"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {parseCsv(form.cities).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => removeCsvToken('cities', item)}
+                          className="rounded-full border border-white/20 px-2 py-0.5 text-xs hover:border-red-400"
+                        >
+                          {item} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/70">States</p>
+                    <select
+                      onChange={(e) => {
+                        addCsvToken('states', e.target.value)
+                        e.currentTarget.selectedIndex = 0
+                      }}
+                      className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                    >
+                      <option value="">Add state from list</option>
+                      {metadataOptions.states.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        value={customState}
+                        onChange={(e) => setCustomState(e.target.value)}
+                        placeholder="State not listed? add it"
+                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void suggestMetadataOption('states', customState)}
+                        className="rounded-lg border border-white/25 px-3 py-2 text-xs font-semibold hover:border-[#D4AF37]"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {parseCsv(form.states).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => removeCsvToken('states', item)}
+                          className="rounded-full border border-white/20 px-2 py-0.5 text-xs hover:border-red-400"
+                        >
+                          {item} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <p className="text-xs text-white/70">Regions</p>
+                    <select
+                      onChange={(e) => {
+                        addCsvToken('regions', e.target.value)
+                        e.currentTarget.selectedIndex = 0
+                      }}
+                      className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                    >
+                      <option value="">Add region from list</option>
+                      {metadataOptions.regions.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        value={customRegion}
+                        onChange={(e) => setCustomRegion(e.target.value)}
+                        placeholder="Region not listed? add it"
+                        className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void suggestMetadataOption('regions', customRegion)}
+                        className="rounded-lg border border-white/25 px-3 py-2 text-xs font-semibold hover:border-[#D4AF37]"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {parseCsv(form.regions).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => removeCsvToken('regions', item)}
+                          className="rounded-full border border-white/20 px-2 py-0.5 text-xs hover:border-red-400"
+                        >
+                          {item} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input value={form.institutions} onChange={(e) => setForm((p) => ({ ...p, institutions: e.target.value }))} placeholder="institutions (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                   <input value={form.participantNames} onChange={(e) => setForm((p) => ({ ...p, participantNames: e.target.value }))} placeholder="participantNames (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                   <input value={form.relatedVersionIds} onChange={(e) => setForm((p) => ({ ...p, relatedVersionIds: e.target.value }))} placeholder="relatedVersionIds (csv)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
@@ -1147,7 +1541,18 @@ export default function ViewerEntryManager({ mode }: Props) {
               {submitSuccess}
             </p>
           ) : null}
-        </form>
+          </form>
+        ) : (
+          <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+            <button
+              type="button"
+              onClick={() => router.push('/studio/viewer-submissions')}
+              className="rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black hover:bg-[#E6C86A]"
+            >
+              Submit Another Entry
+            </button>
+          </div>
+        )}
       </div>
 
       {canManageAll ? (
@@ -1230,6 +1635,81 @@ export default function ViewerEntryManager({ mode }: Props) {
                   <Trash2 className="h-4 w-4" />
                   Remove Area
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {canManageAll ? (
+        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Metadata Option Lists</h2>
+            <p className="text-xs text-white/60">Used by participant metadata dropdowns</p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr,1.3fr]">
+            <div className="space-y-2">
+              {(['cities', 'states', 'regions'] as MetadataCategory[]).map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setMetadataCategory(category)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                    metadataCategory === category
+                      ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                      : 'border-white/15 bg-black/25 hover:border-white/30'
+                  }`}
+                >
+                  <p className="text-sm font-semibold capitalize">{category}</p>
+                  <p className="mt-1 text-xs text-white/70">{metadataOptions[category].length} options</p>
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  value={metadataOptionValue}
+                  onChange={(e) => setMetadataOptionValue(e.target.value)}
+                  placeholder="value"
+                  className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                />
+                <input
+                  value={metadataOptionLabel}
+                  onChange={(e) => setMetadataOptionLabel(e.target.value)}
+                  placeholder="label (optional)"
+                  className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                />
+                <div className="md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveMetadataOption()}
+                    disabled={metadataOptionSaving}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black hover:bg-[#E6C86A] disabled:opacity-70"
+                  >
+                    <Save className="h-4 w-4" />
+                    {metadataOptionSaving ? 'Saving Option...' : 'Add / Update Option'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {metadataOptions[metadataCategory].map((item) => (
+                  <div key={item.value} className="flex items-center justify-between rounded-lg border border-white/15 bg-black/25 px-3 py-2">
+                    <div>
+                      <p className="text-sm">{item.label}</p>
+                      <p className="text-xs text-white/60">{item.value}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void removeMetadataOption(metadataCategory, item.value)}
+                      className="rounded-lg border border-red-400/40 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/20"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1340,7 +1820,7 @@ export default function ViewerEntryManager({ mode }: Props) {
         <p className="inline-flex items-center gap-2"><Video className="h-3.5 w-3.5" /> Changes write directly to Firestore documents used by viewer playback and overlay metadata.</p>
       </div>
 
-      {mode === 'participant' && submissionGuideOpen && guideStep ? (
+      {mode === 'participant' && !mineOnly && submissionGuideOpen && guideStep ? (
         <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm rounded-2xl border border-[#D4AF37]/35 bg-black/90 p-4 shadow-2xl backdrop-blur-sm sm:bottom-6 sm:right-6">
           <p className="text-xs uppercase tracking-[0.12em] text-[#F5D37A]">
             Submissions Guide {submissionGuideIndex + 1}/{PARTICIPANT_SUBMISSION_GUIDE_STEPS.length}
@@ -1391,7 +1871,7 @@ export default function ViewerEntryManager({ mode }: Props) {
         </div>
       ) : null}
 
-      {mode === 'participant' && !submissionGuideOpen ? (
+      {mode === 'participant' && !mineOnly && !submissionGuideOpen ? (
         <div className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
           <button
             type="button"

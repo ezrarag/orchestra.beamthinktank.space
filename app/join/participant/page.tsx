@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { db } from '@/lib/firebase'
+import ParticipantShell from '@/components/participant/ParticipantShell'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { createCommunityBookingInterest } from '@/lib/api/bookings'
 import { setUserInstitutionAndInstrument } from '@/lib/api/users'
@@ -475,16 +476,16 @@ export default function JoinParticipantPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+      <ParticipantShell title="Become a Participant" subtitle="Choose your path, then complete the required onboarding steps.">
         <div className="mx-auto max-w-4xl rounded-2xl border border-white/10 bg-white/5 p-8">
           <p className="text-white/80">Loading participant onboarding...</p>
         </div>
-      </div>
+      </ParticipantShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+    <ParticipantShell title="Become a Participant" subtitle="Mirror the Viewer structure, then route into the right participant tools.">
       <div className="mx-auto max-w-4xl">
         <Link href="/home" className="mb-6 inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#D4AF37]">
           <ArrowLeft className="h-4 w-4" />
@@ -948,6 +949,6 @@ export default function JoinParticipantPage() {
           </div>
         </div>
       )}
-    </div>
+    </ParticipantShell>
   )
 }

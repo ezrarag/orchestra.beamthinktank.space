@@ -24,6 +24,8 @@ type ViewerSection = {
   availability: SectionAvailability
   order: number
   active: boolean
+  status?: 'open' | 'archived'
+  isPublished?: boolean
   createdAt?: unknown
   updatedAt?: unknown
 }
@@ -36,7 +38,8 @@ type FormState = {
   summary: string
   availability: SectionAvailability
   order: number
-  active: boolean
+  status: 'open' | 'archived'
+  isPublished: boolean
 }
 
 const DEFAULT_FORM: FormState = {
@@ -47,7 +50,8 @@ const DEFAULT_FORM: FormState = {
   summary: '',
   availability: 'open',
   order: 1,
-  active: true,
+  status: 'open',
+  isPublished: true,
 }
 
 function toMillis(value: unknown): number {
@@ -162,7 +166,8 @@ export default function ViewerSectionsManager() {
       summary: section.summary,
       availability: section.availability,
       order: Number.isFinite(section.order) ? section.order : 1,
-      active: section.active !== false,
+      status: section.status === 'archived' ? 'archived' : section.active === false ? 'archived' : 'open',
+      isPublished: section.isPublished ?? section.active !== false,
     })
   }
 
@@ -191,7 +196,9 @@ export default function ViewerSectionsManager() {
         summary: form.summary.trim(),
         availability: form.availability,
         order: Number.isFinite(form.order) ? form.order : 1,
-        active: form.active,
+        status: form.status,
+        isPublished: form.isPublished,
+        active: form.status === 'open' && form.isPublished,
       }
 
       const method = selectedId ? 'PATCH' : 'POST'
@@ -221,7 +228,9 @@ export default function ViewerSectionsManager() {
             summary: form.summary.trim(),
             availability: form.availability,
             order: Number.isFinite(form.order) ? form.order : 1,
-            active: form.active,
+            status: form.status,
+            isPublished: form.isPublished,
+            active: form.status === 'open' && form.isPublished,
             updatedAt: serverTimestamp(),
           }
 
@@ -364,7 +373,11 @@ export default function ViewerSectionsManager() {
                     <p className="mt-1 text-xs text-white/70">{section.id} · {section.areaId} · #{section.order}</p>
                   </button>
                   <div className="flex items-center gap-1">
-                    {section.active ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : null}
+                    {section.active ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                    ) : (
+                      <span className="rounded-full border border-white/25 px-1.5 py-0.5 text-[10px] uppercase text-white/70">Off</span>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -446,14 +459,30 @@ export default function ViewerSectionsManager() {
                 rows={4}
                 className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
               />
-              <label className="inline-flex items-center gap-2 text-sm md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))}
-                />
-                active
-              </label>
+              <div className="rounded-lg border border-white/15 bg-black/25 p-3 md:col-span-2">
+                <p className="mb-2 text-xs uppercase tracking-[0.12em] text-white/70">Publishing</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as 'open' | 'archived' }))}
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  >
+                    <option value="open">status: open</option>
+                    <option value="archived">status: archived</option>
+                  </select>
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.isPublished}
+                      onChange={(e) => setForm((p) => ({ ...p, isPublished: e.target.checked }))}
+                    />
+                    visible on frontend
+                  </label>
+                </div>
+                <p className="mt-2 text-xs text-white/70">
+                  Frontend visibility is enabled when status is <span className="font-semibold text-white">open</span> and visible is checked.
+                </p>
+              </div>
             </div>
           </div>
 

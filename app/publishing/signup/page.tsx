@@ -8,6 +8,7 @@ import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/fires
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import ParticipantShell from '@/components/participant/ParticipantShell'
 
 const roleOptions = [
   { id: 'dancer', label: 'Dancer' },
@@ -182,17 +183,17 @@ export default function PublishingSignupPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+      <ParticipantShell title="Publishing Project Sign Up" subtitle="Submit role interest, availability, and materials for publishing collaborations.">
         <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 p-8">
           <p className="text-white/80">Loading publishing sign up...</p>
         </div>
-      </div>
+      </ParticipantShell>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+      <ParticipantShell title="Publishing Project Sign Up" subtitle="Sign in to submit a publishing application.">
         <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 p-8">
           <h1 className="text-3xl font-bold">Publishing Sign Up</h1>
           <p className="mt-3 text-white/80">Please sign in to join a publishing project.</p>
@@ -211,12 +212,12 @@ export default function PublishingSignupPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </ParticipantShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 lg:px-8">
+    <ParticipantShell title="Publishing Project Sign Up" subtitle="Submit your role interest, availability, and materials to join publishing collaborations.">
       <div className="mx-auto max-w-3xl">
         <Link href="/home" className="mb-6 inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#D4AF37]">
           <ArrowLeft className="h-4 w-4" />
@@ -365,6 +366,6 @@ export default function PublishingSignupPage() {
           </form>
         </section>
       </div>
-    </div>
+    </ParticipantShell>
   )
 }
