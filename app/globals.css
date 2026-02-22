@@ -70,4 +70,36 @@
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
+
+  .home-loop-video-fade {
+    animation: home-loop-video-fade 10s linear infinite;
+    will-change: opacity;
+  }
+
+  .home-eye-vignette {
+    background: radial-gradient(
+      circle at center,
+      rgba(0, 0, 0, 0.04) 0%,
+      rgba(0, 0, 0, 0.14) 28%,
+      rgba(0, 0, 0, 0.34) 56%,
+      rgba(0, 0, 0, 0.64) 78%,
+      rgba(0, 0, 0, 0.9) 100%
+    );
+    pointer-events: none;
+  }
+}
+
+@keyframes home-loop-video-fade {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

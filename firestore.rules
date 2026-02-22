@@ -556,6 +556,23 @@ service cloud.firestore {
       allow create: if true;
       allow write: if isAdmin() || viewerAdminBypassEnabled();
     }
+
+    // Timecoded comments for viewer content review and collaboration
+    match /viewerComments/{commentId} {
+      // Read for all viewer roles except "select" (enforced in app)
+      allow read: if true;
+
+      // Partner/instructor write gating is handled in app; keep auth requirement at rules layer.
+      allow create: if isAuthenticated() || viewerAdminBypassEnabled();
+      allow update, delete: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Student learner movement/engagement telemetry events
+    match /studentSessionTelemetry/{eventId} {
+      // Allow browser-side capture in development/testing and anonymous preview flows.
+      allow create: if true;
+      allow read, write: if isAdmin() || viewerAdminBypassEnabled();
+    }
     
     // Default deny rule for any unmatched paths
     match /{document=**} {

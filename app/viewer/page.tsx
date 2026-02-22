@@ -14,7 +14,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react'
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
@@ -85,6 +85,8 @@ type ActiveVideo = {
 
 const placeholderVideoUrl = ''
 const OVERLAY_RESTORE_DELAY_MS = 1600
+const PREVIEW_FADE_DURATION_MS = 700
+const STUDENT_TELEMETRY_INTERVAL_MS = 5000
 const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
 const LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY = 'viewer-last-active-video'
@@ -116,8 +118,27 @@ type WatchedHistoryItem = {
   watchedAt: number
 }
 
-type ViewerIntent = 'subscriber' | 'student' | 'instructor' | 'partner'
+type ViewerIntent = 'select' | 'subscriber' | 'student' | 'instructor' | 'partner'
 type StoriesLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
+type CommentLoadState = 'idle' | 'loading' | 'ready' | 'error'
+
+type ViewerComment = {
+  id: string
+  contentId: string
+  areaId: string
+  sectionId?: string
+  authorRole: 'partner' | 'instructor'
+  authorLabel: string
+  message: string
+  timestampSeconds: number
+  thumbnailDataUrl?: string
+  createdAt?: unknown
+}
+
+type StudentTelemetrySession = {
+  id: string
+  startedAt: number
+}
 
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
@@ -377,6 +398,7 @@ export default function ViewerPage() {
   })
   const [isPlayerOverlayVisible, setIsPlayerOverlayVisible] = useState(true)
   const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const previewLoopTransitioningRef = useRef(false)
   const [isLibraryOpen, setIsLibraryOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState('')
   const [availableCities, setAvailableCities] = useState<string[]>([])
@@ -388,7 +410,7 @@ export default function ViewerPage() {
   const [firestoreNarrativeSections, setFirestoreNarrativeSections] = useState<AreaSection[] | null>(null)
   const [contentProgress, setContentProgress] = useState<Record<string, ContentProgress>>({})
   const [watchedHistory, setWatchedHistory] = useState<WatchedHistoryItem[]>([])
-  const [viewerIntent, setViewerIntent] = useState<ViewerIntent>('subscriber')
+  const [viewerIntent, setViewerIntent] = useState<ViewerIntent>('select')
   const [partnerType, setPartnerType] = useState('Community Partner')
   const [showMoreInfo, setShowMoreInfo] = useState(false)
   const [isVideoPaused, setIsVideoPaused] = useState(false)
@@ -404,6 +426,20 @@ export default function ViewerPage() {
   const [moduleBannerVisible, setModuleBannerVisible] = useState(false)
   const [allPublishedContent, setAllPublishedContent] = useState<ViewerContent[]>([])
   const [isUsingFallbackContent, setIsUsingFallbackContent] = useState(false)
+  const [previewWindow, setPreviewWindow] = useState<{ start: number; end: number } | null>(null)
+  const [isPreviewLoopFading, setIsPreviewLoopFading] = useState(false)
+  const [commentsLoadState, setCommentsLoadState] = useState<CommentLoadState>('idle')
+  const [commentsError, setCommentsError] = useState<string | null>(null)
+  const [activeComments, setActiveComments] = useState<ViewerComment[]>([])
+  const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false)
+  const [draftCommentMessage, setDraftCommentMessage] = useState('')
+  const [draftCommentThumbnail, setDraftCommentThumbnail] = useState<string | null>(null)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [isStudentCameraEnabled, setIsStudentCameraEnabled] = useState(false)
+  const [studentTelemetrySession, setStudentTelemetrySession] = useState<StudentTelemetrySession | null>(null)
+  const studentCameraPreviewRef = useRef<HTMLVideoElement | null>(null)
+  const studentCameraStreamRef = useRef<MediaStream | null>(null)
+  const studentTelemetryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const requestedAreaFilter = useMemo(() => {
     const area = searchParams.get('area')
@@ -521,6 +557,12 @@ export default function ViewerPage() {
       if (progressSaveTimerRef.current) {
         clearTimeout(progressSaveTimerRef.current)
       }
+      if (studentTelemetryTimerRef.current) {
+        clearInterval(studentTelemetryTimerRef.current)
+      }
+      if (studentCameraStreamRef.current) {
+        studentCameraStreamRef.current.getTracks().forEach((track) => track.stop())
+      }
     }
   }, [])
 
@@ -552,6 +594,8 @@ export default function ViewerPage() {
       .sort((a, b) => b.watchedAt - a.watchedAt)
       .slice(0, 5)
   }, [watchedHistory])
+  const canViewComments = viewerIntent !== 'select'
+  const canCreateComments = viewerIntent === 'partner' || viewerIntent === 'instructor'
 
   const recordedLabel = useMemo(() => {
     if (!activeStory?.recordedAt) return 'Date not provided'
@@ -576,6 +620,13 @@ export default function ViewerPage() {
     const total = Math.floor(seconds)
     const mins = Math.floor(total / 60)
     const secs = total % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const getTimestampLabel = (seconds: number): string => {
+    const safeSeconds = Math.max(0, Math.floor(seconds))
+    const mins = Math.floor(safeSeconds / 60)
+    const secs = safeSeconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
@@ -943,11 +994,112 @@ export default function ViewerPage() {
   }, [selectedAreaCatalog, selectedAreaId, selectedCity])
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+    const preloadTargets = selectedAreaStories.slice(0, 2).map((item) => item.hlsUrl || item.videoUrl).filter(Boolean)
+    const links: HTMLLinkElement[] = []
+    preloadTargets.forEach((url) => {
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.as = 'video'
+      link.href = url
+      link.crossOrigin = 'anonymous'
+      link.dataset.viewerPreload = '1'
+      document.head.appendChild(link)
+      links.push(link)
+    })
+    return () => {
+      links.forEach((link) => link.remove())
+    }
+  }, [selectedAreaStories])
+
+  useEffect(() => {
+    const element = videoRef.current
+    if (!element) return
+    if (viewerIntent === 'select') return
+    setPreviewWindow(null)
+    setIsPreviewLoopFading(false)
+    previewLoopTransitioningRef.current = false
+    if (viewerIntent === 'subscriber' && activeVideo.sourceType === 'content') {
+      element.currentTime = 0
+      setCurrentPlaybackTime(0)
+      void element.play().catch((error) => {
+        console.error('Unable to start full-length playback for subscriber mode:', error)
+      })
+    }
+  }, [viewerIntent, activeVideo.sourceType, activeVideo.contentId])
+
+  useEffect(() => {
+    if (!db || !activeVideo.contentId || !canViewComments) {
+      setCommentsLoadState(canViewComments ? 'ready' : 'idle')
+      setActiveComments([])
+      setCommentsError(null)
+      return
+    }
+    let mounted = true
+
+    const loadComments = async () => {
+      setCommentsLoadState('loading')
+      setCommentsError(null)
+      try {
+        const commentsQuery = query(collection(db, 'viewerComments'), where('contentId', '==', activeVideo.contentId))
+        const snapshot = await getDocs(commentsQuery)
+        if (!mounted) return
+        const comments = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as Partial<ViewerComment>
+            return {
+              id: docSnap.id,
+              contentId: data.contentId ?? '',
+              areaId: data.areaId ?? '',
+              sectionId: data.sectionId,
+              authorRole:
+                data.authorRole === 'partner' || data.authorRole === 'instructor'
+                  ? data.authorRole
+                  : 'partner',
+              authorLabel: data.authorLabel ?? 'Partner',
+              message: data.message ?? '',
+              timestampSeconds: Number.isFinite(data.timestampSeconds) ? Number(data.timestampSeconds) : 0,
+              thumbnailDataUrl: data.thumbnailDataUrl,
+              createdAt: data.createdAt,
+            } as ViewerComment
+          })
+          .filter((item) => item.contentId === activeVideo.contentId)
+          .sort((a, b) => a.timestampSeconds - b.timestampSeconds)
+        setActiveComments(comments)
+        setCommentsLoadState('ready')
+      } catch (error) {
+        console.error('Error loading viewer comments:', error)
+        if (!mounted) return
+        setCommentsError(getErrorMessage(error))
+        setCommentsLoadState('error')
+        setActiveComments([])
+      }
+    }
+
+    void loadComments()
+    return () => {
+      mounted = false
+    }
+  }, [db, activeVideo.contentId, canViewComments])
+
+  useEffect(() => {
+    if (viewerIntent !== 'student') {
+      setIsStudentCameraEnabled(false)
+    }
+  }, [viewerIntent])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
     if (!activeVideo.url) return
     if (activeVideo.sourceType === 'area-default' && !activeVideo.contentId) return
     window.localStorage.setItem(LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY, JSON.stringify(activeVideo))
   }, [activeVideo])
+
+  useEffect(() => {
+    setIsCommentComposerOpen(false)
+    setDraftCommentMessage('')
+    setDraftCommentThumbnail(null)
+  }, [activeVideo.contentId])
 
   const getTimestampMillis = (value: unknown): number => {
     if (!value) return 0
@@ -1131,6 +1283,103 @@ export default function ViewerPage() {
     })
   }
 
+  const captureCommentThumbnail = (): string | null => {
+    const element = videoRef.current
+    if (!element || element.videoWidth <= 0 || element.videoHeight <= 0) return null
+    try {
+      const canvas = document.createElement('canvas')
+      const width = 240
+      const height = Math.max(135, Math.round((width / element.videoWidth) * element.videoHeight))
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      ctx.drawImage(element, 0, 0, width, height)
+      return canvas.toDataURL('image/jpeg', 0.72)
+    } catch (error) {
+      console.error('Unable to capture comment thumbnail:', error)
+      return null
+    }
+  }
+
+  const openCommentComposer = () => {
+    setDraftCommentMessage('')
+    setDraftCommentThumbnail(captureCommentThumbnail())
+    setIsCommentComposerOpen(true)
+  }
+
+  const submitComment = async () => {
+    if (!db || !activeVideo.contentId || !canCreateComments) return
+    const message = draftCommentMessage.trim()
+    if (!message) return
+    const currentSeconds = Math.max(0, Math.floor(videoRef.current?.currentTime ?? currentPlaybackTime ?? 0))
+    const authorRole: 'partner' | 'instructor' = viewerIntent === 'instructor' ? 'instructor' : 'partner'
+    const authorLabel = viewerIntent === 'instructor' ? 'Institutional Instructor' : partnerType
+
+    setIsSubmittingComment(true)
+    try {
+      const payload = {
+        contentId: activeVideo.contentId,
+        areaId: activeVideo.areaId,
+        sectionId: activeVideo.sectionId ?? null,
+        authorRole,
+        authorLabel,
+        message,
+        timestampSeconds: currentSeconds,
+        thumbnailDataUrl: draftCommentThumbnail ?? null,
+        createdAt: serverTimestamp(),
+      }
+      const created = await addDoc(collection(db, 'viewerComments'), payload)
+      const optimistic: ViewerComment = {
+        id: created.id,
+        contentId: activeVideo.contentId,
+        areaId: activeVideo.areaId,
+        sectionId: activeVideo.sectionId,
+        authorRole,
+        authorLabel,
+        message,
+        timestampSeconds: currentSeconds,
+        thumbnailDataUrl: draftCommentThumbnail ?? undefined,
+      }
+      setActiveComments((current) => [...current, optimistic].sort((a, b) => a.timestampSeconds - b.timestampSeconds))
+      setIsCommentComposerOpen(false)
+      setDraftCommentMessage('')
+      setDraftCommentThumbnail(null)
+    } catch (error) {
+      console.error('Error creating viewer comment:', error)
+      setCommentsError(getErrorMessage(error))
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const enableStudentCamera = async () => {
+    if (viewerIntent !== 'student') return
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+        void Notification.requestPermission().catch(() => undefined)
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 360 } },
+        audio: false,
+      })
+      studentCameraStreamRef.current = stream
+      if (studentCameraPreviewRef.current) {
+        studentCameraPreviewRef.current.srcObject = stream
+      }
+      const nextSession: StudentTelemetrySession = {
+        id: `student-${Date.now()}`,
+        startedAt: Date.now(),
+      }
+      setStudentTelemetrySession(nextSession)
+      setIsStudentCameraEnabled(true)
+    } catch (error) {
+      console.error('Unable to enable student camera:', error)
+      setPlaybackNotice('Unable to access the front camera for learner analysis.')
+    }
+  }
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -1148,6 +1397,62 @@ export default function ViewerPage() {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [activeVideo, contentProgress, db, user])
+
+  useEffect(() => {
+    if (!isStudentCameraEnabled || viewerIntent !== 'student' || !db || !studentTelemetrySession) {
+      if (studentTelemetryTimerRef.current) {
+        clearInterval(studentTelemetryTimerRef.current)
+        studentTelemetryTimerRef.current = null
+      }
+      return
+    }
+
+    const tick = async () => {
+      if (!activeVideo.contentId) return
+      const payload = {
+        sessionId: studentTelemetrySession.id,
+        startedAtMs: studentTelemetrySession.startedAt,
+        contentId: activeVideo.contentId,
+        areaId: activeVideo.areaId,
+        playbackTimeSeconds: Math.floor(videoRef.current?.currentTime ?? 0),
+        paused: Boolean(videoRef.current?.paused),
+        volume: Number(videoRef.current?.volume ?? volume),
+        muted: Boolean(videoRef.current?.muted ?? isMuted),
+        viewport: {
+          width: typeof window !== 'undefined' ? window.innerWidth : 0,
+          height: typeof window !== 'undefined' ? window.innerHeight : 0,
+        },
+        createdAt: serverTimestamp(),
+      }
+      try {
+        await addDoc(collection(db, 'studentSessionTelemetry'), payload)
+      } catch (error) {
+        console.error('Error writing student telemetry event:', error)
+      }
+    }
+
+    studentTelemetryTimerRef.current = setInterval(() => {
+      void tick()
+    }, STUDENT_TELEMETRY_INTERVAL_MS)
+
+    return () => {
+      if (studentTelemetryTimerRef.current) {
+        clearInterval(studentTelemetryTimerRef.current)
+        studentTelemetryTimerRef.current = null
+      }
+    }
+  }, [db, isMuted, isStudentCameraEnabled, studentTelemetrySession, viewerIntent, activeVideo.contentId, activeVideo.areaId, volume])
+
+  useEffect(() => {
+    if (isStudentCameraEnabled) return
+    if (studentCameraStreamRef.current) {
+      studentCameraStreamRef.current.getTracks().forEach((track) => track.stop())
+      studentCameraStreamRef.current = null
+    }
+    if (studentCameraPreviewRef.current) {
+      studentCameraPreviewRef.current.srcObject = null
+    }
+  }, [isStudentCameraEnabled])
 
   useEffect(() => {
     const element = videoRef.current
@@ -1284,6 +1589,7 @@ export default function ViewerPage() {
     setIsPlayerOverlayVisible(false)
     setShowMoreInfo(false)
     setIsUsingFallbackContent(false)
+    setPreviewWindow(null)
     setIsMuted(true)
     setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
@@ -1351,9 +1657,27 @@ export default function ViewerPage() {
     setIsLibraryOpen(false)
     setIsPlayerOverlayVisible(false)
     setIsUsingFallbackContent(false)
+    setPreviewWindow(null)
     setIsMuted(true)
     setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
+  }
+
+  const runPreviewLoopTransition = (element: HTMLVideoElement, startSeconds: number) => {
+    if (previewLoopTransitioningRef.current) return
+    previewLoopTransitioningRef.current = true
+    setIsPreviewLoopFading(true)
+
+    window.setTimeout(() => {
+      element.currentTime = startSeconds
+      void element.play().catch((error) => {
+        console.error('Unable to continue preview loop playback:', error)
+      })
+      setCurrentPlaybackTime(startSeconds)
+      setIsVideoPaused(false)
+      setIsPreviewLoopFading(false)
+      previewLoopTransitioningRef.current = false
+    }, PREVIEW_FADE_DURATION_MS)
   }
 
   return (
@@ -1383,15 +1707,34 @@ export default function ViewerPage() {
           <video
             ref={videoRef}
             key={`${activeVideo.areaId}-${activeVideo.contentId ?? 'area-default'}`}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+              isPreviewLoopFading ? 'opacity-0' : 'opacity-100'
+            }`}
             autoPlay
-            loop
+            loop={viewerIntent === 'select'}
+            preload="auto"
             muted={isMuted}
             playsInline
             onLoadedMetadata={(event) => {
               const element = event.currentTarget
               setVideoDuration(Number.isFinite(element.duration) ? element.duration : 0)
-              setCurrentPlaybackTime(element.currentTime || 0)
+              if (
+                viewerIntent === 'select' &&
+                activeVideo.sourceType === 'content' &&
+                Number.isFinite(element.duration) &&
+                element.duration > 0
+              ) {
+                const midpoint = Math.max(0, element.duration / 2)
+                const end = Math.min(element.duration, midpoint + 15)
+                element.currentTime = midpoint
+                setPreviewWindow({ start: midpoint, end })
+                setCurrentPlaybackTime(midpoint)
+                setIsPreviewLoopFading(true)
+                window.setTimeout(() => setIsPreviewLoopFading(false), PREVIEW_FADE_DURATION_MS)
+              } else {
+                setPreviewWindow(null)
+                setCurrentPlaybackTime(element.currentTime || 0)
+              }
               setIsVideoPaused(element.paused)
               setVolume(element.volume)
               setIsMuted(element.muted)
@@ -1401,7 +1744,12 @@ export default function ViewerPage() {
               saveCurrentVideoProgress()
             }}
             onTimeUpdate={(event) => {
-              setCurrentPlaybackTime(event.currentTarget.currentTime || 0)
+              const current = event.currentTarget.currentTime || 0
+              if (viewerIntent === 'select' && previewWindow && current >= previewWindow.end) {
+                runPreviewLoopTransition(event.currentTarget, previewWindow.start)
+                return
+              }
+              setCurrentPlaybackTime(current)
               queueVideoProgressSave()
             }}
             onPause={(event) => {
@@ -1414,6 +1762,9 @@ export default function ViewerPage() {
               setCurrentPlaybackTime(event.currentTarget.currentTime || 0)
               saveCurrentVideoProgress()
             }}
+            onWaiting={() => setPlaybackNotice('Buffering… optimizing playback.')}
+            onStalled={() => setPlaybackNotice('Playback stalled. Reconnecting stream…')}
+            onCanPlay={() => setPlaybackNotice(null)}
           />
         ) : null}
 
@@ -1639,6 +1990,34 @@ export default function ViewerPage() {
                   onChange={(event) => handleSeek(Number(event.target.value))}
                   className="w-full accent-[#D4AF37]"
                 />
+                {canViewComments && activeComments.length > 0 && videoDuration > 0 ? (
+                  <div className="relative mt-2 h-4">
+                    {activeComments.map((comment) => {
+                      const leftPercent = Math.max(0, Math.min(100, (comment.timestampSeconds / videoDuration) * 100))
+                      return (
+                        <button
+                          key={comment.id}
+                          type="button"
+                          title={`${getTimestampLabel(comment.timestampSeconds)} • ${comment.authorLabel}`}
+                          onClick={() => handleSeek(comment.timestampSeconds)}
+                          className="group absolute top-0 -translate-x-1/2"
+                          style={{ left: `${leftPercent}%` }}
+                        >
+                          <span className="block h-2.5 w-2.5 rounded-full border border-[#D4AF37] bg-[#D4AF37]" />
+                          {comment.thumbnailDataUrl ? (
+                            <span className="pointer-events-none absolute bottom-5 left-1/2 hidden -translate-x-1/2 overflow-hidden rounded border border-white/25 bg-black/70 group-hover:block">
+                              <img
+                                src={comment.thumbnailDataUrl}
+                                alt="Comment frame"
+                                className="h-12 w-20 object-cover"
+                              />
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
                 <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                   <div className="flex items-center gap-3">
                     <button
@@ -1670,6 +2049,7 @@ export default function ViewerPage() {
                     onChange={(event) => setViewerIntent(event.target.value as ViewerIntent)}
                     className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
                   >
+                    <option value="select">Select</option>
                     <option value="subscriber">Subscriber</option>
                     <option value="student">Student Learner</option>
                     <option value="instructor">Institutional Instructor</option>
@@ -1702,12 +2082,134 @@ export default function ViewerPage() {
                   >
                     Home
                   </Link>
+                  {canCreateComments && activeVideo.contentId ? (
+                    <button
+                      type="button"
+                      onClick={openCommentComposer}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      Add Comment
+                    </button>
+                  ) : null}
+                  {viewerIntent === 'student' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isStudentCameraEnabled) {
+                          setIsStudentCameraEnabled(false)
+                          return
+                        }
+                        void enableStudentCamera()
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      {isStudentCameraEnabled ? 'Disable Camera Coach' : 'Enable Camera Coach'}
+                    </button>
+                  ) : null}
                 </div>
+                {canViewComments && activeVideo.contentId ? (
+                  <div className="mt-3 space-y-2 rounded-xl border border-white/15 bg-black/30 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">Comments</p>
+                      <p className="text-[11px] text-white/65">
+                        {canCreateComments
+                          ? 'You can comment'
+                          : viewerIntent === 'subscriber'
+                            ? 'Read only for subscribers'
+                            : 'Read only'}
+                      </p>
+                    </div>
+                    {commentsLoadState === 'loading' ? (
+                      <p className="text-xs text-white/70">Loading comments…</p>
+                    ) : null}
+                    {commentsError ? (
+                      <p className="text-xs text-red-200">{commentsError}</p>
+                    ) : null}
+                    {commentsLoadState === 'ready' && activeComments.length === 0 ? (
+                      <p className="text-xs text-white/70">No comments yet for this moment.</p>
+                    ) : null}
+                    {activeComments.slice(0, 3).map((comment) => (
+                      <button
+                        key={`inline-${comment.id}`}
+                        type="button"
+                        onClick={() => handleSeek(comment.timestampSeconds)}
+                        className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left transition hover:border-[#D4AF37]/40"
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">
+                          {getTimestampLabel(comment.timestampSeconds)} • {comment.authorLabel}
+                        </p>
+                        <p className="mt-1 text-xs text-white/85">{comment.message}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {viewerIntent === 'student' && isStudentCameraEnabled ? (
+                  <div className="mt-3 rounded-xl border border-white/15 bg-black/30 p-2.5">
+                    <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">
+                      Learner Camera (Session Analysis)
+                    </p>
+                    <video
+                      ref={studentCameraPreviewRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="h-24 w-40 rounded-md border border-white/20 bg-black object-cover"
+                    />
+                    <p className="mt-2 text-[11px] text-white/70">
+                      Camera movement events are sampled to Firestore every {Math.round(STUDENT_TELEMETRY_INTERVAL_MS / 1000)}s.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
         </div>
       </section>
+
+      {isCommentComposerOpen ? (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setIsCommentComposerOpen(false)} />
+          <div className="relative mx-auto mt-16 w-[min(92%,560px)] rounded-2xl border border-white/20 bg-[#0E1018] p-5 text-white">
+            <h3 className="text-lg font-semibold">Add Timestamp Comment</h3>
+            <p className="mt-1 text-xs text-white/70">
+              Comment at {getTimestampLabel(Math.floor(videoRef.current?.currentTime ?? currentPlaybackTime ?? 0))}
+            </p>
+            {draftCommentThumbnail ? (
+              <img
+                src={draftCommentThumbnail}
+                alt="Current video frame"
+                className="mt-3 h-28 w-48 rounded border border-white/20 object-cover"
+              />
+            ) : null}
+            <textarea
+              value={draftCommentMessage}
+              onChange={(event) => setDraftCommentMessage(event.target.value)}
+              rows={4}
+              placeholder="Add coaching or partner context for this moment…"
+              className="mt-3 w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCommentComposerOpen(false)}
+                className="rounded-full border border-white/30 bg-black/25 px-4 py-1.5 text-xs font-semibold text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingComment || !draftCommentMessage.trim()}
+                onClick={() => {
+                  void submitComment()
+                }}
+                className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/15 px-4 py-1.5 text-xs font-semibold text-[#F5D37A] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmittingComment ? 'Saving…' : 'Save Comment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isLibraryOpen ? (
         <div className="fixed inset-0 z-50">
