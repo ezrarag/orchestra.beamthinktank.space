@@ -145,6 +145,20 @@ export const adminNavGroups: AdminNavGroup[] = [
         icon: Video,
         enabled: true,
       },
+      {
+        key: 'role-overviews',
+        label: 'Role Overviews',
+        href: '/admin/viewer-role-overviews',
+        icon: Video,
+        enabled: true,
+      },
+      {
+        key: 'home-slides',
+        label: 'Home Slides',
+        href: '/admin/home-slides',
+        icon: Video,
+        enabled: true,
+      },
     ],
   },
   {

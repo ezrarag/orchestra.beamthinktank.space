@@ -21,6 +21,18 @@ export default function AdminViewerPage() {
           >
             Manage Narrative Arcs (viewerSections)
           </Link>
+          <Link
+            href="/admin/viewer-role-overviews"
+            className="inline-flex font-semibold text-orchestra-gold hover:text-orchestra-gold/80"
+          >
+            Manage Arc Roles Overview Videos
+          </Link>
+          <Link
+            href="/admin/home-slides"
+            className="inline-flex font-semibold text-orchestra-gold hover:text-orchestra-gold/80"
+          >
+            Manage Home Slides (1-5)
+          </Link>
         </div>
       </div>
       <ViewerEntryManager mode="admin" />

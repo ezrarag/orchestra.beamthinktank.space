@@ -26,6 +26,11 @@ type ViewerSection = {
   active: boolean
   status?: 'open' | 'archived'
   isPublished?: boolean
+  rolesOverview?: {
+    videoUrl?: string
+    title?: string
+    description?: string
+  }
   createdAt?: unknown
   updatedAt?: unknown
 }
@@ -40,6 +45,9 @@ type FormState = {
   order: number
   status: 'open' | 'archived'
   isPublished: boolean
+  rolesOverviewVideoUrl: string
+  rolesOverviewTitle: string
+  rolesOverviewDescription: string
 }
 
 const DEFAULT_FORM: FormState = {
@@ -52,6 +60,9 @@ const DEFAULT_FORM: FormState = {
   order: 1,
   status: 'open',
   isPublished: true,
+  rolesOverviewVideoUrl: '',
+  rolesOverviewTitle: '',
+  rolesOverviewDescription: '',
 }
 
 function toMillis(value: unknown): number {
@@ -168,6 +179,9 @@ export default function ViewerSectionsManager() {
       order: Number.isFinite(section.order) ? section.order : 1,
       status: section.status === 'archived' ? 'archived' : section.active === false ? 'archived' : 'open',
       isPublished: section.isPublished ?? section.active !== false,
+      rolesOverviewVideoUrl: section.rolesOverview?.videoUrl ?? '',
+      rolesOverviewTitle: section.rolesOverview?.title ?? '',
+      rolesOverviewDescription: section.rolesOverview?.description ?? '',
     })
   }
 
@@ -198,6 +212,11 @@ export default function ViewerSectionsManager() {
         order: Number.isFinite(form.order) ? form.order : 1,
         status: form.status,
         isPublished: form.isPublished,
+        rolesOverview: {
+          videoUrl: form.rolesOverviewVideoUrl.trim(),
+          title: form.rolesOverviewTitle.trim(),
+          description: form.rolesOverviewDescription.trim(),
+        },
         active: form.status === 'open' && form.isPublished,
       }
 
@@ -230,6 +249,11 @@ export default function ViewerSectionsManager() {
             order: Number.isFinite(form.order) ? form.order : 1,
             status: form.status,
             isPublished: form.isPublished,
+            rolesOverview: {
+              videoUrl: form.rolesOverviewVideoUrl.trim(),
+              title: form.rolesOverviewTitle.trim(),
+              description: form.rolesOverviewDescription.trim(),
+            },
             active: form.status === 'open' && form.isPublished,
             updatedAt: serverTimestamp(),
           }
@@ -482,6 +506,29 @@ export default function ViewerSectionsManager() {
                 <p className="mt-2 text-xs text-white/70">
                   Frontend visibility is enabled when status is <span className="font-semibold text-white">open</span> and visible is checked.
                 </p>
+              </div>
+              <div className="rounded-lg border border-white/15 bg-black/25 p-3 md:col-span-2">
+                <p className="mb-2 text-xs uppercase tracking-[0.12em] text-white/70">Roles Overview (for this narrative arc)</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <input
+                    value={form.rolesOverviewVideoUrl}
+                    onChange={(e) => setForm((p) => ({ ...p, rolesOverviewVideoUrl: e.target.value }))}
+                    placeholder="roles overview video URL"
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
+                  />
+                  <input
+                    value={form.rolesOverviewTitle}
+                    onChange={(e) => setForm((p) => ({ ...p, rolesOverviewTitle: e.target.value }))}
+                    placeholder="roles overview title (optional)"
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={form.rolesOverviewDescription}
+                    onChange={(e) => setForm((p) => ({ ...p, rolesOverviewDescription: e.target.value }))}
+                    placeholder="roles overview description (optional)"
+                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
