@@ -95,7 +95,11 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
 
     const loadCollageVideos = async () => {
       try {
-        const q = query(collection(db, 'viewerContent'), where('isPublished', '==', true))
+        const q = query(
+          collection(db, 'viewerContent'),
+          where('isPublished', '==', true),
+          where('showOnHome', '==', true),
+        )
         const snapshot = await getDocs(q)
         if (!mounted) return
 

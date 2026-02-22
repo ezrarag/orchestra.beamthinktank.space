@@ -33,6 +33,7 @@ type ViewerEntry = {
   thumbnailUrl?: string
   accessLevel: AccessLevel
   isPublished: boolean
+  showOnHome?: boolean
   sortOrder: number
   geo?: {
     regions?: string[]
@@ -121,6 +122,7 @@ type FormState = {
   thumbnailUrl: string
   accessLevel: AccessLevel
   isPublished: boolean
+  showOnHome: boolean
   sortOrder: number
   regions: string
   states: string
@@ -155,6 +157,7 @@ const DEFAULT_FORM: FormState = {
   thumbnailUrl: '',
   accessLevel: 'open',
   isPublished: true,
+  showOnHome: false,
   sortOrder: 1,
   regions: '',
   states: '',
@@ -295,7 +298,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
   const [sectionOpen, setSectionOpen] = useState({
     required: true,
     media: true,
-    publishing: false,
+    publishing: true,
     advanced: false,
   })
   const [submissionGuideOpen, setSubmissionGuideOpen] = useState(false)
@@ -611,6 +614,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       thumbnailUrl: entry.thumbnailUrl ?? '',
       accessLevel: entry.accessLevel,
       isPublished: entry.isPublished,
+      showOnHome: entry.showOnHome ?? false,
       sortOrder: entry.sortOrder ?? 1,
       regions: toCsv(entry.geo?.regions),
       states: toCsv(entry.geo?.states),
@@ -649,6 +653,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       thumbnailUrl: form.thumbnailUrl.trim(),
       accessLevel: participantManaged ? 'open' : form.accessLevel,
       isPublished: participantManaged ? true : form.isPublished,
+      showOnHome: participantManaged ? false : form.showOnHome,
       sortOrder: Number.isFinite(form.sortOrder) ? form.sortOrder : 1,
       geo: {
         regions: parseCsv(form.regions),
@@ -1066,6 +1071,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       if (cloneCopyPublishingFlags) {
         payload.status = source.status ?? 'open'
         payload.isPublished = source.isPublished ?? false
+        payload.showOnHome = source.showOnHome ?? false
         payload.confirmed = source.confirmed ?? false
         payload.isNew = source.isNew ?? false
         payload.sortOrder = Number.isFinite(source.sortOrder) ? source.sortOrder : 0
@@ -1074,6 +1080,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       } else {
         payload.status = 'open'
         payload.isPublished = false
+        payload.showOnHome = false
         payload.confirmed = false
         payload.isNew = true
         payload.sortOrder = 0
@@ -1094,6 +1101,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
         thumbnailUrl: String(payload.thumbnailUrl ?? ''),
         accessLevel: (payload.accessLevel as AccessLevel) ?? 'open',
         isPublished: Boolean(payload.isPublished),
+        showOnHome: Boolean(payload.showOnHome),
         sortOrder: Number(payload.sortOrder ?? 0),
         geo: (payload.geo as ViewerEntry['geo']) ?? { regions: [], states: [], cities: [] },
         institutions: (payload.institutions as string[]) ?? [],
@@ -1225,6 +1233,7 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
                   </button>
                   <div className="flex items-center gap-1">
                     {entry.isNew ? <span className="rounded-full bg-[#D4AF37]/20 px-2 py-0.5 text-[10px] uppercase text-[#F5D37A]">New</span> : null}
+                    {entry.showOnHome ? <span className="rounded-full border border-cyan-300/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase text-cyan-200">Home</span> : null}
                     {entry.confirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : null}
                     <button
                       type="button"
@@ -1353,6 +1362,16 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
                   <input type="number" value={form.sortOrder} onChange={(e) => setForm((p) => ({ ...p, sortOrder: Number(e.target.value) || 1 }))} placeholder="sortOrder" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                   <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm">
                     <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.isPublished} onChange={(e) => setForm((p) => ({ ...p, isPublished: e.target.checked }))} /> isPublished</label>
+                    {canManageAll ? (
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={form.showOnHome}
+                          onChange={(e) => setForm((p) => ({ ...p, showOnHome: e.target.checked }))}
+                        />
+                        show on /home
+                      </label>
+                    ) : null}
                     <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.confirmed} onChange={(e) => setForm((p) => ({ ...p, confirmed: e.target.checked }))} /> confirmed</label>
                     <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.isNew} onChange={(e) => setForm((p) => ({ ...p, isNew: e.target.checked }))} /> isNew</label>
                   </div>

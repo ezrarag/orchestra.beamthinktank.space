@@ -1,4 +1,4 @@
-import SlideHero from '@/components/portal/SlideHero'
+import HomeSlidesHero from '@/components/portal/HomeSlidesHero'
 import { getPortalContext } from '@/lib/portal/page-data'
 
 export default function NgoHomePage({ params }: { params: { ngo: string } }) {
@@ -6,7 +6,7 @@ export default function NgoHomePage({ params }: { params: { ngo: string } }) {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <SlideHero slides={config.homeSlides} ngo={config.id} scopedRoutes />
+      <HomeSlidesHero fallbackSlides={config.homeSlides} ngo={config.id} scopedRoutes />
     </div>
   )
 }

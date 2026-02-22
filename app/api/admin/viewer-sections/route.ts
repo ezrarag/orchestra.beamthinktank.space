@@ -72,6 +72,12 @@ export async function POST(request: NextRequest) {
     if (!sectionId) {
       return NextResponse.json({ error: 'sectionId is required' }, { status: 400 })
     }
+    const roleOverviewInput = (body.rolesOverview ?? {}) as Record<string, unknown>
+    const rolesOverview = {
+      videoUrl: typeof roleOverviewInput.videoUrl === 'string' ? roleOverviewInput.videoUrl.trim() : '',
+      title: typeof roleOverviewInput.title === 'string' ? roleOverviewInput.title.trim() : '',
+      description: typeof roleOverviewInput.description === 'string' ? roleOverviewInput.description.trim() : '',
+    }
     const status = body.status === 'archived' ? 'archived' : 'open'
     const isPublished = body.isPublished !== false
     const active = typeof body.active === 'boolean' ? body.active : status === 'open' && isPublished
@@ -87,6 +93,7 @@ export async function POST(request: NextRequest) {
           summary: body.summary ?? '',
           availability: body.availability ?? 'open',
           order: Number.isFinite(body.order) ? body.order : 1,
+          rolesOverview,
           status,
           isPublished,
           active,
@@ -121,6 +128,12 @@ export async function PATCH(request: NextRequest) {
     if (!sectionId) {
       return NextResponse.json({ error: 'sectionId is required' }, { status: 400 })
     }
+    const roleOverviewInput = (body.rolesOverview ?? {}) as Record<string, unknown>
+    const rolesOverview = {
+      videoUrl: typeof roleOverviewInput.videoUrl === 'string' ? roleOverviewInput.videoUrl.trim() : '',
+      title: typeof roleOverviewInput.title === 'string' ? roleOverviewInput.title.trim() : '',
+      description: typeof roleOverviewInput.description === 'string' ? roleOverviewInput.description.trim() : '',
+    }
     const status = body.status === 'archived' ? 'archived' : 'open'
     const isPublished = body.isPublished !== false
     const active = typeof body.active === 'boolean' ? body.active : status === 'open' && isPublished
@@ -136,6 +149,7 @@ export async function PATCH(request: NextRequest) {
           summary: body.summary ?? '',
           availability: body.availability ?? 'open',
           order: Number.isFinite(body.order) ? body.order : 1,
+          rolesOverview,
           status,
           isPublished,
           active,

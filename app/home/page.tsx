@@ -1,4 +1,4 @@
-import SlideHero from '@/components/portal/SlideHero'
+import HomeSlidesHero from '@/components/portal/HomeSlidesHero'
 import { DEFAULT_NGO } from '@/lib/config/ngoConfigs'
 import { getPortalContext } from '@/lib/portal/page-data'
 
@@ -7,7 +7,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <SlideHero slides={config.homeSlides} ngo={config.id} scopedRoutes={false} />
+      <HomeSlidesHero fallbackSlides={config.homeSlides} ngo={config.id} scopedRoutes={false} />
     </div>
   )
 }
