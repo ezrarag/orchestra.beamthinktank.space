@@ -573,6 +573,13 @@ service cloud.firestore {
       allow create: if true;
       allow read, write: if isAdmin() || viewerAdminBypassEnabled();
     }
+
+    // Viewer-linked supporting documents (scores, context, research notes)
+    match /viewerDocuments/{documentId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || viewerAdminBypassEnabled();
+      allow update, delete: if isAdmin() || viewerAdminBypassEnabled();
+    }
     
     // Default deny rule for any unmatched paths
     match /{document=**} {

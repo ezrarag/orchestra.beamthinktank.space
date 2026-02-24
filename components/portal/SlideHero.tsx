@@ -9,6 +9,10 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { User, X } from 'lucide-react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import {
+  fetchInternalWebsiteDirectory,
+  type BeamWebsiteDirectoryEntry,
+} from '@/lib/api/beamWebsiteDirectory'
 
 interface SlideHeroProps {
   slides: HeroSlide[]
@@ -17,39 +21,15 @@ interface SlideHeroProps {
   preloadImages?: boolean
 }
 
-type BeamSiteEntry = {
-  id: string
-  label: string
-  title: string
-  subtitle: string
-  url: string
-  previewImageUrl?: string
-  sortOrder?: number
-  isActive?: boolean
-}
-
-const defaultBeamSites: BeamSiteEntry[] = [
-  {
-    id: 'beam-home',
-    label: 'BEAM Home Site',
-    title: 'BEAM Home Site',
-    subtitle: 'Explore the primary BEAM platform and ecosystem updates.',
-    url: 'https://beamthinktank.space',
-    previewImageUrl: '',
-    sortOrder: 0,
-    isActive: true,
-  },
-]
-
 export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadImages = false }: SlideHeroProps) {
   const [selectedSlideId, setSelectedSlideId] = useState<string | null>(null)
   const [showSlideMenu, setShowSlideMenu] = useState(false)
   const [showBeamModal, setShowBeamModal] = useState(false)
   const [collageVideoUrls, setCollageVideoUrls] = useState<string[]>([])
-  const [beamSites, setBeamSites] = useState<BeamSiteEntry[]>(defaultBeamSites)
+  const [beamSites, setBeamSites] = useState<BeamWebsiteDirectoryEntry[]>([])
   const [beamSitesLoading, setBeamSitesLoading] = useState(false)
   const [beamSitesError, setBeamSitesError] = useState<string | null>(null)
-  const [selectedBeamSiteId, setSelectedBeamSiteId] = useState<string>(defaultBeamSites[0].id)
+  const [selectedBeamSiteId, setSelectedBeamSiteId] = useState<string>('')
   const slideMenuRef = useRef<HTMLDivElement>(null)
   const { user, role } = useUserRole()
 
@@ -162,39 +142,26 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
       setBeamSitesError(null)
 
       try {
-        const snapshot = await getDocs(collection(db, 'beamWebsiteDirectory'))
+        const payload = await fetchInternalWebsiteDirectory()
         if (!mounted) return
 
-        const items = snapshot.docs
-          .map((item) => {
-            const data = item.data() as Partial<BeamSiteEntry>
-            return {
-              id: item.id,
-              label: data.label ?? data.title ?? 'Untitled site',
-              title: data.title ?? data.label ?? 'Untitled site',
-              subtitle: data.subtitle ?? 'No description provided yet.',
-              url: data.url ?? '',
-              previewImageUrl: data.previewImageUrl,
-              sortOrder: data.sortOrder ?? 999,
-              isActive: data.isActive ?? true,
-            } as BeamSiteEntry
-          })
-          .filter((item) => item.isActive !== false && item.url.trim().length > 0)
-          .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+        const items = payload.entries
+          .filter((item) => item.url?.trim().length > 0)
+          .map((item) => ({
+            ...item,
+            label: item.label ?? item.title ?? 'Untitled site',
+            title: item.title ?? item.label ?? 'Untitled site',
+            subtitle: item.subtitle ?? 'No description provided yet.',
+          }))
 
-        if (items.length > 0) {
-          setBeamSites(items)
-          setSelectedBeamSiteId(items[0].id)
-        } else {
-          setBeamSites(defaultBeamSites)
-          setSelectedBeamSiteId(defaultBeamSites[0].id)
-        }
+        setBeamSites(items)
+        setSelectedBeamSiteId(items[0]?.id ?? '')
       } catch (error) {
         console.error('Error loading BEAM website directory:', error)
         if (mounted) {
-          setBeamSites(defaultBeamSites)
-          setSelectedBeamSiteId(defaultBeamSites[0].id)
-          setBeamSitesError('Using default directory while BEAM links load.')
+          setBeamSites([])
+          setSelectedBeamSiteId('')
+          setBeamSitesError('Unable to load BEAM directory right now.')
         }
       } finally {
         if (mounted) {
@@ -220,9 +187,8 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
 
   const quickRoutes = [
     { label: 'BEAM', action: 'beam-modal' as const },
-    { label: 'Admin Dashboard', href: resolvePortalPath('/admin', ngo, scopedRoutes) },
+    { label: 'Admin', href: resolvePortalPath('/admin', ngo, scopedRoutes) },
     { label: 'Participant Dashboard', href: resolvePortalPath('/dashboard', ngo, scopedRoutes) },
-    { label: 'Publishing Sign Up', href: '/publishing/signup' },
     { label: 'Viewer', href: '/viewer' },
   ]
 
@@ -354,14 +320,19 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
       )}
 
       {showBeamModal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/20 bg-[#0B0D12] p-5 text-white shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Choose A BEAM Site</h3>
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setShowBeamModal(false)} />
+          <div className="relative z-10 flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-white/20 bg-black/45 p-5 text-white shadow-2xl backdrop-blur-sm">
+            <div className="mb-4 flex items-center justify-between border-b border-white/15 pb-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D4AF37]">BEAM Network</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">Choose A BEAM Site</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowBeamModal(false)}
-                className="rounded-full border border-white/25 p-2 hover:bg-white/10"
+                className="rounded-full border border-white/25 p-2 text-white/80 transition hover:bg-white/10 hover:text-white"
                 aria-label="Close site chooser"
               >
                 <X className="h-4 w-4" />
@@ -369,27 +340,44 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
             </div>
 
             <label className="mb-4 block">
-              <span className="mb-2 block text-sm text-white/70">Website</span>
+              <span className="mb-2 block text-sm text-white/75">Website</span>
               <select
                 value={selectedBeamSiteId}
                 onChange={(event) => setSelectedBeamSiteId(event.target.value)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
+                disabled={beamSites.length === 0}
+                className="w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
               >
-                {beamSites.map((site) => (
-                  <option key={site.id} value={site.id} className="text-black">
-                    {site.label}
+                {beamSites.length === 0 ? (
+                  <option value="" className="text-black">
+                    No websites available
                   </option>
-                ))}
+                ) : (
+                  beamSites.map((site) => (
+                    <option key={site.id} value={site.id} className="text-black">
+                      {site.label}
+                    </option>
+                  ))
+                )}
               </select>
             </label>
 
             {(() => {
               const selectedSite = beamSites.find((site) => site.id === selectedBeamSiteId) ?? beamSites[0]
-              if (!selectedSite) return null
+              if (!selectedSite) {
+                return (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-white/20 bg-black/35 p-4 text-sm text-white/75">
+                      {beamSitesLoading
+                        ? 'Loading BEAM websites...'
+                        : beamSitesError || 'No internal BEAM websites are available right now.'}
+                    </div>
+                  </div>
+                )
+              }
 
               return (
                 <div className="space-y-4">
-                  <div className="overflow-hidden rounded-xl border border-white/15 bg-black/35">
+                  <div className="overflow-hidden rounded-xl border border-white/20 bg-black/35">
                     {selectedSite.previewImageUrl ? (
                       <img
                         src={selectedSite.previewImageUrl}
@@ -404,7 +392,7 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
                   </div>
 
                   <div>
-                    <h4 className="text-xl font-semibold">{selectedSite.title}</h4>
+                    <h4 className="text-xl font-semibold text-white">{selectedSite.title}</h4>
                     <p className="mt-1 text-sm text-white/75">{selectedSite.subtitle}</p>
                   </div>
 
@@ -423,10 +411,11 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
               )
             })()}
 
-            <div className="mt-4 text-xs text-white/60">
+            <div className="mt-4 border-t border-white/15 pt-3 text-xs text-white/60">
               {beamSitesLoading
                 ? 'Loading directory entries...'
-                : beamSitesError || 'Directory is powered by Firestore collection: beamWebsiteDirectory'}
+                : beamSitesError || 'Source: BEAM internal directory endpoint'}
+            </div>
             </div>
           </div>
         </div>

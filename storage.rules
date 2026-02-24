@@ -39,6 +39,22 @@ service firebase.storage {
           request.auth.token.beam_admin == true
         );
     }
+
+    // Viewer document uploads (scores, context, research notes)
+    match /viewer-documents/{contentId}/{fileName} {
+      allow write: if
+        request.resource.size < 25 * 1024 * 1024 &&
+        (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'application/msword' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          request.resource.contentType == 'text/plain' ||
+          request.resource.contentType == 'text/markdown' ||
+          request.resource.contentType.matches('image/.*')
+        );
+
+      allow read: if true;
+    }
     
     // Default deny rule for any unmatched paths
     match /{allPaths=**} {

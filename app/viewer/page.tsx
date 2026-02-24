@@ -16,9 +16,11 @@ import {
 } from 'lucide-react'
 import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { storage } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 
 type AreaSection = {
   id: string
@@ -92,6 +94,12 @@ const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
 const LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY = 'viewer-last-active-video'
 const PROGRESS_SAVE_INTERVAL_MS = 1200
 const BROAD_FETCH_LIMIT = 50
+const VIEWER_DOCUMENT_CATEGORY_OPTIONS: Array<{ value: ViewerDocumentCategory; label: string }> = [
+  { value: 'score', label: 'Score Related' },
+  { value: 'historical-context', label: 'Historical Context' },
+  { value: 'research-notes', label: 'Research Notes' },
+  { value: 'performance-notes', label: 'Performance Notes' },
+]
 const VIEWER_CONTENT_DEFAULTS = {
   status: 'open',
   isPublished: false,
@@ -140,6 +148,22 @@ type StudentTelemetrySession = {
   startedAt: number
 }
 
+type ViewerDocumentCategory = 'score' | 'historical-context' | 'research-notes' | 'performance-notes'
+
+type ViewerDocument = {
+  id: string
+  contentId: string
+  areaId: string
+  category: ViewerDocumentCategory
+  title: string
+  description?: string
+  fileUrl: string
+  fileName?: string
+  storagePath?: string
+  uploadedByRole?: string
+  createdAt?: unknown
+}
+
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
     const withCode = error as { code?: unknown; message?: unknown }
@@ -150,6 +174,12 @@ function getErrorMessage(error: unknown): string {
   }
   if (error instanceof Error) return error.message
   return String(error)
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const code = 'code' in error ? String((error as { code?: unknown }).code ?? '') : ''
+  return code === 'permission-denied' || code.endsWith('/permission-denied')
 }
 
 function normalizeViewerContent(id: string, data: Partial<ViewerContent>): ViewerContent {
@@ -440,6 +470,17 @@ export default function ViewerPage() {
   const studentCameraPreviewRef = useRef<HTMLVideoElement | null>(null)
   const studentCameraStreamRef = useRef<MediaStream | null>(null)
   const studentTelemetryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [documentsLoadState, setDocumentsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [documentsError, setDocumentsError] = useState<string | null>(null)
+  const [activeDocuments, setActiveDocuments] = useState<ViewerDocument[]>([])
+  const [documentCategoryFilter, setDocumentCategoryFilter] = useState<'all' | ViewerDocumentCategory>('all')
+  const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false)
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false)
+  const [documentUploadTitle, setDocumentUploadTitle] = useState('')
+  const [documentUploadDescription, setDocumentUploadDescription] = useState('')
+  const [documentUploadCategory, setDocumentUploadCategory] = useState<ViewerDocumentCategory>('score')
+  const [documentUploadFile, setDocumentUploadFile] = useState<File | null>(null)
+  const [isStudentPipCollapsed, setIsStudentPipCollapsed] = useState(false)
 
   const requestedAreaFilter = useMemo(() => {
     const area = searchParams.get('area')
@@ -596,6 +637,8 @@ export default function ViewerPage() {
   }, [watchedHistory])
   const canViewComments = viewerIntent !== 'select'
   const canCreateComments = viewerIntent === 'partner' || viewerIntent === 'instructor'
+  const canViewDocuments = viewerIntent === 'student' || viewerIntent === 'instructor' || viewerIntent === 'partner'
+  const canUploadDocuments = canViewDocuments
 
   const recordedLabel = useMemo(() => {
     if (!activeStory?.recordedAt) return 'Date not provided'
@@ -607,6 +650,11 @@ export default function ViewerPage() {
       year: 'numeric',
     })
   }, [activeStory?.recordedAt])
+
+  const filteredDocuments = useMemo(() => {
+    if (documentCategoryFilter === 'all') return activeDocuments
+    return activeDocuments.filter((item) => item.category === documentCategoryFilter)
+  }, [activeDocuments, documentCategoryFilter])
 
   const getStoryProgressPercent = (contentId: string): number => {
     const progress = contentProgress[contentId]
@@ -999,10 +1047,8 @@ export default function ViewerPage() {
     const links: HTMLLinkElement[] = []
     preloadTargets.forEach((url) => {
       const link = document.createElement('link')
-      link.rel = 'preload'
-      link.as = 'video'
+      link.rel = 'prefetch'
       link.href = url
-      link.crossOrigin = 'anonymous'
       link.dataset.viewerPreload = '1'
       document.head.appendChild(link)
       links.push(link)
@@ -1068,7 +1114,9 @@ export default function ViewerPage() {
         setActiveComments(comments)
         setCommentsLoadState('ready')
       } catch (error) {
-        console.error('Error loading viewer comments:', error)
+        if (!isPermissionDeniedError(error)) {
+          console.error('Error loading viewer comments:', error)
+        }
         if (!mounted) return
         setCommentsError(getErrorMessage(error))
         setCommentsLoadState('error')
@@ -1081,6 +1129,60 @@ export default function ViewerPage() {
       mounted = false
     }
   }, [db, activeVideo.contentId, canViewComments])
+
+  useEffect(() => {
+    if (!db || !activeVideo.contentId || !canViewDocuments) {
+      setDocumentsLoadState(canViewDocuments ? 'ready' : 'idle')
+      setDocumentsError(null)
+      setActiveDocuments([])
+      return
+    }
+    let mounted = true
+    const loadDocuments = async () => {
+      setDocumentsLoadState('loading')
+      setDocumentsError(null)
+      try {
+        const docsQuery = query(collection(db, 'viewerDocuments'), where('contentId', '==', activeVideo.contentId))
+        const snapshot = await getDocs(docsQuery)
+        if (!mounted) return
+        const rows = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as Partial<ViewerDocument>
+            return {
+              id: docSnap.id,
+              contentId: data.contentId ?? '',
+              areaId: data.areaId ?? '',
+              category: (data.category as ViewerDocumentCategory) ?? 'score',
+              title: data.title ?? 'Untitled Document',
+              description: data.description,
+              fileUrl: data.fileUrl ?? '',
+              fileName: data.fileName,
+              storagePath: data.storagePath,
+              uploadedByRole: data.uploadedByRole,
+              createdAt: data.createdAt,
+            } as ViewerDocument
+          })
+          .filter((item) => item.fileUrl)
+          .sort((a, b) => {
+            const bTs = getTimestampMillis(b.createdAt)
+            const aTs = getTimestampMillis(a.createdAt)
+            return bTs - aTs
+          })
+        setActiveDocuments(rows)
+        setDocumentsLoadState('ready')
+      } catch (error) {
+        console.error('Error loading viewer documents:', error)
+        if (!mounted) return
+        setDocumentsError(getErrorMessage(error))
+        setDocumentsLoadState('error')
+        setActiveDocuments([])
+      }
+    }
+    void loadDocuments()
+    return () => {
+      mounted = false
+    }
+  }, [db, activeVideo.contentId, canViewDocuments])
 
   useEffect(() => {
     if (viewerIntent !== 'student') {
@@ -1099,6 +1201,11 @@ export default function ViewerPage() {
     setIsCommentComposerOpen(false)
     setDraftCommentMessage('')
     setDraftCommentThumbnail(null)
+    setIsDocumentUploadOpen(false)
+    setDocumentUploadTitle('')
+    setDocumentUploadDescription('')
+    setDocumentUploadCategory('score')
+    setDocumentUploadFile(null)
   }, [activeVideo.contentId])
 
   const getTimestampMillis = (value: unknown): number => {
@@ -1353,6 +1460,59 @@ export default function ViewerPage() {
     }
   }
 
+  const uploadViewerDocument = async () => {
+    if (!db || !storage || !activeVideo.contentId || !canUploadDocuments || !documentUploadFile) return
+    const title = documentUploadTitle.trim() || documentUploadFile.name
+    setIsUploadingDocument(true)
+    setDocumentsError(null)
+    try {
+      const safeName = documentUploadFile.name.replace(/\s+/g, '_')
+      const storagePath = `viewer-documents/${activeVideo.contentId}/${Date.now()}_${safeName}`
+      const fileRef = storageRef(storage, storagePath)
+      await uploadBytes(fileRef, documentUploadFile)
+      const fileUrl = await getDownloadURL(fileRef)
+
+      const payload = {
+        contentId: activeVideo.contentId,
+        areaId: activeVideo.areaId,
+        category: documentUploadCategory,
+        title,
+        description: documentUploadDescription.trim(),
+        fileUrl,
+        fileName: documentUploadFile.name,
+        storagePath,
+        uploadedByRole: viewerIntent,
+        createdAt: serverTimestamp(),
+      }
+      const createdRef = await addDoc(collection(db, 'viewerDocuments'), payload)
+      setActiveDocuments((current) => [
+        {
+          id: createdRef.id,
+          contentId: activeVideo.contentId!,
+          areaId: activeVideo.areaId,
+          category: documentUploadCategory,
+          title,
+          description: documentUploadDescription.trim(),
+          fileUrl,
+          fileName: documentUploadFile.name,
+          storagePath,
+          uploadedByRole: viewerIntent,
+        },
+        ...current,
+      ])
+      setIsDocumentUploadOpen(false)
+      setDocumentUploadTitle('')
+      setDocumentUploadDescription('')
+      setDocumentUploadCategory('score')
+      setDocumentUploadFile(null)
+    } catch (error) {
+      console.error('Error uploading viewer document:', error)
+      setDocumentsError(getErrorMessage(error))
+    } finally {
+      setIsUploadingDocument(false)
+    }
+  }
+
   const enableStudentCamera = async () => {
     if (viewerIntent !== 'student') return
     try {
@@ -1427,7 +1587,9 @@ export default function ViewerPage() {
       try {
         await addDoc(collection(db, 'studentSessionTelemetry'), payload)
       } catch (error) {
-        console.error('Error writing student telemetry event:', error)
+        if (!isPermissionDeniedError(error)) {
+          console.error('Error writing student telemetry event:', error)
+        }
       }
     }
 
@@ -1453,6 +1615,13 @@ export default function ViewerPage() {
       studentCameraPreviewRef.current.srcObject = null
     }
   }, [isStudentCameraEnabled])
+
+  useEffect(() => {
+    if (!isStudentCameraEnabled) return
+    if (!studentCameraPreviewRef.current) return
+    if (!studentCameraStreamRef.current) return
+    studentCameraPreviewRef.current.srcObject = studentCameraStreamRef.current
+  }, [isStudentCameraEnabled, isStudentPipCollapsed])
 
   useEffect(() => {
     const element = videoRef.current
@@ -1836,15 +2005,19 @@ export default function ViewerPage() {
                     </p>
                   ) : (
                     <>
-                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                        Institution: {activeStory?.institutionName ?? 'Not listed'}
-                      </p>
-                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                        Recorded: {recordedLabel}
-                      </p>
-                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                        Research Status: {activeStory?.researchStatus ?? 'General release'}
-                      </p>
+                      {viewerIntent !== 'select' ? (
+                        <>
+                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                            Institution: {activeStory?.institutionName ?? 'Not listed'}
+                          </p>
+                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                            Recorded: {recordedLabel}
+                          </p>
+                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                            Research Status: {activeStory?.researchStatus ?? 'General release'}
+                          </p>
+                        </>
+                      ) : null}
                     </>
                   )}
 
@@ -1960,15 +2133,19 @@ export default function ViewerPage() {
                   </p>
                 ) : (
                   <>
-                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                      Institution: {activeStory?.institutionName ?? 'Not listed'}
-                    </p>
-                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                      Recorded: {recordedLabel}
-                    </p>
-                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                      Research Status: {activeStory?.researchStatus ?? 'General release'}
-                    </p>
+                    {viewerIntent !== 'select' ? (
+                      <>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Institution: {activeStory?.institutionName ?? 'Not listed'}
+                        </p>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Recorded: {recordedLabel}
+                        </p>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Research Status: {activeStory?.researchStatus ?? 'General release'}
+                        </p>
+                      </>
+                    ) : null}
                     <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
                   </>
                 )}
@@ -2106,6 +2283,15 @@ export default function ViewerPage() {
                       {isStudentCameraEnabled ? 'Disable Camera Coach' : 'Enable Camera Coach'}
                     </button>
                   ) : null}
+                  {canUploadDocuments && activeVideo.contentId ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsDocumentUploadOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                    >
+                      Upload Document
+                    </button>
+                  ) : null}
                 </div>
                 {canViewComments && activeVideo.contentId ? (
                   <div className="mt-3 space-y-2 rounded-xl border border-white/15 bg-black/30 p-2.5">
@@ -2148,16 +2334,50 @@ export default function ViewerPage() {
                     <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">
                       Learner Camera (Session Analysis)
                     </p>
-                    <video
-                      ref={studentCameraPreviewRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className="h-24 w-40 rounded-md border border-white/20 bg-black object-cover"
-                    />
                     <p className="mt-2 text-[11px] text-white/70">
-                      Camera movement events are sampled to Firestore every {Math.round(STUDENT_TELEMETRY_INTERVAL_MS / 1000)}s.
+                      Live camera pop-up is active. Movement telemetry events are sampled every {Math.round(STUDENT_TELEMETRY_INTERVAL_MS / 1000)}s.
                     </p>
+                  </div>
+                ) : null}
+                {canViewDocuments && activeVideo.contentId ? (
+                  <div className="mt-3 space-y-2 rounded-xl border border-white/15 bg-black/30 p-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">Documents</p>
+                      <select
+                        value={documentCategoryFilter}
+                        onChange={(event) =>
+                          setDocumentCategoryFilter(event.target.value as 'all' | ViewerDocumentCategory)
+                        }
+                        className="rounded-lg border border-white/20 bg-black/35 px-2 py-1 text-[11px] text-white outline-none focus:border-[#D4AF37]"
+                      >
+                        <option value="all">All Categories</option>
+                        {VIEWER_DOCUMENT_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {documentsLoadState === 'loading' ? <p className="text-xs text-white/70">Loading documents…</p> : null}
+                    {documentsError ? <p className="text-xs text-red-200">{documentsError}</p> : null}
+                    {documentsLoadState === 'ready' && filteredDocuments.length === 0 ? (
+                      <p className="text-xs text-white/70">No documents available in this category yet.</p>
+                    ) : null}
+                    {filteredDocuments.slice(0, 4).map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left transition hover:border-[#D4AF37]/40"
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">
+                          {VIEWER_DOCUMENT_CATEGORY_OPTIONS.find((option) => option.value === item.category)?.label ?? item.category}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-white">{item.title}</p>
+                        {item.description ? <p className="mt-0.5 text-xs text-white/75">{item.description}</p> : null}
+                      </a>
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -2165,6 +2385,93 @@ export default function ViewerPage() {
           </div>
         </div>
       </section>
+
+      {viewerIntent === 'student' && isStudentCameraEnabled ? (
+        <div className="pointer-events-none fixed bottom-5 right-5 z-40">
+          <div className="pointer-events-auto w-[220px] overflow-hidden rounded-2xl border border-white/25 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.42)] backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-white/15 px-2.5 py-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#F5D37A]">Learner Camera</p>
+              <button
+                type="button"
+                onClick={() => setIsStudentPipCollapsed((current) => !current)}
+                className="text-[11px] text-white/80 hover:text-white"
+              >
+                {isStudentPipCollapsed ? 'Show' : 'Hide'}
+              </button>
+            </div>
+            {!isStudentPipCollapsed ? (
+              <video
+                ref={studentCameraPreviewRef}
+                autoPlay
+                muted
+                playsInline
+                className="h-32 w-full bg-black object-cover [transform:scaleX(-1)]"
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {isDocumentUploadOpen ? (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setIsDocumentUploadOpen(false)} />
+          <div className="relative mx-auto mt-16 w-[min(92%,560px)] rounded-2xl border border-white/20 bg-[#0E1018] p-5 text-white">
+            <h3 className="text-lg font-semibold">Upload Viewer Document</h3>
+            <p className="mt-1 text-xs text-white/70">Attach score/research material to this selected video entry.</p>
+            <div className="mt-3 grid gap-2">
+              <input
+                value={documentUploadTitle}
+                onChange={(event) => setDocumentUploadTitle(event.target.value)}
+                placeholder="Document title"
+                className="w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
+              />
+              <select
+                value={documentUploadCategory}
+                onChange={(event) => setDocumentUploadCategory(event.target.value as ViewerDocumentCategory)}
+                className="w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
+              >
+                {VIEWER_DOCUMENT_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                rows={3}
+                value={documentUploadDescription}
+                onChange={(event) => setDocumentUploadDescription(event.target.value)}
+                placeholder="Short description (optional)"
+                className="w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
+              />
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
+                onChange={(event) => setDocumentUploadFile(event.target.files?.[0] ?? null)}
+                className="w-full rounded-xl border border-white/20 bg-black/35 px-3 py-2 text-xs text-white/90 file:mr-3 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white"
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDocumentUploadOpen(false)}
+                className="rounded-full border border-white/30 bg-black/25 px-4 py-1.5 text-xs font-semibold text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUploadingDocument || !documentUploadFile}
+                onClick={() => {
+                  void uploadViewerDocument()
+                }}
+                className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/15 px-4 py-1.5 text-xs font-semibold text-[#F5D37A] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isUploadingDocument ? 'Uploading…' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isCommentComposerOpen ? (
         <div className="fixed inset-0 z-[60]">
@@ -2242,7 +2549,7 @@ export default function ViewerPage() {
                   const isSelected = area.id === selectedAreaId
 
                   return (
-                    <button
+                    <div
                       key={area.id}
                       onClick={() => {
                         setSelectedAreaId(area.id)
@@ -2261,7 +2568,23 @@ export default function ViewerPage() {
                           ? 'border-[#D4AF37] bg-white/[0.08]'
                           : 'border-white/10 bg-white/[0.03] hover:border-white/30'
                       }`}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setSelectedAreaId(area.id)
+                          setAreaFilterInUrl(area.id)
+                          setActiveVideo({
+                            url: '',
+                            title: area.title,
+                            areaId: area.id,
+                            overlayClass: area.visual,
+                            sourceType: 'area-default',
+                          })
+                          setIsUsingFallbackContent(false)
+                        }
+                      }}
                     >
                       <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">Slide {index + 1}</p>
                       <div className="mb-2 flex items-center justify-between gap-2">
@@ -2294,7 +2617,7 @@ export default function ViewerPage() {
                         </p>
                       ) : null}
                       <span className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-transparent transition group-hover:ring-white/20" />
-                    </button>
+                    </div>
                   )
                 })}
               </div>
