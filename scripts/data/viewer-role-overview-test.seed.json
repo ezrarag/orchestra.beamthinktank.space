@@ -1,0 +1,40 @@
+{
+  "content": [
+    {
+      "id": "role-overview-test-stage-manager",
+      "areaId": "business",
+      "sectionId": "business-production",
+      "slug": "stage-manager-role-overview",
+      "title": "Stage Manager Role Overview",
+      "description": "Overview for the Stage Manager role in the BEAM viewer role-avatar track.",
+      "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
+      "isPublished": true,
+      "sortOrder": 1,
+      "accessLevel": "open",
+      "contentType": "role_overview",
+      "series": "role-avatars",
+      "tags": ["role_overview", "role_avatar", "test"],
+      "roleOverview": {
+        "roleId": "stage-manager",
+        "title": "Stage Manager",
+        "description": "Coordinate rehearsal and performance flow, cues, and production handoffs.",
+        "whatYouDo": [
+          "Run cue sheets and timeline checkpoints",
+          "Coordinate artists, production, and venue logistics",
+          "Track rehearsal notes and execution details"
+        ],
+        "requirements": {
+          "time": "6-10 hours per week during active cycles",
+          "skill": "Organized communication and live-production coordination",
+          "equipment": "Laptop, headset, and reliable internet"
+        },
+        "whatYouGain": [
+          "Training from production leads",
+          "Project credits and portfolio evidence",
+          "Paid opportunities on qualifying projects",
+          "Network access across BEAM collaborators"
+        ]
+      }
+    }
+  ]
+}

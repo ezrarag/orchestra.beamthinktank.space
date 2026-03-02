@@ -13,7 +13,7 @@ import { db } from '@/lib/firebase'
 
 const AREA_TITLES: Record<ViewerAreaId, string> = {
   professional: 'Professional Orchestra',
-  community: 'Community Orchestra',
+  community: 'Repertoire Orchestra',
   chamber: 'Chamber Series',
   publishing: 'Publishing',
   business: 'The Business',

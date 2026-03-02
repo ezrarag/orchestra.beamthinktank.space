@@ -22,7 +22,7 @@ const institutions = [
 ]
 
 const communityOrchestras = [
-  { id: 'mke-community-orchestra', name: 'Milwaukee Community Orchestra' },
+  { id: 'mke-community-orchestra', name: 'Milwaukee Repertoire Orchestra' },
   { id: 'north-side-strings', name: 'North Side Strings Collective' },
   { id: 'lakefront-chamber', name: 'Lakefront Chamber Ensemble' },
 ]
@@ -104,7 +104,7 @@ const viewerAreaSummaries: ViewerAreaSummary[] = [
   },
   {
     id: 'community',
-    title: 'Community Orchestra',
+    title: 'Repertoire Orchestra',
     narrative: 'Neighborhood ensembles, schools, and local partner collaborations.',
     sections: [
       { id: 'community-lead', title: 'Community Leads', summary: 'Participant-led stories and performances.' },
@@ -402,7 +402,7 @@ export default function JoinParticipantPage() {
       router.refresh()
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : 'Failed to submit your community orchestra application.',
+        submitError instanceof Error ? submitError.message : 'Failed to submit your repertoire orchestra application.',
       )
     } finally {
       setSubmitting(false)
@@ -587,7 +587,7 @@ export default function JoinParticipantPage() {
                   : 'border-white/15 bg-black/20 hover:border-white/30'
               }`}
             >
-              <p className="font-semibold">Community Orchestra Performer</p>
+              <p className="font-semibold">Repertoire Orchestra Performer</p>
             </button>
             <button
               type="button"
@@ -698,7 +698,7 @@ export default function JoinParticipantPage() {
 
           {selectedPathway === 'community' && (
             <div className="mt-6 space-y-4 rounded-xl border border-white/10 bg-black/25 p-5">
-              <h2 className="text-xl font-semibold">Community Orchestra Performer</h2>
+              <h2 className="text-xl font-semibold">Repertoire Orchestra Performer</h2>
               <label className="block">
                 <span className="mb-1 block text-sm text-white/80">Instrument</span>
                 <input

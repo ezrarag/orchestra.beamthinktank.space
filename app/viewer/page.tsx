@@ -47,7 +47,13 @@ type ViewerContent = {
   areaId: string
   status?: string
   sectionId: string
+  slug?: string
+  projectId?: string
+  contentType?: string
+  series?: string
+  tags?: string[]
   title: string
+  composer?: string
   description: string
   thumbnailUrl?: string
   videoUrl: string
@@ -72,6 +78,26 @@ type ViewerContent = {
     states?: string[]
     cities?: string[]
   }
+  roleOverview?: {
+    roleId?: string
+    title?: string
+    description?: string
+    whatYouDo?: string[] | string
+    requirements?: {
+      time?: string
+      skill?: string
+      equipment?: string
+    }
+    whatYouGain?: string[] | string
+  }
+  roleId?: string
+  roleTitle?: string
+  roleDescription?: string
+  whatYouDo?: string[] | string
+  requirementsTime?: string
+  requirementsSkill?: string
+  requirementsEquipment?: string
+  whatYouGain?: string[] | string
 }
 
 type ActiveVideo = {
@@ -188,7 +214,15 @@ function normalizeViewerContent(id: string, data: Partial<ViewerContent>): Viewe
     areaId: data.areaId ?? '',
     status: data.status ?? VIEWER_CONTENT_DEFAULTS.status,
     sectionId: data.sectionId ?? '',
+    slug: data.slug,
+    projectId: data.projectId,
+    contentType: data.contentType,
+    series: data.series,
+    tags: Array.isArray(data.tags)
+      ? data.tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+      : [],
     title: data.title ?? '',
+    composer: data.composer,
     description: data.description ?? '',
     thumbnailUrl: data.thumbnailUrl,
     videoUrl: data.videoUrl ?? '',
@@ -209,7 +243,25 @@ function normalizeViewerContent(id: string, data: Partial<ViewerContent>): Viewe
     sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : 999,
     accessLevel: data.accessLevel ?? VIEWER_CONTENT_DEFAULTS.accessLevel,
     geo: data.geo,
+    roleOverview: data.roleOverview,
+    roleId: data.roleId,
+    roleTitle: data.roleTitle,
+    roleDescription: data.roleDescription,
+    whatYouDo: data.whatYouDo,
+    requirementsTime: data.requirementsTime,
+    requirementsSkill: data.requirementsSkill,
+    requirementsEquipment: data.requirementsEquipment,
+    whatYouGain: data.whatYouGain,
   }
+}
+
+function isRoleOverviewContent(content: ViewerContent | null): boolean {
+  if (!content) return false
+  const tags = content.tags ?? []
+  const hasRoleOverviewTag = tags.some((tag) => tag.toLowerCase() === 'role_overview')
+  const isRoleOverviewType = (content.contentType ?? '').toLowerCase() === 'role_overview'
+  const isRoleAvatarSeries = (content.series ?? '').toLowerCase() === 'role-avatars'
+  return hasRoleOverviewTag || isRoleOverviewType || isRoleAvatarSeries
 }
 
 function contentOverlayClass(content: ViewerContent, fallback: string): string {
@@ -269,11 +321,11 @@ const viewerAreas: ViewerArea[] = [
   },
   {
     id: 'community',
-    title: 'Community Orchestra',
-    tag: 'Neighborhood Stories',
+    title: 'Repertoire Orchestra',
+    tag: 'Repertoire Stories',
     locked: false,
     narrative:
-      'Narratives rooted in local players, schools, and cultural partners. Built to flex by city, state, and institutional collaboration.',
+      'Community-rooted repertoire narratives shaped by local players, schools, and cultural partners. Built to flex by city, state, and institutional collaboration.',
     locationHint: 'Filtered by city, region, and verified institutions.',
     visual: 'from-[#0B5D6E]/75 via-[#12344D]/70 to-[#090A0F]/92',
     videoUrl: placeholderVideoUrl,
@@ -458,6 +510,7 @@ export default function ViewerPage() {
   const [isUsingFallbackContent, setIsUsingFallbackContent] = useState(false)
   const [previewWindow, setPreviewWindow] = useState<{ start: number; end: number } | null>(null)
   const [isPreviewLoopFading, setIsPreviewLoopFading] = useState(false)
+  const [hasAppliedQueryContentSelection, setHasAppliedQueryContentSelection] = useState(false)
   const [commentsLoadState, setCommentsLoadState] = useState<CommentLoadState>('idle')
   const [commentsError, setCommentsError] = useState<string | null>(null)
   const [activeComments, setActiveComments] = useState<ViewerComment[]>([])
@@ -487,6 +540,7 @@ export default function ViewerPage() {
     if (!area) return null
     return viewerAreas.some((item) => item.id === area) ? (area as ViewerAreaId) : null
   }, [searchParams])
+  const requestedContentId = searchParams.get('contentId')
   const moduleMode = searchParams.get('module') === '1'
   const isDevelopment = process.env.NODE_ENV === 'development'
   const devProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'unknown'
@@ -513,6 +567,22 @@ export default function ViewerPage() {
     }
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
+
+  const buildRoleDashboardTargetId = (content: ViewerContent | null, fallbackContentId?: string): string | null => {
+    if (content?.slug) return content.slug
+    if (content?.projectId) return content.projectId
+    if (content?.id) return content.id
+    if (fallbackContentId) return fallbackContentId
+    return null
+  }
+
+  const buildRoleOverviewTargetId = (content: ViewerContent | null, fallbackContentId?: string): string | null => {
+    if (content?.slug) return content.slug
+    if (content?.projectId) return content.projectId
+    if (content?.id) return content.id
+    if (fallbackContentId) return fallbackContentId
+    return null
   }
 
   useEffect(() => {
@@ -611,11 +681,16 @@ export default function ViewerPage() {
     () => viewerAreas.find((area) => area.id === selectedAreaId) ?? viewerAreas[0],
     [selectedAreaId]
   )
+  const canOpenAreaRolesPage = useMemo(
+    () => ['professional', 'community', 'chamber', 'publishing'].includes(selectedAreaId),
+    [selectedAreaId]
+  )
 
   const activeStory = useMemo(
     () => selectedAreaCatalog.find((item) => item.id === activeVideo.contentId) ?? null,
     [selectedAreaCatalog, activeVideo.contentId]
   )
+  const isRoleOverview = useMemo(() => isRoleOverviewContent(activeStory), [activeStory])
 
   const selectedAreaRoleDoc = useMemo(() => {
     return viewerAreaRolesMap?.[selectedAreaId] ?? null
@@ -635,9 +710,9 @@ export default function ViewerPage() {
       .sort((a, b) => b.watchedAt - a.watchedAt)
       .slice(0, 5)
   }, [watchedHistory])
-  const canViewComments = viewerIntent !== 'select'
-  const canCreateComments = viewerIntent === 'partner' || viewerIntent === 'instructor'
-  const canViewDocuments = viewerIntent === 'student' || viewerIntent === 'instructor' || viewerIntent === 'partner'
+  const canViewComments = !isRoleOverview && viewerIntent !== 'select'
+  const canCreateComments = !isRoleOverview && (viewerIntent === 'partner' || viewerIntent === 'instructor')
+  const canViewDocuments = !isRoleOverview && (viewerIntent === 'student' || viewerIntent === 'instructor' || viewerIntent === 'partner')
   const canUploadDocuments = canViewDocuments
 
   const recordedLabel = useMemo(() => {
@@ -958,6 +1033,34 @@ export default function ViewerPage() {
   }, [db, selectedAreaId])
 
   useEffect(() => {
+    if (!db || !requestedContentId || hasAppliedQueryContentSelection) return
+    let mounted = true
+
+    const loadRequestedContent = async () => {
+      try {
+        const direct = await getDoc(doc(db, 'viewerContent', requestedContentId))
+        if (!mounted) return
+        if (direct.exists()) {
+          const normalized = normalizeViewerContent(direct.id, direct.data() as Partial<ViewerContent>)
+          const areaId = (normalized.areaId || selectedAreaId) as ViewerArea['id']
+          await handleOpenContent(normalized, areaId)
+          setHasAppliedQueryContentSelection(true)
+          return
+        }
+      } catch (error) {
+        console.error('Error loading requested contentId:', error)
+      } finally {
+        if (mounted) setHasAppliedQueryContentSelection(true)
+      }
+    }
+
+    void loadRequestedContent()
+    return () => {
+      mounted = false
+    }
+  }, [db, hasAppliedQueryContentSelection, requestedContentId, selectedAreaId])
+
+  useEffect(() => {
     if (!db) {
       setFirestoreNarrativeSections(null)
       return
@@ -1189,6 +1292,27 @@ export default function ViewerPage() {
       setIsStudentCameraEnabled(false)
     }
   }, [viewerIntent])
+
+  useEffect(() => {
+    if (isRoleOverview) {
+      setViewerIntent('select')
+      setIsStudentCameraEnabled(false)
+      setIsMuted(false)
+      setHasUserEnabledAudio(true)
+      setVolume((current) => (current > 0 ? current : 0.85))
+    }
+  }, [isRoleOverview])
+
+  useEffect(() => {
+    if (!isRoleOverview || !videoRef.current) return
+    videoRef.current.muted = false
+    if (videoRef.current.volume === 0) {
+      videoRef.current.volume = volume > 0 ? volume : 0.85
+    }
+    void videoRef.current.play().catch((error) => {
+      console.error('Unable to continue role overview playback with audio enabled:', error)
+    })
+  }, [isRoleOverview, activeVideo.url, volume])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1812,6 +1936,14 @@ export default function ViewerPage() {
     }, OVERLAY_RESTORE_DELAY_MS)
   }
 
+  const pinOverlayVisibility = () => {
+    setIsPlayerOverlayVisible(true)
+    if (overlayTimerRef.current) {
+      clearTimeout(overlayTimerRef.current)
+      overlayTimerRef.current = null
+    }
+  }
+
   const handlePlayRoleExplainer = () => {
     const explainerUrl = selectedAreaRoleDoc?.explainerVideoUrl?.trim() ?? ''
     if (!explainerUrl) return
@@ -2098,7 +2230,7 @@ export default function ViewerPage() {
                 No default area video configured.
               </p>
             ) : null}
-            {isMuted && !hasUserEnabledAudio ? (
+            {isMuted && !hasUserEnabledAudio && !isRoleOverview ? (
               <button
                 type="button"
                 onClick={handleEnableAudio}
@@ -2117,6 +2249,24 @@ export default function ViewerPage() {
                 <PlayCircle className="h-4 w-4" />
                 {activeVideo.contentId ? 'Browse' : 'Start Watching'}
               </button>
+              {(buildRoleOverviewTargetId(activeStory, activeVideo.contentId) || canOpenAreaRolesPage) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = buildRoleOverviewTargetId(activeStory, activeVideo.contentId) ?? selectedAreaId
+                    if (!target) return
+                    router.push(
+                      `/viewer/role-overview/${encodeURIComponent(target)}${
+                        activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''
+                      }`
+                    )
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  Open {selectedArea.title} Roles Page
+                </button>
+              ) : null}
               <Link
                 href="/home"
                 className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-black/25 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
@@ -2152,7 +2302,7 @@ export default function ViewerPage() {
               </div>
             ) : null}
 
-            {activeVideo.url ? (
+            {!isRoleOverview && activeVideo.url ? (
               <div className="mt-5 w-full max-w-3xl rounded-2xl border border-white/20 bg-black/35 p-3">
                 <div className="mb-2 flex items-center justify-between text-xs text-white/70">
                   <span>{formatDuration(currentPlaybackTime)}</span>
@@ -2221,30 +2371,85 @@ export default function ViewerPage() {
                     onChange={(event) => handleVolumeChange(Number(event.target.value))}
                     className="w-full accent-[#D4AF37] sm:w-36"
                   />
-                  <select
-                    value={viewerIntent}
-                    onChange={(event) => setViewerIntent(event.target.value as ViewerIntent)}
-                    className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
-                  >
-                    <option value="select">Select</option>
-                    <option value="subscriber">Subscriber</option>
-                    <option value="student">Student Learner</option>
-                    <option value="instructor">Institutional Instructor</option>
-                    <option value="partner">Partner</option>
-                  </select>
-                  {viewerIntent === 'partner' ? (
-                    <select
-                      value={partnerType}
-                      onChange={(event) => setPartnerType(event.target.value)}
-                      className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
-                    >
-                      <option>Community Partner</option>
-                      <option>Institutional Partner</option>
-                      <option>Presenter</option>
-                      <option>Sponsor</option>
-                    </select>
+                  {!isRoleOverview ? (
+                    <>
+                      <select
+                        value={viewerIntent}
+                        onChange={(event) => setViewerIntent(event.target.value as ViewerIntent)}
+                        className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
+                      >
+                        <option value="select">Select</option>
+                        <option value="subscriber">Subscriber</option>
+                        <option value="student">Student Learner</option>
+                        <option value="instructor">Institutional Instructor</option>
+                        <option value="partner">Partner</option>
+                      </select>
+                      {viewerIntent === 'partner' ? (
+                        <select
+                          value={partnerType}
+                          onChange={(event) => setPartnerType(event.target.value)}
+                          className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-1.5 text-xs text-white outline-none focus:border-[#D4AF37] sm:w-auto"
+                        >
+                          <option>Community Partner</option>
+                          <option>Institutional Partner</option>
+                          <option>Presenter</option>
+                          <option>Sponsor</option>
+                        </select>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
+                {!isRoleOverview && viewerIntent === 'student' ? (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onMouseEnter={pinOverlayVisibility}
+                      onFocus={pinOverlayVisibility}
+                      onClick={() => {
+                        const target = buildRoleDashboardTargetId(activeStory, activeVideo.contentId)
+                        if (!target) return
+                        router.push(`/viewer/student-learner/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
+                    >
+                      Open Student Learner
+                    </button>
+                  </div>
+                ) : null}
+                {!isRoleOverview && viewerIntent === 'instructor' ? (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onMouseEnter={pinOverlayVisibility}
+                      onFocus={pinOverlayVisibility}
+                      onClick={() => {
+                        const target = buildRoleDashboardTargetId(activeStory, activeVideo.contentId)
+                        if (!target) return
+                        router.push(`/viewer/instructor/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
+                    >
+                      Open Instructor Dashboard
+                    </button>
+                  </div>
+                ) : null}
+                {!isRoleOverview && viewerIntent === 'partner' ? (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onMouseEnter={pinOverlayVisibility}
+                      onFocus={pinOverlayVisibility}
+                      onClick={() => {
+                        const target = buildRoleDashboardTargetId(activeStory, activeVideo.contentId)
+                        if (!target) return
+                        router.push(`/viewer/partner/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
+                    >
+                      Open Partner Dashboard
+                    </button>
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -2268,7 +2473,7 @@ export default function ViewerPage() {
                       Add Comment
                     </button>
                   ) : null}
-                  {viewerIntent === 'student' ? (
+                  {!isRoleOverview && viewerIntent === 'student' ? (
                     <button
                       type="button"
                       onClick={() => {

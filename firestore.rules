@@ -580,6 +580,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() || viewerAdminBypassEnabled();
       allow update, delete: if isAdmin() || viewerAdminBypassEnabled();
     }
+
+    // Role overview interest requests from viewer role CTAs
+    match /roleInterestRequests/{requestId} {
+      allow create: if
+        (request.resource.data.userId == null || request.resource.data.userId == '') ||
+        (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+      allow read, update, delete: if isAdmin() || viewerAdminBypassEnabled();
+    }
     
     // Default deny rule for any unmatched paths
     match /{document=**} {

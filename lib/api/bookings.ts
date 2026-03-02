@@ -35,7 +35,7 @@ export async function createCommunityBookingInterest(
 ): Promise<CreateCommunityBookingInterestResponse> {
   const currentUser = auth?.currentUser
   if (!currentUser) {
-    throw new Error('You must be signed in to apply to a community orchestra.')
+    throw new Error('You must be signed in to apply to a repertoire orchestra.')
   }
 
   const token = await currentUser.getIdToken()
@@ -50,7 +50,7 @@ export async function createCommunityBookingInterest(
 
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error(data?.error || 'Failed to submit community orchestra request.')
+    throw new Error(data?.error || 'Failed to submit repertoire orchestra request.')
   }
 
   return data as CreateCommunityBookingInterestResponse

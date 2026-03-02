@@ -14,10 +14,10 @@
     },
     {
       "id": "community",
-      "title": "Community Orchestra",
-      "tag": "Neighborhood Stories",
+      "title": "Repertoire Orchestra",
+      "tag": "Repertoire Stories",
       "locked": false,
-      "narrative": "Narratives rooted in local players, schools, and cultural partners. Built to flex by city, state, and institutional collaboration.",
+      "narrative": "Community-rooted repertoire narratives shaped by local players, schools, and cultural partners. Built to flex by city, state, and institutional collaboration.",
       "locationHint": "Filtered by city, region, and verified institutions.",
       "visual": "from-[#0B5D6E]/75 via-[#12344D]/70 to-[#090A0F]/92",
       "videoUrl": "https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4",
