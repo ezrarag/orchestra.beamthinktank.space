@@ -7,6 +7,8 @@ The Settings page supports multiple integration types for Pulse to access data f
 - **Outlook** - Microsoft Office 365 / Outlook accounts  
 - **WhatsApp Business** - WhatsApp Business API (coming soon)
 
+For admin Slack note posting, see [`docs/slack-notes-setup.md`](./slack-notes-setup.md).
+
 ## Gmail Integration
 
 ### Setup
@@ -170,7 +172,6 @@ for (const integration of gmailIntegrations.docs) {
   // Query Gmail API with tokens.accessToken
 }
 ```
-
 
 
 

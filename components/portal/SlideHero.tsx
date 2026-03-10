@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { AnimatePresence, motion } from 'framer-motion'
 import { resolvePortalPath } from '@/lib/portal/routes'
 import type { HeroSlide } from '@/lib/types/portal'
 import { useUserRole } from '@/lib/hooks/useUserRole'
@@ -30,6 +31,7 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
   const [beamSitesLoading, setBeamSitesLoading] = useState(false)
   const [beamSitesError, setBeamSitesError] = useState<string | null>(null)
   const [selectedBeamSiteId, setSelectedBeamSiteId] = useState<string>('')
+  const [showParticipationPaths, setShowParticipationPaths] = useState(false)
   const slideMenuRef = useRef<HTMLDivElement>(null)
   const { user, role } = useUserRole()
 
@@ -195,6 +197,12 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
   const isWatchSlide = currentSlide?.id === 'watch-and-support'
   const primaryWatchVideoUrl = collageVideoUrls[0] ?? currentSlide?.videoUrl ?? null
 
+  useEffect(() => {
+    if (!isWatchSlide && showParticipationPaths) {
+      setShowParticipationPaths(false)
+    }
+  }, [isWatchSlide, showParticipationPaths])
+
   const handleCollageTimeUpdate = (event: SyntheticEvent<HTMLVideoElement>) => {
     const video = event.currentTarget
     if (video.currentTime >= 10) {
@@ -235,30 +243,99 @@ export default function SlideHero({ slides, ngo, scopedRoutes = false, preloadIm
           <div className="relative z-10 mx-auto flex h-full w-full max-w-6xl flex-col justify-end px-4 pb-20 pt-12 sm:px-6">
             {(() => {
               const cta = getSlideCta(currentSlide)
+              if (!isWatchSlide) {
+                return (
+                  <>
+                    <h1 className="max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">{currentSlide.title}</h1>
+                    <p className="mt-3 max-w-xl text-base text-white/85 sm:text-lg">{currentSlide.subtitle}</p>
+                    <div className="mt-7 flex items-center gap-5">
+                      {cta.disabled ? (
+                        <span className="inline-flex rounded-lg bg-white/70 px-5 py-3 text-sm font-semibold text-slate-900/80">
+                          {cta.label}
+                        </span>
+                      ) : (
+                        <Link
+                          href={cta.href}
+                          className="inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                        >
+                          {cta.label}
+                        </Link>
+                      )}
+                    </div>
+                  </>
+                )
+              }
+
               return (
-                <>
-                  <h1 className="max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">{currentSlide.title}</h1>
-                  <p className="mt-3 max-w-xl text-base text-white/85 sm:text-lg">{currentSlide.subtitle}</p>
-                  <div className="mt-7 flex items-center gap-5">
-                    {cta.disabled ? (
-                      <span className="inline-flex rounded-lg bg-white/70 px-5 py-3 text-sm font-semibold text-slate-900/80">
-                        {cta.label}
-                      </span>
-                    ) : (
-                      <Link
-                        href={cta.href}
-                        className="inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                      >
-                        {cta.label}
-                      </Link>
-                    )}
-                    {isWatchSlide && (
-                      <Link href="/join/participant" className="text-sm font-semibold text-white/90 underline-offset-4 hover:text-white hover:underline">
-                        Participate
-                      </Link>
-                    )}
-                  </div>
-                </>
+                <AnimatePresence mode="wait" initial={false}>
+                  {!showParticipationPaths ? (
+                    <motion.div
+                      key="watch-default"
+                      initial={{ opacity: 0, filter: 'blur(8px)' }}
+                      animate={{ opacity: 1, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, filter: 'blur(8px)' }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                    >
+                      <h1 className="max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">{currentSlide.title}</h1>
+                      <p className="mt-3 max-w-xl text-base text-white/85 sm:text-lg">{currentSlide.subtitle}</p>
+                      <div className="mt-7 flex items-center gap-5">
+                        {cta.disabled ? (
+                          <span className="inline-flex rounded-lg bg-white/70 px-5 py-3 text-sm font-semibold text-slate-900/80">
+                            {cta.label}
+                          </span>
+                        ) : (
+                          <Link
+                            href={cta.href}
+                            className="inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                          >
+                            {cta.label}
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowParticipationPaths(true)}
+                          className="text-sm font-semibold text-white/90 underline-offset-4 hover:text-white hover:underline"
+                        >
+                          Participate
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="watch-participation-paths"
+                      initial={{ opacity: 0, filter: 'blur(8px)' }}
+                      animate={{ opacity: 1, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, filter: 'blur(8px)' }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                    >
+                      <h1 className="max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">Choose Participation Path</h1>
+                      <p className="mt-3 max-w-xl text-base text-white/85 sm:text-lg">
+                        Continue as an independent participant or as an institutional partner.
+                      </p>
+                      <div className="mt-7 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowParticipationPaths(false)}
+                          className="inline-flex rounded-lg border border-white/35 bg-black/20 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/60"
+                        >
+                          Back
+                        </button>
+                        <Link
+                          href="/join/institution"
+                          className="inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                        >
+                          Institution
+                        </Link>
+                        <Link
+                          href="/join/participant"
+                          className="inline-flex rounded-lg border border-white/35 bg-black/20 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/60"
+                        >
+                          Independent Participant
+                        </Link>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               )
             })()}
           </div>
