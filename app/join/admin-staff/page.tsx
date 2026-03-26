@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -9,6 +9,7 @@ import ParticipantShell from '@/components/participant/ParticipantShell'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 import { createAdminStaffJoinRequest } from '@/lib/api/adminStaff'
 import type { ViewerAreaId } from '@/lib/config/viewerRoleTemplates'
+import { buildOrchestraAdminStaffHandoffUrl, persistPendingAdminStaffJoin } from '@/lib/beamHome'
 import { db } from '@/lib/firebase'
 
 const AREA_TITLES: Record<ViewerAreaId, string> = {
@@ -26,7 +27,7 @@ type AreaSelectionState = {
   intent: string
 }
 
-export default function JoinAdminStaffPage() {
+function JoinAdminStaffPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading } = useUserRole()
@@ -139,11 +140,6 @@ export default function JoinAdminStaffPage() {
   const handleSubmit = async () => {
     setError(null)
 
-    if (!user) {
-      setError('Please sign in before submitting your admin/staff cart.')
-      return
-    }
-
     if (selectedAreas.length === 0) {
       setError('Add at least one area to your cart.')
       return
@@ -156,6 +152,19 @@ export default function JoinAdminStaffPage() {
 
     if (missingRoles) {
       setError(`Choose at least one role for ${AREA_TITLES[missingRoles]}.`)
+      return
+    }
+
+    if (!user) {
+      persistPendingAdminStaffJoin({
+        selections: cartSelections,
+        areaIds: cartSelections.map((selection) => selection.areaId),
+        createdAt: new Date().toISOString(),
+      })
+
+      if (typeof window !== 'undefined') {
+        window.location.assign(buildOrchestraAdminStaffHandoffUrl(cartSelections.map((selection) => selection.areaId)))
+      }
       return
     }
 
@@ -186,9 +195,9 @@ export default function JoinAdminStaffPage() {
   return (
     <ParticipantShell title="Join Admin/Staff" subtitle="Build your role cart by area, then continue to your dashboard.">
       <div className="mx-auto max-w-5xl">
-        <Link href="/join/participant" className="mb-6 inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#D4AF37]">
+        <Link href="/join" className="mb-6 inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#D4AF37]">
           <ArrowLeft className="h-4 w-4" />
-          Back to Participant Paths
+          Back to Join
         </Link>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6 md:p-8">
@@ -199,7 +208,8 @@ export default function JoinAdminStaffPage() {
 
           {!user ? (
             <div className="mt-4 rounded-lg border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-4 py-3 text-sm text-[#F6E6A8]">
-              You can browse this flow without signing in. Sign in is required when you submit.
+              You can build your role cart here without signing in. When you continue, you will be sent through BEAM Home
+              so the participant is tagged to `orchestra.beamthinktank.space`, then returned here to complete access.
             </div>
           ) : null}
 
@@ -297,7 +307,7 @@ export default function JoinAdminStaffPage() {
                 disabled={submitting}
                 className="mt-4 w-full rounded-lg bg-[#D4AF37] px-4 py-2.5 text-sm font-semibold text-black hover:bg-[#E5C86A] disabled:opacity-70"
               >
-                {submitting ? 'Submitting...' : 'Submit Cart and Continue'}
+                {submitting ? 'Submitting...' : user ? 'Submit Cart and Continue' : 'Continue Through BEAM Login'}
               </button>
 
               <Link
@@ -317,5 +327,21 @@ export default function JoinAdminStaffPage() {
         </section>
       </div>
     </ParticipantShell>
+  )
+}
+
+export default function JoinAdminStaffPage() {
+  return (
+    <Suspense
+      fallback={
+        <ParticipantShell title="Join Admin/Staff" subtitle="Select one or more areas and define your role intentions.">
+          <div className="mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/5 p-8">
+            <p className="text-white/80">Loading admin/staff onboarding...</p>
+          </div>
+        </ParticipantShell>
+      }
+    >
+      <JoinAdminStaffPageContent />
+    </Suspense>
   )
 }

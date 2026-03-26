@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { addDoc, collection, doc, getDoc, getDocs, limit, query, serverTimestamp, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -69,7 +69,7 @@ function toArray(value: string[] | string | undefined): string[] {
   return []
 }
 
-export default function RoleOverviewPage() {
+function RoleOverviewPageContent() {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const { user } = useUserRole()
@@ -385,5 +385,19 @@ export default function RoleOverviewPage() {
         ) : null}
       </div>
     </div>
+  )
+}
+
+export default function RoleOverviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#050816] text-white flex items-center justify-center">
+          <p className="text-sm uppercase tracking-[0.18em] text-white/70">Loading Role Overview...</p>
+        </div>
+      }
+    >
+      <RoleOverviewPageContent />
+    </Suspense>
   )
 }

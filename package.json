@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/next-network-host.mjs dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "node scripts/next-network-host.mjs start",
+    "lint": "eslint .",
+    "typegen": "next typegen"
   },
   "dependencies": {
     "@stripe/stripe-js": "^2.2.0",
@@ -16,15 +17,15 @@
     "date-fns": "^2.30.0",
     "firebase": "^9.23.0",
     "firebase-admin": "^13.5.0",
-    "framer-motion": "^10.16.4",
-    "lucide-react": "^0.294.0",
-    "next": "14.0.4",
+    "framer-motion": "^12.36.0",
+    "lucide-react": "^0.577.0",
+    "next": "16.1.6",
     "nodemailer": "^7.0.10",
     "openai": "^4.20.0",
     "postcss": "^8.4.32",
     "qrcode.react": "^4.2.0",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
     "stripe": "^14.10.0",
@@ -32,10 +33,10 @@
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "14.0.4",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.38.0",
+    "eslint-config-next": "16.1.6",
     "typescript": "^5"
   }
 }

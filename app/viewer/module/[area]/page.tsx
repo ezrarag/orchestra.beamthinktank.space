@@ -3,10 +3,11 @@ import type { ViewerAreaId } from '@/lib/config/viewerRoleTemplates'
 
 const validAreas: ViewerAreaId[] = ['professional', 'community', 'chamber', 'publishing', 'business']
 
-export default function ViewerModulePage({ params }: { params: { area: string } }) {
-  const area = params.area as ViewerAreaId
-  if (!validAreas.includes(area)) {
+export default async function ViewerModulePage({ params }: { params: Promise<{ area: string }> }) {
+  const { area } = await params
+  const viewerArea = area as ViewerAreaId
+  if (!validAreas.includes(viewerArea)) {
     redirect('/viewer')
   }
-  redirect(`/viewer?area=${area}&module=1`)
+  redirect(`/viewer?area=${viewerArea}&module=1`)
 }

@@ -10,6 +10,8 @@ const EMPTY_SLIDE: HeroSlide = {
   subtitle: '',
   ctaLabel: '',
   ctaPath: '/home',
+  secondaryCtaLabel: '',
+  secondaryCtaPath: undefined,
   imageSrc: '',
   imageAlt: '',
   audience: 'all',
@@ -33,7 +35,7 @@ export default function HomeSlidesManager() {
         throw new Error([data?.error || 'Failed to load home slides', details].filter(Boolean).join(': '))
       }
       const nextSlides = Array.isArray(data?.slides) ? (data.slides as HeroSlide[]) : []
-      setSlides(nextSlides.slice(0, 5))
+      setSlides(nextSlides.slice(0, 1))
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Unknown error'
       setError(message)
@@ -47,8 +49,8 @@ export default function HomeSlidesManager() {
     void load()
   }, [])
 
-  const canAddSlide = slides.length < 5
-  const orderedSlides = useMemo(() => slides.slice(0, 5), [slides])
+  const canAddSlide = slides.length < 1
+  const orderedSlides = useMemo(() => slides.slice(0, 1), [slides])
 
   const setSlide = (index: number, patch: Partial<HeroSlide>) => {
     setSlides((current) =>
@@ -87,7 +89,7 @@ export default function HomeSlidesManager() {
         throw new Error([data?.error || 'Failed to save home slides', details].filter(Boolean).join(': '))
       }
       const nextSlides = Array.isArray(data?.slides) ? (data.slides as HeroSlide[]) : orderedSlides
-      setSlides(nextSlides.slice(0, 5))
+      setSlides(nextSlides.slice(0, 1))
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unknown error')
     } finally {
@@ -98,7 +100,7 @@ export default function HomeSlidesManager() {
   return (
     <div className="space-y-4 text-white">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Home Slides Admin</h1>
+        <h1 className="text-2xl font-bold">Home Hero Admin</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -121,7 +123,7 @@ export default function HomeSlidesManager() {
       </div>
 
       <div className="rounded-xl border border-white/15 bg-white/[0.03] p-3 text-xs text-white/70">
-        Manage up to 5 slides shown on <span className="font-semibold text-white">/home</span>. Order in this list is the display order.
+        Manage the hero shown on <span className="font-semibold text-white">/home</span>. The home page now always shows exactly two actions: <span className="font-semibold text-white">Watch</span> and <span className="font-semibold text-white">Participate</span>. This editor controls the hero title, subtitle, poster image, and the exact background video URL.
       </div>
 
       {error ? <p className="rounded-lg border border-red-400/35 bg-red-500/10 p-3 text-sm text-red-200">{error}</p> : null}
@@ -131,7 +133,7 @@ export default function HomeSlidesManager() {
         {orderedSlides.map((slide, index) => (
           <div key={`${slide.id || 'slide'}-${index}`} className="rounded-xl border border-white/15 bg-white/[0.03] p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Slide {index + 1}</p>
+              <p className="text-sm font-semibold">Hero Entry</p>
               <button
                 type="button"
                 onClick={() => removeSlide(index)}
@@ -151,8 +153,6 @@ export default function HomeSlidesManager() {
               </select>
               <input value={slide.title} onChange={(e) => setSlide(index, { title: e.target.value })} placeholder="title" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
               <input value={slide.subtitle} onChange={(e) => setSlide(index, { subtitle: e.target.value })} placeholder="subtitle" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
-              <input value={slide.ctaLabel} onChange={(e) => setSlide(index, { ctaLabel: e.target.value })} placeholder="ctaLabel" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
-              <input value={slide.ctaPath} onChange={(e) => setSlide(index, { ctaPath: e.target.value as HeroSlide['ctaPath'] })} placeholder="ctaPath (e.g. /viewer)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
               <input value={slide.imageSrc} onChange={(e) => setSlide(index, { imageSrc: e.target.value })} placeholder="imageSrc" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
               <input value={slide.imageAlt} onChange={(e) => setSlide(index, { imageAlt: e.target.value })} placeholder="imageAlt" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
               <input value={slide.videoUrl ?? ''} onChange={(e) => setSlide(index, { videoUrl: e.target.value })} placeholder="videoUrl (optional)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
@@ -168,7 +168,7 @@ export default function HomeSlidesManager() {
         className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm hover:border-[#D4AF37] hover:text-[#F5D37A] disabled:opacity-50"
       >
         <Plus className="h-4 w-4" />
-        Add Slide
+        Create Hero
       </button>
     </div>
   )

@@ -1,8 +1,9 @@
 import HomeSlidesHero from '@/components/portal/HomeSlidesHero'
 import { getPortalContext } from '@/lib/portal/page-data'
 
-export default function NgoHomePage({ params }: { params: { ngo: string } }) {
-  const { config } = getPortalContext(params.ngo)
+export default async function NgoHomePage({ params }: { params: Promise<{ ngo: string }> }) {
+  const { ngo } = await params
+  const { config } = getPortalContext(ngo)
 
   return (
     <div className="min-h-screen bg-slate-950">

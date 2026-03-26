@@ -12,9 +12,10 @@ const AREA_LABELS = {
 
 type AreaId = keyof typeof AREA_LABELS
 
-export default function AreaPage({ params }: { params: { areaId: string } }) {
-  const areaId = params.areaId as AreaId
-  const areaName = AREA_LABELS[areaId]
+export default async function AreaPage({ params }: { params: Promise<{ areaId: string }> }) {
+  const { areaId } = await params
+  const resolvedAreaId = areaId as AreaId
+  const areaName = AREA_LABELS[resolvedAreaId]
 
   if (!areaName) {
     notFound()
@@ -45,7 +46,7 @@ export default function AreaPage({ params }: { params: { areaId: string } }) {
         </article>
         <article className="rounded-xl border border-orchestra-gold/20 bg-orchestra-cream/5 p-5 md:col-span-2">
           <h2 className="mb-3 text-lg font-semibold text-orchestra-gold">Roles</h2>
-          <AreaRolesEditor areaId={areaId as ViewerAreaId} />
+          <AreaRolesEditor areaId={resolvedAreaId as ViewerAreaId} />
         </article>
         <article className="rounded-xl border border-orchestra-gold/20 bg-orchestra-cream/5 p-5 md:col-span-2">
           <h2 className="text-lg font-semibold text-orchestra-gold">Media</h2>

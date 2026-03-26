@@ -166,6 +166,20 @@ service cloud.firestore {
       allow read, update, create: if isOwner(userId);
     }
 
+    // Lightweight NGO membership documents created during participant onboarding.
+    match /ngoMemberships/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow create, update: if isOwner(userId);
+    }
+
+    // Public cohort interest form for recruitment and mentorship work.
+    match /cohortApplications/{applicationId} {
+      allow read: if isAdmin();
+      allow create: if
+        request.resource.data.ngo == 'orchestra' &&
+        request.resource.data.status == 'pending';
+    }
+
     // Page guides (helper overlay configuration)
     match /pageGuides/{pageId} {
       // Public read so onboarding helpers can render for all visitors

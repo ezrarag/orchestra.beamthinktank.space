@@ -4,8 +4,9 @@ import ProjectGrid from '@/components/portal/ProjectGrid'
 import { fetchProjects } from '@/lib/api'
 import { getPortalContext, getPortalNav } from '@/lib/portal/page-data'
 
-export default async function NgoProjectsPage({ params }: { params: { ngo: string } }) {
-  const { config, locale } = getPortalContext(params.ngo)
+export default async function NgoProjectsPage({ params }: { params: Promise<{ ngo: string }> }) {
+  const { ngo } = await params
+  const { config, locale } = getPortalContext(ngo)
   const projects = (await fetchProjects(config.id)).map((project) => ({
     ...project,
     href: `/${config.id}${project.href}`,

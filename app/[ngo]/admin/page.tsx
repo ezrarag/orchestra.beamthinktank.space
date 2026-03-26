@@ -3,8 +3,9 @@ import AdminScaffold from '@/components/portal/AdminScaffold'
 import { fetchAdminRows } from '@/lib/api'
 import { getPortalContext, getPortalNav } from '@/lib/portal/page-data'
 
-export default async function NgoAdminPage({ params }: { params: { ngo: string } }) {
-  const { config, locale } = getPortalContext(params.ngo)
+export default async function NgoAdminPage({ params }: { params: Promise<{ ngo: string }> }) {
+  const { ngo } = await params
+  const { config, locale } = getPortalContext(ngo)
   const rowsByTab = await fetchAdminRows(config.id)
 
   return (

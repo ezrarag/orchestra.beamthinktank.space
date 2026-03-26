@@ -9,6 +9,8 @@ export type PortalPath =
   | '/subscriber'
   | '/sign-in'
   | '/musician/select-project'
+  | '/join'
+  | '/join/institution'
   | '/join/participant'
   | '/publishing/signup'
 
@@ -18,6 +20,8 @@ export interface HeroSlide {
   subtitle: string
   ctaLabel: string
   ctaPath: PortalPath
+  secondaryCtaLabel?: string
+  secondaryCtaPath?: PortalPath
   imageSrc: string
   imageAlt: string
   audience?: 'all' | 'viewer' | 'participant_admin'

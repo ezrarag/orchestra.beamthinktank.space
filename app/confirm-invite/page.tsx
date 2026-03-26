@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
@@ -8,7 +8,7 @@ import { doc, getDoc, updateDoc, setDoc, serverTimestamp, query, collection, whe
 import { motion } from 'framer-motion'
 import { CheckCircle, XCircle, Loader2, Music, Calendar, DollarSign, Coins } from 'lucide-react'
 
-export default function ConfirmInvitePage() {
+function ConfirmInvitePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -386,3 +386,16 @@ export default function ConfirmInvitePage() {
   )
 }
 
+export default function ConfirmInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-white" />
+        </div>
+      }
+    >
+      <ConfirmInvitePageContent />
+    </Suspense>
+  )
+}

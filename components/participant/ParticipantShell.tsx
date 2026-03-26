@@ -39,7 +39,7 @@ export default function ParticipantShell({ title, subtitle, children }: Particip
         id: 'pathways',
         title: 'Pathways',
         items: [
-          { href: '/join/participant', label: 'Participant Paths' },
+          { href: '/join', label: 'Become a Participant' },
           { href: '/join/admin-staff', label: 'Join Admin/Staff Cart' },
         ],
       },
@@ -53,7 +53,9 @@ export default function ParticipantShell({ title, subtitle, children }: Particip
       { prefix: '/studio/viewer-submissions/mine', label: 'My Submissions' },
       { prefix: '/studio/viewer-submissions', label: 'New Submission' },
       { prefix: '/join/admin-staff', label: 'Join Admin/Staff' },
-      { prefix: '/join/participant', label: 'Participant Paths' },
+      { prefix: '/join/cohort', label: 'Cohort Sign-Up' },
+      { prefix: '/join/confirm', label: 'Confirm Role' },
+      { prefix: '/join', label: 'Become a Participant' },
       { prefix: '/publishing/signup', label: 'Publishing Sign-Up' },
       { prefix: '/viewer', label: 'Viewer' },
     ]

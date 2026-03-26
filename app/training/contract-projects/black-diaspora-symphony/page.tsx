@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Users, 
@@ -722,7 +722,7 @@ export default function BlackDiasporaSymphonyPage() {
     }
   }
 
-  const renderMusicianSource = (source: string | undefined | null): JSX.Element | string => {
+  const renderMusicianSource = (source: string | undefined | null): ReactNode => {
     if (!source) {
       return 'n/a'
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   addDoc,
@@ -27,6 +27,14 @@ type ViewerEntry = {
   areaId: string
   sectionId: string
   title: string
+  composer?: string
+  composerName?: string
+  composerSlug?: string
+  composerImage?: string
+  workTitle?: string
+  workSlug?: string
+  versionLabel?: string
+  submittedBy?: string
   description: string
   videoUrl: string
   hlsUrl?: string
@@ -116,6 +124,13 @@ type FormState = {
   areaId: string
   sectionId: string
   title: string
+  composerName: string
+  composerSlug: string
+  composerImage: string
+  workTitle: string
+  workSlug: string
+  versionLabel: string
+  submittedBy: string
   description: string
   videoUrl: string
   hlsUrl: string
@@ -151,6 +166,13 @@ const DEFAULT_FORM: FormState = {
   areaId: 'community',
   sectionId: 'community-lead',
   title: '',
+  composerName: '',
+  composerSlug: '',
+  composerImage: '',
+  workTitle: '',
+  workSlug: '',
+  versionLabel: '',
+  submittedBy: '',
   description: '',
   videoUrl: '',
   hlsUrl: '',
@@ -250,6 +272,23 @@ function createSessionId(): string {
   return `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const maybeError = error as { message?: unknown }
+    if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
+      return maybeError.message
+    }
+  }
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+function getFirebaseErrorCode(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const maybeError = error as { code?: unknown }
+  return typeof maybeError.code === 'string' ? maybeError.code : ''
+}
+
 function normalizeMetadataOptions(value: unknown): MetadataOptionItem[] {
   if (!Array.isArray(value)) return []
   return value
@@ -269,12 +308,13 @@ function normalizeMetadataOptions(value: unknown): MetadataOptionItem[] {
     .sort((a, b) => a.order - b.order)
 }
 
-export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
+function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [entries, setEntries] = useState<ViewerEntry[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
@@ -357,6 +397,10 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       const haystack = [
         entry.id,
         entry.title,
+        entry.composerName,
+        entry.workTitle,
+        entry.versionLabel,
+        entry.submittedBy,
         entry.description,
         entry.areaId,
         entry.sectionId,
@@ -435,11 +479,13 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
 
   const loadData = async () => {
     if (!db) {
+      setLoadError('Firebase is not initialized in this environment. Check the NEXT_PUBLIC_FIREBASE_* variables and restart the app.')
       setLoading(false)
       return
     }
 
     setLoading(true)
+    setLoadError(null)
 
     try {
       let rows: ViewerEntry[] = []
@@ -516,6 +562,17 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       }
     } catch (error) {
       console.error('Error loading viewer manager data:', error)
+      const code = getFirebaseErrorCode(error)
+      const message = getErrorMessage(error)
+      if (code === 'permission-denied' || code.endsWith('/permission-denied')) {
+        setLoadError(
+          mode === 'admin'
+            ? 'Firebase denied access to viewer admin data. This usually means the current ID token is missing the beam_admin claim, the token needs refresh, or Firestore rules are not deployed.'
+            : 'Firebase denied access to viewer submission data for this account.',
+        )
+      } else {
+        setLoadError(`Viewer data failed to load: ${message}`)
+      }
     } finally {
       setLoading(false)
     }
@@ -608,6 +665,13 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
       areaId: entry.areaId,
       sectionId: entry.sectionId,
       title: entry.title,
+      composerName: entry.composerName ?? entry.composer ?? '',
+      composerSlug: entry.composerSlug ?? '',
+      composerImage: entry.composerImage ?? '',
+      workTitle: entry.workTitle ?? '',
+      workSlug: entry.workSlug ?? '',
+      versionLabel: entry.versionLabel ?? '',
+      submittedBy: entry.submittedBy ?? entry.submissionDisplayName ?? '',
       description: entry.description,
       videoUrl: entry.videoUrl,
       hlsUrl: entry.hlsUrl ?? '',
@@ -643,10 +707,23 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
   const toPayload = () => {
     const participantManaged = mode === 'participant'
     const forcedConfirmed = participantManaged ? true : form.confirmed
+    const composerName = form.composerName.trim()
+    const workTitle = form.workTitle.trim()
+    const composerSlug = toSlug(form.composerSlug) || toSlug(composerName)
+    const workSlug = toSlug(form.workSlug) || toSlug(workTitle)
+    const submittedBy = form.submittedBy.trim() || form.submissionDisplayName.trim()
     return {
       areaId: form.areaId,
       sectionId: form.sectionId,
       title: form.title.trim(),
+      composer: composerName,
+      composerName,
+      composerSlug,
+      composerImage: form.composerImage.trim(),
+      workTitle,
+      workSlug,
+      versionLabel: form.versionLabel.trim(),
+      submittedBy,
       description: form.description.trim(),
       videoUrl: form.videoUrl.trim(),
       hlsUrl: form.hlsUrl.trim(),
@@ -1039,6 +1116,14 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
         title: nextTitle,
         areaId: nextAreaId,
         sectionId: nextSectionId,
+        composer: source.composerName ?? source.composer ?? '',
+        composerName: source.composerName ?? source.composer ?? '',
+        composerSlug: source.composerSlug ?? '',
+        composerImage: source.composerImage ?? '',
+        workTitle: source.workTitle ?? '',
+        workSlug: source.workSlug ?? '',
+        versionLabel: source.versionLabel ?? '',
+        submittedBy: source.submittedBy ?? source.submissionDisplayName ?? '',
         description: source.description ?? '',
         videoUrl: cloneCopyMediaUrls ? source.videoUrl ?? '' : '',
         hlsUrl: cloneCopyMediaUrls ? source.hlsUrl ?? '' : '',
@@ -1059,6 +1144,14 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
         payload.infoUrl = source.infoUrl ?? ''
         payload.researchStatus = source.researchStatus ?? ''
       } else {
+        payload.composer = ''
+        payload.composerName = ''
+        payload.composerSlug = ''
+        payload.composerImage = ''
+        payload.workTitle = ''
+        payload.workSlug = ''
+        payload.versionLabel = ''
+        payload.submittedBy = ''
         payload.geo = { regions: [], states: [], cities: [] }
         payload.institutions = []
         payload.participants = []
@@ -1095,6 +1188,14 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
         title: nextTitle,
         areaId: nextAreaId,
         sectionId: nextSectionId,
+        composer: String(payload.composer ?? ''),
+        composerName: String(payload.composerName ?? ''),
+        composerSlug: String(payload.composerSlug ?? ''),
+        composerImage: String(payload.composerImage ?? ''),
+        workTitle: String(payload.workTitle ?? ''),
+        workSlug: String(payload.workSlug ?? ''),
+        versionLabel: String(payload.versionLabel ?? ''),
+        submittedBy: String(payload.submittedBy ?? ''),
         description: String(payload.description ?? ''),
         videoUrl: String(payload.videoUrl ?? ''),
         hlsUrl: String(payload.hlsUrl ?? ''),
@@ -1132,6 +1233,12 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
 
   return (
     <div className="space-y-6 text-white">
+      {loadError ? (
+        <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+          {loadError}
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">
           {mode === 'admin'
@@ -1227,8 +1334,15 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
                   >
                     <p className="truncate text-sm font-semibold">{entry.title}</p>
                     <p className="mt-1 text-xs text-white/70">{entry.areaId} / {entry.sectionId}</p>
-                    {entry.submissionDisplayName ? (
-                      <p className="mt-1 text-[11px] text-white/55">Submitted by: {entry.submissionDisplayName}</p>
+                    {entry.composerName || entry.workTitle ? (
+                      <p className="mt-1 text-[11px] text-white/55">
+                        {[entry.composerName ?? entry.composer, entry.workTitle, entry.versionLabel].filter(Boolean).join(' / ')}
+                      </p>
+                    ) : null}
+                    {entry.submittedBy || entry.submissionDisplayName ? (
+                      <p className="mt-1 text-[11px] text-white/55">
+                        Submitted by: {entry.submittedBy ?? entry.submissionDisplayName}
+                      </p>
                     ) : null}
                   </button>
                   <div className="flex items-center gap-1">
@@ -1313,6 +1427,60 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
                   </select>
                   <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="title" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="description" rows={3} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
+                  {form.areaId === 'chamber' ? (
+                    <div className="md:col-span-2 rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/8 p-3">
+                      <div className="mb-3">
+                        <p className="text-xs uppercase tracking-[0.14em] text-[#F5D37A]">Chamber Series grouping</p>
+                        <p className="mt-1 text-xs text-white/70">
+                          Presentation-layer metadata for composer → work → version aggregation on the public viewer. Composer cards read from composer metadata, not work titles.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          value={form.composerName}
+                          onChange={(e) => setForm((p) => ({ ...p, composerName: e.target.value }))}
+                          placeholder="composerName"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.workTitle}
+                          onChange={(e) => setForm((p) => ({ ...p, workTitle: e.target.value }))}
+                          placeholder="workTitle"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.versionLabel}
+                          onChange={(e) => setForm((p) => ({ ...p, versionLabel: e.target.value }))}
+                          placeholder="versionLabel"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.submittedBy}
+                          onChange={(e) => setForm((p) => ({ ...p, submittedBy: e.target.value }))}
+                          placeholder="submittedBy"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.composerSlug}
+                          onChange={(e) => setForm((p) => ({ ...p, composerSlug: e.target.value }))}
+                          placeholder="composerSlug (auto if blank)"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.workSlug}
+                          onChange={(e) => setForm((p) => ({ ...p, workSlug: e.target.value }))}
+                          placeholder="workSlug (auto if blank)"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={form.composerImage}
+                          onChange={(e) => setForm((p) => ({ ...p, composerImage: e.target.value }))}
+                          placeholder="composerImage (portrait URL)"
+                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -2086,5 +2254,19 @@ export default function ViewerEntryManager({ mode, scope = 'all' }: Props) {
         </div>
       ) : null}
     </div>
+  )
+}
+
+export default function ViewerEntryManager(props: Props) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/70">
+          Loading viewer submissions...
+        </div>
+      }
+    >
+      <ViewerEntryManagerContent {...props} />
+    </Suspense>
   )
 }

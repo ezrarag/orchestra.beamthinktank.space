@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const docSnap = await adminDb.collection(HOME_SLIDES_COLLECTION).doc(ngo).get()
     if (!docSnap.exists) return NextResponse.json({ slides: [] })
     const data = docSnap.data() as { slides?: unknown }
-    return NextResponse.json({ slides: sanitizeHomeSlides(data?.slides) })
+    return NextResponse.json({ slides: sanitizeHomeSlides(data?.slides).slice(0, 1) })
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to load home slides', details: error instanceof Error ? error.message : 'Unknown error' },
@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const ngo = (typeof body.ngo === 'string' ? body.ngo : 'orchestra').trim() || 'orchestra'
-    const slides = sanitizeHomeSlides(body.slides).slice(0, 5)
+    const slides = sanitizeHomeSlides(body.slides).slice(0, 1)
 
     await adminDb
       .collection(HOME_SLIDES_COLLECTION)

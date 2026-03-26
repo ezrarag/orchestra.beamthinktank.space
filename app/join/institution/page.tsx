@@ -240,13 +240,13 @@ export default function JoinInstitutionPage() {
 
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
-                href="/join/participant"
+                href="/join"
                 className="inline-flex items-center rounded-full border border-white/30 bg-black/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
               >
                 Independent Flow
               </Link>
               <Link
-                href="/join/participant"
+                href="/join"
                 className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
               >
                 Continue Institutional Onboarding

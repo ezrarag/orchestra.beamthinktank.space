@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,9 +10,10 @@ import {
   Music,
   ChevronDown,
   MoreVertical,
+  Loader2,
   LogOut,
 } from 'lucide-react'
-import { adminNavGroups } from '@/lib/config/adminNav'
+import { getAdminNavGroups } from '@/lib/config/adminNav'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
 import { signOut } from 'firebase/auth'
@@ -91,13 +92,23 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { user, role } = useUserRole()
+  const { user, role, loading: roleLoading } = useUserRole()
   const partnerProjectId = usePartnerProject()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
   const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
+  const hasAdminShellAccess = role === 'beam_admin' || role === 'partner_admin' || role === 'board'
+  const navGroups = useMemo(
+    () => getAdminNavGroups({ role, partnerProjectId }),
+    [partnerProjectId, role],
+  )
+  const adminHomeHref = useMemo(() => {
+    if (role === 'partner_admin' && partnerProjectId) return `/admin/projects/${partnerProjectId}`
+    if (role === 'board') return '/admin/board'
+    return '/admin/dashboard'
+  }, [partnerProjectId, role])
   
   // Redirect partner admins to their project page
   useEffect(() => {
@@ -118,6 +129,18 @@ export default function AdminLayout({
       console.error('Error signing out:', error)
       setSigningOut(false)
     }
+  }
+
+  if (roleLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-orchestra-dark">
+        <Loader2 className="h-12 w-12 animate-spin text-orchestra-gold" />
+      </div>
+    )
+  }
+
+  if (!user || !hasAdminShellAccess) {
+    return <AccessDeniedPage />
   }
 
   return (
@@ -155,7 +178,7 @@ export default function AdminLayout({
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-orchestra-gold/20">
-            <Link href="/admin/dashboard" className="flex items-center space-x-2">
+            <Link href={adminHomeHref} className="flex items-center space-x-2">
               <Music className="h-6 w-6 text-orchestra-gold" />
               <span className="text-lg font-bold text-orchestra-gold">BEAM Admin</span>
             </Link>
@@ -169,7 +192,7 @@ export default function AdminLayout({
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-3 space-y-3">
-            {adminNavGroups.map((group) => (
+            {navGroups.map((group) => (
               <div key={group.key} className="space-y-1.5">
                 {group.title && (
                   <p className="px-2 text-[10px] font-semibold tracking-[0.14em] text-orchestra-gold/70">
@@ -279,7 +302,7 @@ export default function AdminLayout({
                     style={{ pointerEvents: 'auto' }}
                   >
                     <div className="py-2">
-                      {adminNavGroups.map((group) => (
+                      {navGroups.map((group) => (
                         <div key={`dropdown-group-${group.key}`}>
                           {group.title && (
                             <p className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-orchestra-gold/70">

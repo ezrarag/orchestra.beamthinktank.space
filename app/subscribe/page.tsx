@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Loader, AlertCircle } from 'lucide-react'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import Link from 'next/link'
 
-export default function SubscribePage() {
+function SubscribePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useUserRole()
@@ -157,3 +157,19 @@ export default function SubscribePage() {
   )
 }
 
+export default function SubscribePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-[#D4AF37] mx-auto mb-4" />
+            <p className="text-white">Loading subscription flow...</p>
+          </div>
+        </div>
+      }
+    >
+      <SubscribePageContent />
+    </Suspense>
+  )
+}

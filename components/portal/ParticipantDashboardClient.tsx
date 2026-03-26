@@ -1,9 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { signInWithCustomToken } from 'firebase/auth'
+import { useSearchParams } from 'next/navigation'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
+import { createAdminStaffJoinRequest, type AdminStaffAreaSelectionPayload } from '@/lib/api/adminStaff'
+import {
+  clearBeamReturnHash,
+  clearPendingAdminStaffJoin,
+  readBeamReturnIdTokenFromHash,
+  readPendingAdminStaffJoin,
+} from '@/lib/beamHome'
 import { fetchCommitments, fetchOpenCalls, fetchUserProfile } from '@/lib/api'
 import { resolvePortalPath } from '@/lib/portal/routes'
 import { OpenCallCard, SessionCard } from '@/components/portal/SessionCard'
@@ -23,17 +32,99 @@ interface ParticipantDashboardClientProps {
   }
 }
 
+const AREA_TITLES: Record<ViewerAreaId, string> = {
+  professional: 'Professional Orchestra',
+  community: 'Repertoire Orchestra',
+  chamber: 'Chamber Series',
+  publishing: 'Publishing',
+  business: 'The Business',
+}
+
 export default function ParticipantDashboardClient({
   ngo,
   scopedRoutes = false,
   copy,
 }: ParticipantDashboardClientProps) {
+  const searchParams = useSearchParams()
   const { user, loading } = useUserRole()
   const allowTestAccess = process.env.NODE_ENV !== 'production'
   const [commitments, setCommitments] = useState<CommitmentSummary[]>([])
   const [openCalls, setOpenCalls] = useState<OpenCallSummary[]>([])
   const [profile, setProfile] = useState<UserProfileSummary | null>(null)
   const [viewerAreaRolesMap, setViewerAreaRolesMap] = useState<Record<ViewerAreaId, ViewerAreaRolesDoc> | null>(null)
+  const [beamReturnStatus, setBeamReturnStatus] = useState<'idle' | 'processing' | 'ready' | 'error'>('idle')
+  const [beamReturnError, setBeamReturnError] = useState<string | null>(null)
+  const [adminStaffResumeStatus, setAdminStaffResumeStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [adminStaffResumeError, setAdminStaffResumeError] = useState<string | null>(null)
+  const [restoredSelections, setRestoredSelections] = useState<AdminStaffAreaSelectionPayload[]>([])
+
+  const selectedAreaIds = useMemo(() => {
+    const raw = searchParams.get('areas')
+    if (!raw) return []
+
+    return raw
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item): item is ViewerAreaId => item in AREA_TITLES)
+  }, [searchParams])
+
+  const isAdminStaffReturn = searchParams.get('intent') === 'admin-staff'
+
+  useEffect(() => {
+    const beamIdToken = readBeamReturnIdTokenFromHash()
+    if (!beamIdToken) return
+
+    if (!auth) {
+      setBeamReturnStatus('error')
+      setBeamReturnError('Firebase Auth is not available to complete the BEAM return.')
+      return
+    }
+
+    let cancelled = false
+
+    const completeBeamReturn = async () => {
+      setBeamReturnStatus('processing')
+      setBeamReturnError(null)
+
+      try {
+        if (!auth.currentUser) {
+          const response = await fetch('/api/auth/beam-handoff', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              idToken: beamIdToken,
+            }),
+          })
+
+          const payload = (await response.json().catch(() => ({}))) as { customToken?: string; error?: string }
+          if (!response.ok || !payload.customToken) {
+            throw new Error(payload.error || 'Unable to exchange the BEAM authentication token.')
+          }
+
+          await signInWithCustomToken(auth, payload.customToken)
+        }
+
+        clearBeamReturnHash()
+
+        if (!cancelled) {
+          setBeamReturnStatus('ready')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBeamReturnStatus('error')
+          setBeamReturnError(error instanceof Error ? error.message : 'Unable to complete BEAM sign-in.')
+        }
+      }
+    }
+
+    void completeBeamReturn()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!user && !allowTestAccess) return
@@ -72,7 +163,46 @@ export default function ParticipantDashboardClient({
     }
   }, [])
 
-  if (loading) {
+  useEffect(() => {
+    if (!isAdminStaffReturn || loading || beamReturnStatus === 'processing' || !user) return
+    if (adminStaffResumeStatus !== 'idle') return
+
+    const pendingJoin = readPendingAdminStaffJoin()
+    if (!pendingJoin || pendingJoin.selections.length === 0) return
+
+    let cancelled = false
+
+    const submitRestoredCart = async () => {
+      setRestoredSelections(pendingJoin.selections)
+      setAdminStaffResumeStatus('submitting')
+      setAdminStaffResumeError(null)
+
+      try {
+        await createAdminStaffJoinRequest({
+          selections: pendingJoin.selections,
+        })
+
+        clearPendingAdminStaffJoin()
+
+        if (!cancelled) {
+          setAdminStaffResumeStatus('success')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAdminStaffResumeStatus('error')
+          setAdminStaffResumeError(error instanceof Error ? error.message : 'Unable to restore your admin/staff cart.')
+        }
+      }
+    }
+
+    void submitRestoredCart()
+
+    return () => {
+      cancelled = true
+    }
+  }, [adminStaffResumeStatus, beamReturnStatus, isAdminStaffReturn, loading, user])
+
+  if (loading || beamReturnStatus === 'processing') {
     return <main className="mx-auto max-w-6xl px-4 py-10 text-white/80 sm:px-6">Loading dashboard...</main>
   }
 
@@ -80,7 +210,11 @@ export default function ParticipantDashboardClient({
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
         <h1 className="text-3xl font-semibold text-white">{copy.title}</h1>
-        <p className="mt-3 text-white/70">This route is protected. Sign in to access participant scheduling and opportunities.</p>
+        <p className="mt-3 text-white/70">
+          {beamReturnError
+            ? beamReturnError
+            : 'This route is protected. Sign in to access participant scheduling and opportunities.'}
+        </p>
         <Link
           href={resolvePortalPath('/home', ngo, scopedRoutes)}
           className="mt-6 inline-flex rounded-lg bg-[#D4AF37] px-5 py-3 text-sm font-semibold text-black hover:bg-[#E5C86A]"
@@ -93,6 +227,50 @@ export default function ParticipantDashboardClient({
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3">
+      {(isAdminStaffReturn || selectedAreaIds.length > 0 || beamReturnStatus === 'ready') && (
+        <section className={`${PARTICIPANT_UI.card} lg:col-span-3`}>
+          <h2 className="text-xl font-semibold text-white">BEAM Return</h2>
+          <p className="mt-2 text-sm text-white/70">
+            You came through the shared BEAM login flow and were tagged to `orchestra.beamthinktank.space`.
+          </p>
+          {adminStaffResumeStatus === 'submitting' ? (
+            <p className="mt-3 text-sm text-[#F0D68A]">Restoring your admin/staff cart and submitting it now.</p>
+          ) : null}
+          {adminStaffResumeStatus === 'success' ? (
+            <p className="mt-3 text-sm text-emerald-300">
+              Your admin/staff cart was submitted. Use the area shortcuts below to keep working in the spaces you picked.
+            </p>
+          ) : null}
+          {adminStaffResumeStatus === 'error' ? (
+            <p className="mt-3 text-sm text-red-300">
+              {adminStaffResumeError || 'We could not submit the restored admin/staff cart automatically.'}
+            </p>
+          ) : null}
+          {selectedAreaIds.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {selectedAreaIds.map((areaId) => (
+                <Link key={areaId} href={`/viewer?area=${areaId}`} className={PARTICIPANT_UI.buttonGhost}>
+                  {AREA_TITLES[areaId]}
+                </Link>
+              ))}
+              <Link href={`/join/admin-staff?areas=${selectedAreaIds.join(',')}`} className={PARTICIPANT_UI.buttonGhost}>
+                Review Admin/Staff Cart
+              </Link>
+            </div>
+          ) : null}
+          {restoredSelections.length > 0 ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {restoredSelections.map((selection) => (
+                <div key={selection.areaId} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                  <p className="text-sm font-semibold text-white">{selection.areaTitle}</p>
+                  <p className="mt-1 text-xs text-white/70">{selection.roleTitles.join(', ')}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      )}
+
       <section className={`${PARTICIPANT_UI.card} lg:col-span-3`}>
         <h2 className="text-xl font-semibold text-white">Participant Workspace</h2>
         <p className="mt-2 text-sm text-white/70">Use this dashboard as your home base after onboarding and submissions.</p>
@@ -103,8 +281,8 @@ export default function ParticipantDashboardClient({
           <Link href="/studio/viewer-submissions/mine" className={PARTICIPANT_UI.buttonGhost}>
             My Submissions
           </Link>
-          <Link href="/join/participant" className={PARTICIPANT_UI.buttonGhost}>
-            Participant Paths
+          <Link href="/join" className={PARTICIPANT_UI.buttonGhost}>
+            Become a Participant
           </Link>
           <Link href="/join/admin-staff" className={PARTICIPANT_UI.buttonGhost}>
             Join Admin/Staff

@@ -22,7 +22,7 @@ export default function OrchestraHero() {
     role === 'board'
 
   const primaryAction = isPerformerOrAdmin
-    ? { label: 'Join as Participant', href: '/join/participant' }
+    ? { label: 'Join as Participant', href: '/join' }
     : { label: 'Watch & Support', href: '/viewer' }
 
   const secondaryActions = isPerformerOrAdmin

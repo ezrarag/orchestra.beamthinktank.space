@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { CheckCircle2, Plus, RefreshCw, Save, Search, Trash2, X } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 
 type SectionAvailability = 'open' | 'subscriber' | 'regional' | 'institution'
 
@@ -113,12 +113,29 @@ export default function ViewerSectionsManager() {
     })
   }, [search, sections])
 
+  const getAuthHeaders = async (includeJson = false): Promise<Record<string, string>> => {
+    const headers: Record<string, string> = {}
+    if (includeJson) {
+      headers['Content-Type'] = 'application/json'
+    }
+
+    if (auth?.currentUser) {
+      const token = await auth.currentUser.getIdToken()
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    return headers
+  }
+
   const loadData = async () => {
     setLoading(true)
     setLoadError(null)
     let apiErrorMessage: string | null = null
     try {
-      const response = await fetch('/api/admin/viewer-sections', { cache: 'no-store' })
+      const response = await fetch('/api/admin/viewer-sections', {
+        cache: 'no-store',
+        headers: await getAuthHeaders(),
+      })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         const details = typeof data?.details === 'string' ? data.details : ''
@@ -223,7 +240,7 @@ export default function ViewerSectionsManager() {
       const method = selectedId ? 'PATCH' : 'POST'
       const response = await fetch('/api/admin/viewer-sections', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(true),
         body: JSON.stringify(payload),
       })
       const data = await response.json().catch(() => ({}))
@@ -288,6 +305,7 @@ export default function ViewerSectionsManager() {
     try {
       const response = await fetch(`/api/admin/viewer-sections?sectionId=${encodeURIComponent(deleteTarget.id)}`, {
         method: 'DELETE',
+        headers: await getAuthHeaders(),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {

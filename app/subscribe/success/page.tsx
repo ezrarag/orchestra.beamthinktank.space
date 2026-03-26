@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { CheckCircle, Loader } from 'lucide-react'
 import Link from 'next/link'
 
-export default function SubscribeSuccessPage() {
+function SubscribeSuccessPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const sessionId = searchParams?.get('session_id')
@@ -82,3 +82,19 @@ export default function SubscribeSuccessPage() {
   )
 }
 
+export default function SubscribeSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-orchestra-gold mx-auto mb-4" />
+            <p className="text-white">Loading subscription confirmation...</p>
+          </div>
+        </div>
+      }
+    >
+      <SubscribeSuccessPageContent />
+    </Suspense>
+  )
+}

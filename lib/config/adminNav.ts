@@ -13,12 +13,21 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+export type AdminNavRole = 'beam_admin' | 'partner_admin' | 'board'
+
+export type AdminNavContext = {
+  role: string | null
+  partnerProjectId?: string | null
+}
+
 export type AdminNavItem = {
   key: string
   label: string
   href: string
   icon: LucideIcon
   enabled: boolean
+  roles: AdminNavRole[]
+  resolveHref?: (context: AdminNavContext) => string
 }
 
 export type AdminNavGroup = {
@@ -27,7 +36,7 @@ export type AdminNavGroup = {
   items: AdminNavItem[]
 }
 
-export const adminNavGroups: AdminNavGroup[] = [
+const adminNavGroups: AdminNavGroup[] = [
   {
     key: 'dashboard',
     items: [
@@ -37,6 +46,17 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/dashboard',
         icon: LayoutDashboard,
         enabled: true,
+        roles: ['beam_admin', 'partner_admin'],
+        resolveHref: ({ role, partnerProjectId }) =>
+          role === 'partner_admin' && partnerProjectId ? `/admin/projects/${partnerProjectId}` : '/admin/dashboard',
+      },
+      {
+        key: 'board-dashboard',
+        label: 'Board Dashboard',
+        href: '/admin/board',
+        icon: LayoutDashboard,
+        enabled: true,
+        roles: ['board'],
       },
     ],
   },
@@ -50,6 +70,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/areas/professional',
         icon: Music,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'areas-community',
@@ -57,6 +78,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/areas/community',
         icon: Music,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'areas-chamber',
@@ -64,6 +86,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/areas/chamber',
         icon: Music,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'areas-publishing',
@@ -71,6 +94,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/areas/publishing',
         icon: Music,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'areas-business',
@@ -78,6 +102,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/areas/business',
         icon: Music,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -90,6 +115,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/projects',
         icon: FolderOpen,
         enabled: true,
+        roles: ['beam_admin', 'partner_admin'],
       },
     ],
   },
@@ -99,9 +125,10 @@ export const adminNavGroups: AdminNavGroup[] = [
       {
         key: 'people',
         label: 'People',
-        href: '/admin/people',
+        href: '/admin/musicians',
         icon: Users,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -114,6 +141,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/infrastructure',
         icon: Building2,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -126,6 +154,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/finance',
         icon: Wallet,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -138,6 +167,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/viewer',
         icon: Globe,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'narrative-arcs',
@@ -145,6 +175,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/viewer-sections',
         icon: Video,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'role-overviews',
@@ -152,6 +183,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/viewer-role-overviews',
         icon: Video,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'home-slides',
@@ -159,6 +191,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/home-slides',
         icon: Video,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -171,6 +204,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/applications',
         icon: Smartphone,
         enabled: true,
+        roles: ['beam_admin'],
       },
     ],
   },
@@ -183,6 +217,7 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/settings',
         icon: Settings,
         enabled: true,
+        roles: ['beam_admin'],
       },
       {
         key: 'slack-notes',
@@ -190,7 +225,25 @@ export const adminNavGroups: AdminNavGroup[] = [
         href: '/admin/slack-notes',
         icon: MessageSquare,
         enabled: true,
+        roles: ['beam_admin', 'partner_admin'],
       },
     ],
   },
 ]
+
+export function getAdminNavGroups(context: AdminNavContext): AdminNavGroup[] {
+  const activeRole = context.role as AdminNavRole | null
+  if (!activeRole) return []
+
+  return adminNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter((item) => item.roles.includes(activeRole))
+        .map((item) => ({
+          ...item,
+          href: item.resolveHref ? item.resolveHref(context) : item.href,
+        })),
+    }))
+    .filter((group) => group.items.length > 0)
+}

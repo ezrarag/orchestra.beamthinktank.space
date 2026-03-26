@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowRight,
   ChevronDown,
   Lock,
+  Maximize,
   Pause,
   Play,
   PlayCircle,
@@ -21,6 +22,7 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+import ChamberSeriesBrowser from '@/app/viewer/_components/ChamberSeriesBrowser'
 
 type AreaSection = {
   id: string
@@ -54,6 +56,13 @@ type ViewerContent = {
   tags?: string[]
   title: string
   composer?: string
+  composerName?: string
+  composerSlug?: string
+  composerImage?: string
+  workTitle?: string
+  workSlug?: string
+  versionLabel?: string
+  submittedBy?: string
   description: string
   thumbnailUrl?: string
   videoUrl: string
@@ -190,6 +199,21 @@ type ViewerDocument = {
   createdAt?: unknown
 }
 
+type HlsConstructor = {
+  new (config: Record<string, unknown>): any
+  isSupported: () => boolean
+  Events: {
+    ERROR: string
+    MANIFEST_PARSED: string
+  }
+  ErrorTypes: {
+    NETWORK_ERROR: string
+    MEDIA_ERROR: string
+  }
+}
+
+let hlsCtorPromise: Promise<HlsConstructor | null> | null = null
+
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
     const withCode = error as { code?: unknown; message?: unknown }
@@ -208,6 +232,57 @@ function isPermissionDeniedError(error: unknown): boolean {
   return code === 'permission-denied' || code.endsWith('/permission-denied')
 }
 
+function isLikelyMobilePlaybackDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  const isCompactViewport = window.matchMedia('(max-width: 1024px)').matches
+  const isTouchDevice = navigator.maxTouchPoints > 0
+  const mobileUa = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  return isCompactViewport && (isTouchDevice || mobileUa)
+}
+
+function isPortraitMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(orientation: portrait)').matches
+}
+
+function toMediaOrigin(url: string): string | null {
+  try {
+    return new URL(url).origin
+  } catch {
+    return null
+  }
+}
+
+async function ensureHlsCtor(): Promise<HlsConstructor | null> {
+  if (typeof window === 'undefined') return null
+  if (!hlsCtorPromise) {
+    hlsCtorPromise = new Promise<HlsConstructor | null>((resolve, reject) => {
+      const win = window as Window & { Hls?: HlsConstructor }
+      if (win.Hls) {
+        resolve(win.Hls)
+        return
+      }
+
+      const existing = document.querySelector('script[data-hlsjs-cdn="1"]') as HTMLScriptElement | null
+      if (existing) {
+        existing.addEventListener('load', () => resolve(win.Hls ?? null), { once: true })
+        existing.addEventListener('error', () => reject(new Error('hls.js CDN failed to load')), { once: true })
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
+      script.async = true
+      script.dataset.hlsjsCdn = '1'
+      script.onload = () => resolve(win.Hls ?? null)
+      script.onerror = () => reject(new Error('hls.js CDN failed to load'))
+      document.head.appendChild(script)
+    })
+  }
+
+  return hlsCtorPromise
+}
+
 function normalizeViewerContent(id: string, data: Partial<ViewerContent>): ViewerContent {
   return {
     id,
@@ -222,7 +297,14 @@ function normalizeViewerContent(id: string, data: Partial<ViewerContent>): Viewe
       ? data.tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
       : [],
     title: data.title ?? '',
-    composer: data.composer,
+    composer: data.composer ?? data.composerName,
+    composerName: data.composerName ?? data.composer,
+    composerSlug: data.composerSlug,
+    composerImage: data.composerImage,
+    workTitle: data.workTitle,
+    workSlug: data.workSlug,
+    versionLabel: data.versionLabel,
+    submittedBy: data.submittedBy,
     description: data.description ?? '',
     thumbnailUrl: data.thumbnailUrl,
     videoUrl: data.videoUrl ?? '',
@@ -456,7 +538,7 @@ const viewerAreas: ViewerArea[] = [
   },
 ]
 
-export default function ViewerPage() {
+function ViewerPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -467,8 +549,11 @@ export default function ViewerPage() {
       ? (areaFromUrl as ViewerAreaId)
       : 'professional'
   const initialArea = viewerAreas.find((area) => area.id === initialAreaId) ?? viewerAreas[0]
+  const playerViewportRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const hlsRef = useRef<any>(null)
+  const lastPlaybackUiUpdateRef = useRef(0)
+  const landscapePlaybackAttemptRef = useRef('')
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<ViewerArea['id']>(initialArea.id)
   const [activeVideo, setActiveVideo] = useState<ActiveVideo>({
@@ -681,10 +766,12 @@ export default function ViewerPage() {
     () => viewerAreas.find((area) => area.id === selectedAreaId) ?? viewerAreas[0],
     [selectedAreaId]
   )
+  const activePlaybackKey = `${activeVideo.areaId}:${activeVideo.contentId ?? activeVideo.sourceType ?? 'area-default'}:${activeVideo.url}`
   const canOpenAreaRolesPage = useMemo(
     () => ['professional', 'community', 'chamber', 'publishing'].includes(selectedAreaId),
     [selectedAreaId]
   )
+  const isChamberArea = selectedAreaId === 'chamber'
 
   const activeStory = useMemo(
     () => selectedAreaCatalog.find((item) => item.id === activeVideo.contentId) ?? null,
@@ -697,9 +784,8 @@ export default function ViewerPage() {
   }, [selectedAreaId, viewerAreaRolesMap])
   const hasNoDefaultAreaVideoConfigured = !selectedArea.videoUrl?.trim()
   const activeNarrativeSections = useMemo(() => {
-    if (firestoreNarrativeSections) return firestoreNarrativeSections
-    return selectedArea.sections
-  }, [firestoreNarrativeSections, selectedArea.sections])
+    return firestoreNarrativeSections ?? []
+  }, [firestoreNarrativeSections])
 
   const selectedAreaRoles = useMemo<ViewerRoleTemplate[]>(() => {
     return selectedAreaRoleDoc?.roles ?? []
@@ -710,6 +796,10 @@ export default function ViewerPage() {
       .sort((a, b) => b.watchedAt - a.watchedAt)
       .slice(0, 5)
   }, [watchedHistory])
+  const hasVisibleStories = selectedAreaStories.length > 0
+  const shouldShowStoriesSection =
+    storiesLoadState === 'loading' || Boolean(storiesError) || hasVisibleStories
+  const shouldShowNarrativeArcsSection = activeNarrativeSections.length > 0
   const canViewComments = !isRoleOverview && viewerIntent !== 'select'
   const canCreateComments = !isRoleOverview && (viewerIntent === 'partner' || viewerIntent === 'instructor')
   const canViewDocuments = !isRoleOverview && (viewerIntent === 'student' || viewerIntent === 'instructor' || viewerIntent === 'partner')
@@ -1146,20 +1236,71 @@ export default function ViewerPage() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return
-    const preloadTargets = selectedAreaStories.slice(0, 2).map((item) => item.hlsUrl || item.videoUrl).filter(Boolean)
+    const playbackTargets = selectedAreaStories
+      .slice(0, 2)
+      .map((item) => item.hlsUrl || item.videoUrl)
+      .filter(Boolean)
+    const origins = Array.from(
+      new Set(
+        playbackTargets
+          .map((url) => toMediaOrigin(url))
+          .filter((origin): origin is string => Boolean(origin))
+      )
+    )
     const links: HTMLLinkElement[] = []
-    preloadTargets.forEach((url) => {
+    origins.forEach((origin) => {
       const link = document.createElement('link')
-      link.rel = 'prefetch'
-      link.href = url
+      link.rel = 'preconnect'
+      link.href = origin
+      link.crossOrigin = 'anonymous'
       link.dataset.viewerPreload = '1'
       document.head.appendChild(link)
       links.push(link)
+
+      const dnsLink = document.createElement('link')
+      dnsLink.rel = 'dns-prefetch'
+      dnsLink.href = origin
+      dnsLink.dataset.viewerPreload = '1'
+      document.head.appendChild(dnsLink)
+      links.push(dnsLink)
     })
     return () => {
       links.forEach((link) => link.remove())
     }
   }, [selectedAreaStories])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const hlsCandidates = [activeVideo.url, activeVideo.fallbackUrl, ...selectedAreaStories.map((item) => item.hlsUrl || item.videoUrl)]
+      .filter((url): url is string => Boolean(url))
+      .filter((url) => isHlsSource(url))
+
+    if (hlsCandidates.length === 0) return
+
+    const links: HTMLLinkElement[] = []
+    const cdnOrigin = 'https://cdn.jsdelivr.net'
+    const preconnectLink = document.createElement('link')
+    preconnectLink.rel = 'preconnect'
+    preconnectLink.href = cdnOrigin
+    preconnectLink.crossOrigin = 'anonymous'
+    document.head.appendChild(preconnectLink)
+    links.push(preconnectLink)
+
+    const dnsLink = document.createElement('link')
+    dnsLink.rel = 'dns-prefetch'
+    dnsLink.href = cdnOrigin
+    document.head.appendChild(dnsLink)
+    links.push(dnsLink)
+
+    void ensureHlsCtor().catch((error) => {
+      console.warn('Unable to preload hls.js:', error)
+    })
+
+    return () => {
+      links.forEach((link) => link.remove())
+    }
+  }, [activeVideo.fallbackUrl, activeVideo.url, selectedAreaStories])
 
   useEffect(() => {
     const element = videoRef.current
@@ -1450,10 +1591,56 @@ export default function ViewerPage() {
     }, PROGRESS_SAVE_INTERVAL_MS)
   }
 
+  const requestMobileLandscapePlayback = async (forceRetry = false, nextPlaybackUrl?: string) => {
+    const playbackUrl = nextPlaybackUrl ?? activeVideo.url
+    if (typeof window === 'undefined' || !playbackUrl || !isLikelyMobilePlaybackDevice()) return false
+    if (!forceRetry && landscapePlaybackAttemptRef.current === activePlaybackKey) return false
+
+    landscapePlaybackAttemptRef.current = activePlaybackKey
+
+    const orientationApi = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: string) => Promise<void>
+      unlock?: () => void
+    }
+
+    try {
+      const viewport = playerViewportRef.current
+      if (viewport && !document.fullscreenElement && typeof viewport.requestFullscreen === 'function') {
+        await viewport.requestFullscreen()
+      }
+
+      if (typeof orientationApi?.lock === 'function') {
+        await orientationApi.lock('landscape')
+      }
+
+      return true
+    } catch (error) {
+      const element = videoRef.current as HTMLVideoElement & {
+        webkitEnterFullscreen?: () => void
+      }
+
+      try {
+        if (typeof element?.webkitEnterFullscreen === 'function') {
+          element.webkitEnterFullscreen()
+          return true
+        }
+      } catch (webkitError) {
+        console.warn('Unable to enter native mobile fullscreen playback:', webkitError)
+      }
+
+      console.warn('Unable to lock landscape playback:', error)
+      if (isPortraitMobileViewport()) {
+        setPlaybackNotice('Rotate to landscape or use fullscreen for smoother playback.')
+      }
+      return false
+    }
+  }
+
   const handlePlayPause = () => {
     const element = videoRef.current
     if (!element) return
     if (element.paused) {
+      void requestMobileLandscapePlayback()
       void element.play().catch((error) => {
         console.error('Unable to start playback:', error)
       })
@@ -1468,6 +1655,7 @@ export default function ViewerPage() {
     const element = videoRef.current
     if (!element || !Number.isFinite(nextSeconds)) return
     element.currentTime = nextSeconds
+    lastPlaybackUiUpdateRef.current = nextSeconds
     setCurrentPlaybackTime(nextSeconds)
   }
 
@@ -1683,6 +1871,29 @@ export default function ViewerPage() {
   }, [activeVideo, contentProgress, db, user])
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const orientationApi = screen.orientation as ScreenOrientation & {
+      unlock?: () => void
+    }
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && typeof orientationApi?.unlock === 'function') {
+        try {
+          orientationApi.unlock()
+        } catch {
+          // Ignore browsers that expose unlock but reject the call.
+        }
+      }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isStudentCameraEnabled || viewerIntent !== 'student' || !db || !studentTelemetrySession) {
       if (studentTelemetryTimerRef.current) {
         clearInterval(studentTelemetryTimerRef.current)
@@ -1780,29 +1991,7 @@ export default function ViewerPage() {
       }
 
       try {
-        const getHlsCtor = async () => {
-          const win = window as Window & { Hls?: any }
-          if (win.Hls) return win.Hls
-          await new Promise<void>((resolve, reject) => {
-            const existing = document.querySelector('script[data-hlsjs-cdn="1"]') as HTMLScriptElement | null
-            if (existing) {
-              existing.addEventListener('load', () => resolve(), { once: true })
-              existing.addEventListener('error', () => reject(new Error('hls.js CDN failed to load')), { once: true })
-              return
-            }
-
-            const script = document.createElement('script')
-            script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
-            script.async = true
-            script.dataset.hlsjsCdn = '1'
-            script.onload = () => resolve()
-            script.onerror = () => reject(new Error('hls.js CDN failed to load'))
-            document.head.appendChild(script)
-          })
-          return win.Hls
-        }
-
-        const HlsCtor = await getHlsCtor()
+        const HlsCtor = await ensureHlsCtor()
         if (canceled || !HlsCtor) return
         if (!HlsCtor.isSupported()) {
           if (activeVideo.fallbackUrl) {
@@ -1817,13 +2006,18 @@ export default function ViewerPage() {
         clearHls()
         const hls = new HlsCtor({
           enableWorker: true,
-          backBufferLength: 90,
-          maxBufferLength: 30,
+          backBufferLength: 30,
+          maxBufferLength: 12,
+          maxMaxBufferLength: 24,
+          capLevelToPlayerSize: true,
           lowLatencyMode: false,
         })
         hlsRef.current = hls
         hls.loadSource(sourceUrl)
         hls.attachMedia(element)
+        hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+          setPlaybackNotice(null)
+        })
         hls.on(HlsCtor.Events.ERROR, (_event: unknown, data: any) => {
           if (!data?.fatal) return
           if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
@@ -1867,6 +2061,7 @@ export default function ViewerPage() {
     const area = viewerAreas.find((item) => item.id === areaId)
     const fallbackOverlay = area?.visual ?? viewerAreas[0].visual
 
+    lastPlaybackUiUpdateRef.current = 0
     setActiveVideo({
       url: (content.hlsUrl && content.hlsUrl.trim()) || content.videoUrl,
       fallbackUrl: content.hlsUrl ? content.videoUrl : undefined,
@@ -1886,6 +2081,7 @@ export default function ViewerPage() {
     setIsMuted(true)
     setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
+    void requestMobileLandscapePlayback(false, (content.hlsUrl && content.hlsUrl.trim()) || content.videoUrl)
 
     setWatchedHistory((current) => {
       const deduped = current.filter((item) => item.contentId !== content.id)
@@ -1948,6 +2144,7 @@ export default function ViewerPage() {
     const explainerUrl = selectedAreaRoleDoc?.explainerVideoUrl?.trim() ?? ''
     if (!explainerUrl) return
 
+    lastPlaybackUiUpdateRef.current = 0
     setActiveVideo({
       url: explainerUrl,
       title: `${selectedArea.title}: Role Overview`,
@@ -1962,6 +2159,7 @@ export default function ViewerPage() {
     setIsMuted(true)
     setHasUserEnabledAudio(false)
     setVolume((current) => (current > 0 ? current : 0.85))
+    void requestMobileLandscapePlayback(false, explainerUrl)
   }
 
   const runPreviewLoopTransition = (element: HTMLVideoElement, startSeconds: number) => {
@@ -1974,6 +2172,7 @@ export default function ViewerPage() {
       void element.play().catch((error) => {
         console.error('Unable to continue preview loop playback:', error)
       })
+      lastPlaybackUiUpdateRef.current = startSeconds
       setCurrentPlaybackTime(startSeconds)
       setIsVideoPaused(false)
       setIsPreviewLoopFading(false)
@@ -1984,6 +2183,7 @@ export default function ViewerPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07080B] text-white">
       <section
+        ref={playerViewportRef}
         className="relative min-h-[100svh] w-full md:h-screen"
         onMouseMove={handlePlayerInteraction}
         onTouchStart={handlePlayerInteraction}
@@ -2036,13 +2236,13 @@ export default function ViewerPage() {
                 setPreviewWindow(null)
                 setCurrentPlaybackTime(element.currentTime || 0)
               }
+              lastPlaybackUiUpdateRef.current = element.currentTime || 0
               setIsVideoPaused(element.paused)
               setVolume(element.volume)
               setIsMuted(element.muted)
               if (!element.muted) {
                 setHasUserEnabledAudio(true)
               }
-              saveCurrentVideoProgress()
             }}
             onTimeUpdate={(event) => {
               const current = event.currentTarget.currentTime || 0
@@ -2050,16 +2250,24 @@ export default function ViewerPage() {
                 runPreviewLoopTransition(event.currentTarget, previewWindow.start)
                 return
               }
-              setCurrentPlaybackTime(current)
+              if (Math.abs(current - lastPlaybackUiUpdateRef.current) >= 0.35) {
+                lastPlaybackUiUpdateRef.current = current
+                setCurrentPlaybackTime(current)
+              }
               queueVideoProgressSave()
             }}
             onPause={(event) => {
               setIsVideoPaused(true)
+              lastPlaybackUiUpdateRef.current = event.currentTarget.currentTime || 0
               setCurrentPlaybackTime(event.currentTarget.currentTime || 0)
               saveCurrentVideoProgress()
             }}
-            onPlay={() => setIsVideoPaused(false)}
+            onPlay={() => {
+              setIsVideoPaused(false)
+              void requestMobileLandscapePlayback()
+            }}
             onEnded={(event) => {
+              lastPlaybackUiUpdateRef.current = event.currentTarget.currentTime || 0
               setCurrentPlaybackTime(event.currentTarget.currentTime || 0)
               saveCurrentVideoProgress()
             }}
@@ -2360,6 +2568,16 @@ export default function ViewerPage() {
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
                     >
                       {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void requestMobileLandscapePlayback(true)
+                      }}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-black/35 text-white hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                      aria-label="Open fullscreen playback"
+                    >
+                      <Maximize className="h-4 w-4" />
                     </button>
                   </div>
                   <input
@@ -2828,116 +3046,130 @@ export default function ViewerPage() {
               </div>
             </section>
 
-            <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-xl font-semibold">{selectedArea.title} Stories</h3>
-                <p className="text-xs text-white/65">
-                  {selectedAreaId === 'community' ? `City Filter: ${selectedCity || 'All'}` : 'All Markets'}
-                </p>
-              </div>
-              {isDevelopment ? (
-                <div className="mb-4 rounded-xl border border-white/20 bg-black/35 p-3 text-xs text-white/80">
-                  <p>Firebase projectId: {devProjectId}</p>
-                  <p>
-                    Emulators: {isUsingEmulators ? 'enabled' : 'disabled'}
-                    {firestoreEmulatorHost ? ` (${firestoreEmulatorHost})` : ''}
+            {shouldShowStoriesSection ? (
+              <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="text-xl font-semibold">
+                    {isChamberArea ? `${selectedArea.title} Composers` : `${selectedArea.title} Stories`}
+                  </h3>
+                  <p className="text-xs text-white/65">
+                    {isChamberArea
+                      ? 'Composer → Work → Version'
+                      : selectedAreaId === 'community'
+                        ? `City Filter: ${selectedCity || 'All'}`
+                        : 'All Markets'}
                   </p>
                 </div>
-              ) : null}
+                {isDevelopment ? (
+                  <div className="mb-4 rounded-xl border border-white/20 bg-black/35 p-3 text-xs text-white/80">
+                    <p>Firebase projectId: {devProjectId}</p>
+                    <p>
+                      Emulators: {isUsingEmulators ? 'enabled' : 'disabled'}
+                      {firestoreEmulatorHost ? ` (${firestoreEmulatorHost})` : ''}
+                    </p>
+                  </div>
+                ) : null}
 
-              {storiesLoadState === 'loading' ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
-                  Loading Firestore content…
-                </div>
-              ) : null}
+                {storiesLoadState === 'loading' ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
+                    Loading Firestore content…
+                  </div>
+                ) : null}
 
-              {storiesError ? (
-                <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">
-                  {storiesError}
-                </div>
-              ) : null}
+                {storiesError ? (
+                  <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">
+                    {storiesError}
+                  </div>
+                ) : null}
 
-              {storiesLoadState === 'empty' || storiesLoadState === 'error' ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/75">
-                  No published content found for {selectedArea.title}.
-                </div>
-              ) : null}
+                {storiesLoadState === 'ready' && hasVisibleStories ? (
+                  isChamberArea ? (
+                    <ChamberSeriesBrowser
+                      items={selectedAreaStories}
+                      getProgressPercent={getStoryProgressPercent}
+                      onOpenVersion={(content) => {
+                        void handleOpenContent(content as ViewerContent, 'chamber')
+                      }}
+                    />
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {selectedAreaStories.map((content) => {
+                        const progressPercent = getStoryProgressPercent(content.id)
 
-              {storiesLoadState === 'ready' && selectedAreaStories.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {selectedAreaStories.map((content) => {
-                    const progressPercent = getStoryProgressPercent(content.id)
-
-                    return (
-                      <button
-                        key={content.id}
-                        type="button"
-                        onClick={() => handleOpenContent(content, selectedAreaId)}
-                        className="w-full cursor-pointer rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-left transition hover:border-[#D4AF37]/60"
-                      >
-                        <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">
-                          {content.geo?.cities?.join(', ') || selectedArea.title}
-                        </p>
-                        <h4 className="mb-2 text-lg font-semibold">{content.title}</h4>
-                        <p className="text-sm text-white/75">{content.description}</p>
-                        <div className="mt-5 flex items-center justify-between gap-3">
-                          <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/75">
-                            {content.accessLevel}
-                          </span>
+                        return (
                           <button
+                            key={content.id}
                             type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleOpenContent(content, selectedAreaId)
-                            }}
-                            aria-label={`Play ${content.title}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/20"
+                            onClick={() => handleOpenContent(content, selectedAreaId)}
+                            className="w-full cursor-pointer rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-left transition hover:border-[#D4AF37]/60"
                           >
-                            <Play className="h-4 w-4 fill-current" />
+                            <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">
+                              {content.geo?.cities?.join(', ') || selectedArea.title}
+                            </p>
+                            <h4 className="mb-2 text-lg font-semibold">{content.title}</h4>
+                            <p className="text-sm text-white/75">{content.description}</p>
+                            <div className="mt-5 flex items-center justify-between gap-3">
+                              <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/75">
+                                {content.accessLevel}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  handleOpenContent(content, selectedAreaId)
+                                }}
+                                aria-label={`Play ${content.title}`}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/20"
+                              >
+                                <Play className="h-4 w-4 fill-current" />
+                              </button>
+                            </div>
+                            <div className="mt-3">
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+                                <div
+                                  className="h-full rounded-full bg-[#D4AF37] transition-[width] duration-300"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.11em] text-white/60">
+                                Watched {Math.round(progressPercent)}%
+                              </p>
+                            </div>
                           </button>
-                        </div>
-                        <div className="mt-3">
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
-                            <div
-                              className="h-full rounded-full bg-[#D4AF37] transition-[width] duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.11em] text-white/60">
-                            Watched {Math.round(progressPercent)}%
-                          </p>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </section>
-
-            <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-xl font-semibold">{selectedArea.title} Narrative Arcs</h3>
-                <p className="text-xs text-white/65">Location: {selectedCity || 'All / N/A'}</p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {activeNarrativeSections.map((section) => (
-                  <article
-                    key={section.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
-                  >
-                    <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">{section.format}</p>
-                    <h4 className="mb-2 text-lg font-semibold">{section.title}</h4>
-                    <p className="text-sm text-white/75">{section.summary}</p>
-                    <div className="mt-5">
-                      <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/75">
-                        {section.availability}
-                      </span>
+                        )
+                      })}
                     </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+                  )
+                ) : null}
+              </section>
+            ) : null}
+
+            {shouldShowNarrativeArcsSection ? (
+              <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="text-xl font-semibold">{selectedArea.title} Narrative Arcs</h3>
+                  <p className="text-xs text-white/65">Location: {selectedCity || 'All / N/A'}</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  {activeNarrativeSections.map((section) => (
+                    <article
+                      key={section.id}
+                      className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
+                    >
+                      <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">{section.format}</p>
+                      <h4 className="mb-2 text-lg font-semibold">{section.title}</h4>
+                      <p className="text-sm text-white/75">{section.summary}</p>
+                      <div className="mt-5">
+                        <span className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/75">
+                          {section.availability}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -2987,5 +3219,19 @@ export default function ViewerPage() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+export default function ViewerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black text-white flex items-center justify-center">
+          <span className="text-sm uppercase tracking-[0.24em] text-white/70">Loading Viewer...</span>
+        </div>
+      }
+    >
+      <ViewerPageContent />
+    </Suspense>
   )
 }

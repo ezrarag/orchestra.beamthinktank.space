@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -48,7 +48,7 @@ function notFoundMessageFor(mode: RoleDashboardPageProps['mode']): string {
   return 'Partner item not found.'
 }
 
-export function RoleDashboardPage({ mode, title, badgeLabel, actionTiles }: RoleDashboardPageProps) {
+function RoleDashboardPageContent({ mode, title, badgeLabel, actionTiles }: RoleDashboardPageProps) {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const idParam = decodeURIComponent(params.id || '')
@@ -233,5 +233,19 @@ export function RoleDashboardPage({ mode, title, badgeLabel, actionTiles }: Role
         </div>
       </div>
     </div>
+  )
+}
+
+export function RoleDashboardPage(props: RoleDashboardPageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#050816] text-white flex items-center justify-center">
+          <p className="text-sm uppercase tracking-[0.18em] text-white/70">Loading Dashboard...</p>
+        </div>
+      }
+    >
+      <RoleDashboardPageContent {...props} />
+    </Suspense>
   )
 }

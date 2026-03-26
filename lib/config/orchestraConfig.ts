@@ -12,23 +12,13 @@ export const orchestraConfig: NGOConfig = {
       subtitle: 'Stream content, explore topics, and more.',
       ctaLabel: 'Watch',
       ctaPath: '/viewer',
+      secondaryCtaLabel: 'Participate',
+      secondaryCtaPath: '/join',
       imageSrc: '/images/orchestra/recording-sessions.svg',
       imageAlt: 'Audience and performers in a live recording showcase',
       audience: 'viewer',
       videoUrl:
         'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
-    },
-    {
-      id: 'participant-pathway',
-      title: 'orchestra.BEAM',
-      subtitle: 'Become a Participant',
-      ctaLabel: 'Join as Participant',
-      ctaPath: '/join/participant',
-      imageSrc: '/images/orchestra/chamber-submissions.svg',
-      imageAlt: 'Participant pathway for sessions, cohorts, and performance opportunities',
-      audience: 'participant_admin',
-      videoUrl:
-        'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Finterviews%2FD.%20Hallmon%20Interview%20-%20Version%20I.mov?alt=media&token=e1d76347-cc8b-49f7-8268-189452051cf9',
     },
     {
       id: 'chamber-submissions',
