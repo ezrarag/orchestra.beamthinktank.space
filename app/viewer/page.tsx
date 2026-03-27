@@ -22,7 +22,10 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+import { buildChamberWorkId, buildChamberWorkResearchAdminHref, loadChamberWorksByIds } from '@/lib/chamberWorks'
+import type { ChamberWorkDocument } from '@/lib/types/chamber'
 import ChamberSeriesBrowser from '@/app/viewer/_components/ChamberSeriesBrowser'
+import ChamberViewerPanels, { type ChamberViewerTab } from '@/components/viewer/ChamberViewerPanels'
 
 type AreaSection = {
   id: string
@@ -164,6 +167,7 @@ type WatchedHistoryItem = {
 type ViewerIntent = 'select' | 'subscriber' | 'student' | 'instructor' | 'partner'
 type StoriesLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 type CommentLoadState = 'idle' | 'loading' | 'ready' | 'error'
+type ChamberWorkLoadState = 'idle' | 'loading' | 'ready' | 'error'
 
 type ViewerComment = {
   id: string
@@ -542,7 +546,7 @@ function ViewerPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { user } = useUserRole()
+  const { user, role } = useUserRole()
   const areaFromUrl = searchParams.get('area')
   const initialAreaId: ViewerAreaId =
     areaFromUrl && viewerAreas.some((item) => item.id === areaFromUrl)
@@ -571,6 +575,9 @@ function ViewerPageContent() {
   const [availableCities, setAvailableCities] = useState<string[]>([])
   const [selectedAreaCatalog, setSelectedAreaCatalog] = useState<ViewerContent[]>([])
   const [selectedAreaStories, setSelectedAreaStories] = useState<ViewerContent[]>([])
+  const [chamberWorksById, setChamberWorksById] = useState<Record<string, ChamberWorkDocument>>({})
+  const [chamberWorksLoadState, setChamberWorksLoadState] = useState<ChamberWorkLoadState>('idle')
+  const [chamberWorksError, setChamberWorksError] = useState<string | null>(null)
   const [storiesLoadState, setStoriesLoadState] = useState<StoriesLoadState>('idle')
   const [storiesError, setStoriesError] = useState<string | null>(null)
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null)
@@ -619,6 +626,7 @@ function ViewerPageContent() {
   const [documentUploadCategory, setDocumentUploadCategory] = useState<ViewerDocumentCategory>('score')
   const [documentUploadFile, setDocumentUploadFile] = useState<File | null>(null)
   const [isStudentPipCollapsed, setIsStudentPipCollapsed] = useState(false)
+  const [chamberViewerTab, setChamberViewerTab] = useState<ChamberViewerTab>('performance')
 
   const requestedAreaFilter = useMemo(() => {
     const area = searchParams.get('area')
@@ -778,6 +786,19 @@ function ViewerPageContent() {
     [selectedAreaCatalog, activeVideo.contentId]
   )
   const isRoleOverview = useMemo(() => isRoleOverviewContent(activeStory), [activeStory])
+  const activeChamberWorkId = useMemo(() => {
+    if (!isChamberArea || !activeStory) return null
+    return buildChamberWorkId(activeStory)
+  }, [activeStory, isChamberArea])
+  const activeChamberWork = useMemo(() => {
+    if (!activeChamberWorkId) return null
+    return chamberWorksById[activeChamberWorkId] ?? null
+  }, [activeChamberWorkId, chamberWorksById])
+  const chamberResearchAdminHref = useMemo(() => {
+    if (!isChamberArea || !activeStory) return null
+    return buildChamberWorkResearchAdminHref(activeStory)
+  }, [activeStory, isChamberArea])
+  const canManageChamberResearch = Boolean(user && (role === 'beam_admin' || role === 'partner_admin'))
 
   const selectedAreaRoleDoc = useMemo(() => {
     return viewerAreaRolesMap?.[selectedAreaId] ?? null
@@ -820,6 +841,12 @@ function ViewerPageContent() {
     if (documentCategoryFilter === 'all') return activeDocuments
     return activeDocuments.filter((item) => item.category === documentCategoryFilter)
   }, [activeDocuments, documentCategoryFilter])
+  const chamberResearchLoadState = useMemo<ChamberWorkLoadState>(() => {
+    if (!isChamberArea) return 'idle'
+    if (storiesLoadState === 'loading') return 'loading'
+    return chamberWorksLoadState
+  }, [chamberWorksLoadState, isChamberArea, storiesLoadState])
+  const shouldShowChamberViewerPanels = isChamberArea && Boolean(activeVideo.contentId) && activeVideo.sourceType !== 'role-explainer'
 
   const getStoryProgressPercent = (contentId: string): number => {
     const progress = contentProgress[contentId]
@@ -1233,6 +1260,56 @@ function ViewerPageContent() {
 
     setSelectedAreaStories(filtered)
   }, [selectedAreaCatalog, selectedAreaId, selectedCity])
+
+  useEffect(() => {
+    if (!db || selectedAreaId !== 'chamber') {
+      setChamberWorksById({})
+      setChamberWorksLoadState('idle')
+      setChamberWorksError(null)
+      return
+    }
+
+    const workIds = Array.from(new Set(selectedAreaCatalog.map((item) => buildChamberWorkId(item)))).filter(Boolean)
+    if (workIds.length === 0) {
+      setChamberWorksById({})
+      setChamberWorksLoadState(storiesLoadState === 'loading' ? 'loading' : 'ready')
+      setChamberWorksError(null)
+      return
+    }
+
+    let mounted = true
+
+    const loadChamberWorks = async () => {
+      setChamberWorksLoadState('loading')
+      setChamberWorksError(null)
+      try {
+        const workMap = await loadChamberWorksByIds(db, workIds)
+        if (!mounted) return
+        setChamberWorksById(workMap)
+        setChamberWorksLoadState('ready')
+      } catch (error) {
+        console.error('Error loading chamber work documents:', error)
+        if (!mounted) return
+        setChamberWorksById({})
+        setChamberWorksError(getErrorMessage(error))
+        setChamberWorksLoadState('error')
+      }
+    }
+
+    void loadChamberWorks()
+
+    return () => {
+      mounted = false
+    }
+  }, [selectedAreaCatalog, selectedAreaId, storiesLoadState])
+
+  useEffect(() => {
+    if (!isChamberArea || !activeVideo.contentId) {
+      setChamberViewerTab('performance')
+      return
+    }
+    setChamberViewerTab('performance')
+  }, [activeVideo.contentId, isChamberArea])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -2808,6 +2885,35 @@ function ViewerPageContent() {
           </div>
         </div>
       </section>
+
+      {shouldShowChamberViewerPanels ? (
+        <ChamberViewerPanels
+          activeTab={chamberViewerTab}
+          onTabChange={setChamberViewerTab}
+          story={
+            activeStory
+              ? {
+                  title: activeStory.title,
+                  description: activeStory.description,
+                  composer: activeStory.composer,
+                  composerName: activeStory.composerName,
+                  workTitle: activeStory.workTitle,
+                  versionLabel: activeStory.versionLabel,
+                  submittedBy: activeStory.submittedBy,
+                  institutionName: activeStory.institutionName,
+                  recordedLabel,
+                  participantNames: activeStory.participantNames,
+                  relatedVersionCount: activeStory.relatedVersionIds?.length ?? 0,
+                  researchStatus: activeStory.researchStatus,
+                }
+              : null
+          }
+          work={activeChamberWork}
+          researchLoadState={chamberResearchLoadState}
+          researchError={chamberWorksLoadState === 'error' ? chamberWorksError || 'Research references unavailable.' : null}
+          adminResearchHref={canManageChamberResearch ? chamberResearchAdminHref : null}
+        />
+      ) : null}
 
       {viewerIntent === 'student' && isStudentCameraEnabled ? (
         <div className="pointer-events-none fixed bottom-5 right-5 z-40">

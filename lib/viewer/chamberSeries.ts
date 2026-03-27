@@ -1,3 +1,12 @@
+import {
+  humanizeChamberSlug,
+  resolveChamberComposerDisplayName,
+  resolveChamberComposerSlug,
+  resolveChamberWorkTitle,
+  toChamberSlug,
+  trimChamberValue,
+} from '@/lib/chamberWorks'
+
 export type ChamberSeriesSourceEntry = {
   id: string
   title: string
@@ -65,30 +74,8 @@ export type ChamberSeriesComposer = {
   works: ChamberSeriesWork[]
 }
 
-function trimValue(value?: string | null): string {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function toSlug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function humanizeSlug(value?: string): string {
-  const slug = trimValue(value)
-  if (!slug) return ''
-  return slug
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 function formatRecordedLabel(recordedAt?: string): string {
-  const value = trimValue(recordedAt)
+  const value = trimChamberValue(recordedAt)
   if (!value) return 'Date not provided'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
@@ -100,7 +87,7 @@ function formatRecordedLabel(recordedAt?: string): string {
 }
 
 function getRecordedSortValue(recordedAt?: string): number {
-  const value = trimValue(recordedAt)
+  const value = trimChamberValue(recordedAt)
   if (!value) return 0
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? 0 : parsed
@@ -116,56 +103,11 @@ function getCityLabel(entry: ChamberSeriesSourceEntry): string {
   return entry.institutionName?.trim() || 'Chamber Series'
 }
 
-function resolveComposerDisplayName(entry: ChamberSeriesSourceEntry): string {
-  return (
-    trimValue(entry.composerName) ||
-    trimValue(entry.composer) ||
-    humanizeSlug(entry.composerSlug) ||
-    'Composer Metadata Needed'
-  )
-}
-
-function resolveComposerSlug(entry: ChamberSeriesSourceEntry, composerName: string): string {
-  const explicitSlug = trimValue(entry.composerSlug)
-  if (explicitSlug) return explicitSlug
-
-  const explicitName = trimValue(entry.composerName) || trimValue(entry.composer)
-  if (explicitName) return toSlug(explicitName) || `composer-entry-${entry.id}`
-
-  if (composerName !== 'Composer Metadata Needed') {
-    return toSlug(composerName) || `composer-entry-${entry.id}`
-  }
-
-  return `composer-entry-${entry.id}`
-}
-
-function inferWorkTitle(entry: ChamberSeriesSourceEntry, composerName: string): string {
-  const explicit = trimValue(entry.workTitle)
-  if (explicit) return explicit
-
-  const title = trimValue(entry.title)
-  if (!title) return 'Untitled Work'
-
-  const escapedComposer = composerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const prefixed = new RegExp(`^${escapedComposer}\\s[-:|]\\s`, 'i')
-  if (prefixed.test(title)) {
-    return title.replace(prefixed, '').trim() || title
-  }
-
-  const suffixed = new RegExp(`^(.+?)\\s+by\\s+${escapedComposer}$`, 'i')
-  const suffixedMatch = title.match(suffixed)
-  if (suffixedMatch?.[1]) {
-    return suffixedMatch[1].trim() || title
-  }
-
-  return title
-}
-
 function inferVersionLabel(entry: ChamberSeriesSourceEntry): string {
-  const explicit = trimValue(entry.versionLabel)
+  const explicit = trimChamberValue(entry.versionLabel)
   if (explicit) return explicit
 
-  const cityLabel = trimValue(entry.geo?.cities?.[0]) || trimValue(entry.institutionName)
+  const cityLabel = trimChamberValue(entry.geo?.cities?.[0]) || trimChamberValue(entry.institutionName)
   const recordedLabel = formatRecordedLabel(entry.recordedAt)
   if (recordedLabel !== 'Date not provided' && cityLabel) {
     return `${cityLabel} · ${recordedLabel}`
@@ -177,9 +119,9 @@ function inferVersionLabel(entry: ChamberSeriesSourceEntry): string {
 
 function inferSubmittedBy(entry: ChamberSeriesSourceEntry): string {
   return (
-    trimValue(entry.submittedBy) ||
-    trimValue(entry.submissionDisplayName) ||
-    trimValue(entry.institutionName) ||
+    trimChamberValue(entry.submittedBy) ||
+    trimChamberValue(entry.submissionDisplayName) ||
+    trimChamberValue(entry.institutionName) ||
     'Unknown submitter'
   )
 }
@@ -215,12 +157,12 @@ export function groupChamberSeriesEntries(entries: ChamberSeriesSourceEntry[]): 
   >()
 
   entries.forEach((entry) => {
-    const composerName = resolveComposerDisplayName(entry)
-    const composerSlug = resolveComposerSlug(entry, composerName)
-    const workTitle = inferWorkTitle(entry, composerName)
-    const workSlug = trimValue(entry.workSlug) || toSlug(workTitle) || `${composerSlug}-work`
+    const composerName = resolveChamberComposerDisplayName(entry)
+    const composerSlug = resolveChamberComposerSlug(entry, composerName)
+    const workTitle = resolveChamberWorkTitle(entry, composerName)
+    const workSlug = trimChamberValue(entry.workSlug) || toChamberSlug(workTitle) || `${composerSlug}-work`
     const sortOrder = Number.isFinite(entry.sortOrder) ? Number(entry.sortOrder) : 999
-    const recordedAt = trimValue(entry.recordedAt) || undefined
+    const recordedAt = trimChamberValue(entry.recordedAt) || undefined
     const marketLabel = getCityLabel(entry)
 
     const composerGroup =
@@ -228,16 +170,16 @@ export function groupChamberSeriesEntries(entries: ChamberSeriesSourceEntry[]): 
       {
         slug: composerSlug,
         name: composerName,
-        description: trimValue(entry.description),
-        imageUrl: trimValue(entry.composerImage) || trimValue(entry.thumbnailUrl) || undefined,
+        description: trimChamberValue(entry.description),
+        imageUrl: trimChamberValue(entry.composerImage) || trimChamberValue(entry.thumbnailUrl) || undefined,
         sortOrder,
         markets: new Set<string>(),
         latestRecordedAt: recordedAt,
         works: new Map(),
       }
 
-    composerGroup.description ||= trimValue(entry.description)
-    composerGroup.imageUrl ||= trimValue(entry.composerImage) || trimValue(entry.thumbnailUrl) || undefined
+    composerGroup.description ||= trimChamberValue(entry.description)
+    composerGroup.imageUrl ||= trimChamberValue(entry.composerImage) || trimChamberValue(entry.thumbnailUrl) || undefined
     composerGroup.sortOrder = Math.min(composerGroup.sortOrder, sortOrder)
     if (!composerGroup.latestRecordedAt || getRecordedSortValue(recordedAt) > getRecordedSortValue(composerGroup.latestRecordedAt)) {
       composerGroup.latestRecordedAt = recordedAt
@@ -249,14 +191,14 @@ export function groupChamberSeriesEntries(entries: ChamberSeriesSourceEntry[]): 
       {
         slug: workSlug,
         title: workTitle,
-        description: trimValue(entry.description),
-        imageUrl: trimValue(entry.thumbnailUrl) || trimValue(entry.composerImage) || undefined,
+        description: trimChamberValue(entry.description),
+        imageUrl: trimChamberValue(entry.thumbnailUrl) || trimChamberValue(entry.composerImage) || undefined,
         sortOrder,
         versions: [],
       }
 
-    workGroup.description ||= trimValue(entry.description)
-    workGroup.imageUrl ||= trimValue(entry.thumbnailUrl) || trimValue(entry.composerImage) || undefined
+    workGroup.description ||= trimChamberValue(entry.description)
+    workGroup.imageUrl ||= trimChamberValue(entry.thumbnailUrl) || trimChamberValue(entry.composerImage) || undefined
     workGroup.sortOrder = Math.min(workGroup.sortOrder, sortOrder)
     workGroup.versions.push({
       id: entry.id,
@@ -265,8 +207,8 @@ export function groupChamberSeriesEntries(entries: ChamberSeriesSourceEntry[]): 
       recordedAt,
       recordedLabel: formatRecordedLabel(recordedAt),
       sortOrder,
-      thumbnailUrl: trimValue(entry.thumbnailUrl) || undefined,
-      institutionName: trimValue(entry.institutionName) || undefined,
+      thumbnailUrl: trimChamberValue(entry.thumbnailUrl) || undefined,
+      institutionName: trimChamberValue(entry.institutionName) || undefined,
       participantNames: entry.participantNames?.filter(Boolean) ?? [],
       cityLabel: marketLabel,
       entry,

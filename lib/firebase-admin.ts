@@ -10,6 +10,7 @@ let adminDb: ReturnType<typeof getFirestore> | null = null
 let adminAuth: ReturnType<typeof getAuth> | null = null
 let adminStorage: ReturnType<typeof getStorage> | null = null
 const ADMIN_APP_NAME = 'beam-admin-sdk'
+const isVercelRuntime = process.env.VERCEL === '1' || process.env.VERCEL === 'true' || Boolean(process.env.VERCEL_ENV)
 
 // Initialize Firebase Admin SDK with fallback options
 function initializeAdminSDK() {
@@ -93,14 +94,22 @@ function initializeAdminSDK() {
       }
 
       // Final fallback: application default credentials.
-      if (!app) {
+      // This is useful locally with `gcloud auth application-default login`, but on Vercel it
+      // produces a client that still fails at request time because there are no default creds.
+      if (!app && !isVercelRuntime) {
         app = initializeApp({
           credential: applicationDefault(),
           projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
           storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
         }, ADMIN_APP_NAME)
         console.info('Firebase Admin SDK initialized from application default credentials')
+      } else if (!app && isVercelRuntime) {
+        console.warn('Firebase Admin SDK not initialized: skipping application default credentials on Vercel')
       }
+    }
+
+    if (!app) {
+      return null
     }
 
     // Initialize services

@@ -16,8 +16,9 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
+import { BookOpenText, CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
 import { auth, db } from '@/lib/firebase'
+import { buildChamberWorkResearchAdminHref } from '@/lib/chamberWorks'
 import { DEFAULT_VIEWER_AREA_ROLE_TEMPLATES } from '@/lib/config/viewerRoleTemplates'
 
 type AccessLevel = 'open' | 'subscriber' | 'regional' | 'institution'
@@ -1349,6 +1350,16 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
                     {entry.isNew ? <span className="rounded-full bg-[#D4AF37]/20 px-2 py-0.5 text-[10px] uppercase text-[#F5D37A]">New</span> : null}
                     {entry.showOnHome ? <span className="rounded-full border border-cyan-300/35 bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase text-cyan-200">Home</span> : null}
                     {entry.confirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : null}
+                    {entry.areaId === 'chamber' ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(buildChamberWorkResearchAdminHref(entry))}
+                        className="ml-1 rounded-md border border-[#D4AF37]/35 bg-[#D4AF37]/10 p-1.5 text-[#F5D37A] hover:bg-[#D4AF37]/18"
+                        aria-label={`Manage research for ${entry.title}`}
+                      >
+                        <BookOpenText className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => openCloneModal(entry)}
