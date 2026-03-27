@@ -1,5 +1,46 @@
 import type { NGOConfig } from '@/lib/types/portal'
 
+export type NavItem = {
+  label: string
+  href: string
+  group: string
+}
+
+export const roleNavConfig: Record<string, NavItem[]> = {
+  perform: [
+    { label: 'Dashboard', href: '/dashboard', group: 'WORKSPACE' },
+    { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
+    { label: 'New Submission', href: '/submit', group: 'SUBMISSIONS' },
+    { label: 'My Submissions', href: '/dashboard#submissions', group: 'SUBMISSIONS' },
+    { label: 'My Schedule', href: '/dashboard#schedule', group: 'SUBMISSIONS' },
+  ],
+  admin_staff: [
+    { label: 'Dashboard', href: '/dashboard', group: 'WORKSPACE' },
+    { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
+    { label: 'Participant Review', href: '/admin/orchestra', group: 'ADMIN' },
+    { label: 'Open Calls Manager', href: '/admin/orchestra#calls', group: 'ADMIN' },
+  ],
+  publisher: [
+    { label: 'Dashboard', href: '/dashboard', group: 'WORKSPACE' },
+    { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
+    { label: 'My Scores', href: '/dashboard#submissions', group: 'SUBMISSIONS' },
+    { label: 'New Submission', href: '/submit', group: 'SUBMISSIONS' },
+    { label: 'Publishing Sign-Up', href: '/join/publishing', group: 'SUBMISSIONS' },
+  ],
+  unauthenticated: [
+    { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
+    { label: 'Become a Participant', href: '/join', group: 'PATHWAYS' },
+  ],
+}
+
+export function getRoleNavItems(role?: string | null): NavItem[] {
+  if (!role) {
+    return roleNavConfig.perform
+  }
+
+  return roleNavConfig[role] ?? roleNavConfig.perform
+}
+
 export const orchestraConfig: NGOConfig = {
   id: 'orchestra',
   displayName: 'BEAM Orchestra Portal',

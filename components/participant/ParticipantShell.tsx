@@ -1,59 +1,115 @@
 'use client'
 
-import { ReactNode, useMemo, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { PARTICIPANT_UI } from '@/components/participant/ui'
+import { getRoleNavItems, roleNavConfig, type NavItem } from '@/lib/config/orchestraConfig'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import { readCachedParticipantRole, writeCachedParticipantRole } from '@/lib/participantOnboarding'
 
 type ParticipantShellProps = {
   title?: string
   subtitle?: string
   children: ReactNode
+  membershipRole?: string | null
+  membershipRoleLoading?: boolean
 }
 
-export default function ParticipantShell({ title, subtitle, children }: ParticipantShellProps) {
+type ToolGroup = {
+  id: string
+  title: string
+  items: NavItem[]
+}
+
+function groupNavItems(items: NavItem[]): ToolGroup[] {
+  const grouped = new Map<string, NavItem[]>()
+
+  items.forEach((item) => {
+    const bucket = grouped.get(item.group) ?? []
+    bucket.push(item)
+    grouped.set(item.group, bucket)
+  })
+
+  return Array.from(grouped.entries()).map(([group, groupItems]) => ({
+    id: group.toLowerCase(),
+    title: group,
+    items: groupItems,
+  }))
+}
+
+export default function ParticipantShell({
+  title,
+  subtitle,
+  children,
+  membershipRole,
+  membershipRoleLoading = false,
+}: ParticipantShellProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [currentHash, setCurrentHash] = useState('')
+  const [cachedMembershipRole, setCachedMembershipRole] = useState<string | null>(null)
+  const { user } = useUserRole({ allowAdminBypass: false })
 
-  const toolGroups = useMemo(
-    () => [
-      {
-        id: 'workspace',
-        title: 'Workspace',
-        items: [
-          { href: '/dashboard', label: 'Dashboard' },
-          { href: '/viewer', label: 'Browse Viewer' },
-        ],
-      },
-      {
-        id: 'submissions',
-        title: 'Submissions',
-        items: [
-          { href: '/studio/viewer-submissions', label: 'New Submission' },
-          { href: '/studio/viewer-submissions/mine', label: 'My Submissions' },
-          { href: '/publishing/signup', label: 'Publishing Sign-Up' },
-        ],
-      },
-      {
-        id: 'pathways',
-        title: 'Pathways',
-        items: [
-          { href: '/join', label: 'Become a Participant' },
-          { href: '/join/admin-staff', label: 'Join Admin/Staff Cart' },
-        ],
-      },
-    ],
-    [],
-  )
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const syncHash = () => {
+      setCurrentHash(window.location.hash || '')
+    }
+
+    syncHash()
+    window.addEventListener('hashchange', syncHash)
+
+    return () => {
+      window.removeEventListener('hashchange', syncHash)
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setCachedMembershipRole(null)
+      return
+    }
+
+    const nextMembershipRole = membershipRole?.trim()
+    if (nextMembershipRole) {
+      writeCachedParticipantRole(user.uid, nextMembershipRole)
+      setCachedMembershipRole(nextMembershipRole)
+      return
+    }
+
+    setCachedMembershipRole(readCachedParticipantRole(user.uid))
+  }, [membershipRole, user?.uid])
+
+  const resolvedMembershipRole = useMemo(() => {
+    if (!user) return 'unauthenticated'
+    const explicitRole = membershipRole?.trim()
+    const cachedRole = cachedMembershipRole?.trim()
+    return explicitRole || cachedRole || null
+  }, [cachedMembershipRole, membershipRole, user])
+
+  const showRoleSkeleton = Boolean(user && membershipRoleLoading && !resolvedMembershipRole)
+
+  const toolGroups = useMemo(() => {
+    const navItems = !user
+      ? roleNavConfig.unauthenticated
+      : getRoleNavItems(resolvedMembershipRole)
+
+    return groupNavItems(navItems)
+  }, [resolvedMembershipRole, user])
 
   const breadcrumb = useMemo(() => {
     const map: Array<{ prefix: string; label: string }> = [
+      { prefix: '/admin/orchestra', label: 'Participant Review' },
       { prefix: '/dashboard', label: 'Dashboard' },
+      { prefix: '/submit', label: 'New Submission' },
       { prefix: '/studio/viewer-submissions/mine', label: 'My Submissions' },
       { prefix: '/studio/viewer-submissions', label: 'New Submission' },
       { prefix: '/join/admin-staff', label: 'Join Admin/Staff' },
       { prefix: '/join/cohort', label: 'Cohort Sign-Up' },
+      { prefix: '/join/publishing', label: 'Publishing Sign-Up' },
       { prefix: '/join/confirm', label: 'Confirm Role' },
       { prefix: '/join', label: 'Become a Participant' },
       { prefix: '/publishing/signup', label: 'Publishing Sign-Up' },
@@ -62,6 +118,22 @@ export default function ParticipantShell({ title, subtitle, children }: Particip
     const found = map.find((item) => pathname.startsWith(item.prefix))
     return found?.label ?? 'Participant'
   }, [pathname])
+
+  const participantLabel = useMemo(() => {
+    if (!user) return null
+    if (user.displayName?.trim()) return user.displayName.trim()
+    if (user.email?.trim()) return user.email.trim()
+    return null
+  }, [user])
+
+  const isDashboardRoute = pathname.startsWith('/dashboard')
+
+  const isToolActive = (href: string) => {
+    const [hrefPath, hrefHash = ''] = href.split('#')
+    if (hrefPath !== pathname) return false
+    if (!hrefHash) return currentHash === ''
+    return currentHash === `#${hrefHash}`
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -95,30 +167,44 @@ export default function ParticipantShell({ title, subtitle, children }: Particip
             </div>
             <p className="mb-4 text-xs text-white/60">Menu starts closed and opens from the Tools button.</p>
             <nav className="space-y-4">
-              {toolGroups.map((group) => (
-                <div key={group.id}>
-                  <p className="mb-2 text-xs uppercase tracking-[0.12em] text-white/55">{group.title}</p>
+              {showRoleSkeleton ? (
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-[0.12em] text-white/55">Loading</p>
                   <div className="space-y-2">
-                    {group.items.map((tool) => {
-                      const active = pathname === tool.href
-                      return (
-                        <Link
-                          key={tool.href}
-                          href={tool.href}
-                          onClick={() => setMenuOpen(false)}
-                          className={`${PARTICIPANT_UI.drawerLink} ${
-                            active
-                              ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-white'
-                              : 'border-white/10 bg-white/[0.02] text-white/85 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 hover:text-white'
-                          }`}
-                        >
-                          {tool.label}
-                        </Link>
-                      )
-                    })}
+                    {[0, 1, 2].map((index) => (
+                      <div
+                        key={index}
+                        className="h-[42px] rounded-[18px] border border-white/10 bg-white/[0.02] animate-pulse"
+                      />
+                    ))}
                   </div>
                 </div>
-              ))}
+              ) : (
+                toolGroups.map((group) => (
+                  <div key={group.id}>
+                    <p className="mb-2 text-xs uppercase tracking-[0.12em] text-white/55">{group.title}</p>
+                    <div className="space-y-2">
+                      {group.items.map((tool) => {
+                        const active = isToolActive(tool.href)
+                        return (
+                          <Link
+                            key={tool.href}
+                            href={tool.href}
+                            onClick={() => setMenuOpen(false)}
+                            className={`${PARTICIPANT_UI.drawerLink} ${
+                              active
+                                ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-white'
+                                : 'border-white/10 bg-white/[0.02] text-white/85 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 hover:text-white'
+                            }`}
+                          >
+                            {tool.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
             </nav>
           </aside>
         </>
@@ -129,6 +215,9 @@ export default function ParticipantShell({ title, subtitle, children }: Particip
           <div className="mx-auto mb-4 max-w-6xl">
             <p className="text-xs uppercase tracking-[0.12em] text-white/55">Participant / {breadcrumb}</p>
             {title ? <h1 className="text-2xl font-bold text-white">{title}</h1> : null}
+            {isDashboardRoute && participantLabel ? (
+              <p className="mt-1 text-sm font-medium text-[#F5D37A]">Personal dashboard for {participantLabel}</p>
+            ) : null}
             {subtitle ? <p className="mt-1 text-sm text-white/70">{subtitle}</p> : null}
           </div>
         )}

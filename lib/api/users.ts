@@ -1,13 +1,84 @@
 import type { AdminTableRow, UserProfileSummary } from '@/lib/types/portal'
 import { db } from '@/lib/firebase'
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 
-export async function fetchUserProfile(_ngo: string, _userId?: string): Promise<UserProfileSummary> {
-  return {
-    name: 'Guest Musician',
-    volunteerHours: 28,
-    paidOpportunities: 3,
-    institutionRole: 'Performer',
+const MEMBERSHIP_ROLE_LABELS: Record<string, string> = {
+  perform: 'Performer',
+  recruit_mentor: 'Recruiter and Mentor',
+  admin_staff: 'Admin / Staff',
+  publisher: 'Publisher',
+}
+
+export async function fetchUserProfile(_ngo: string, userId?: string): Promise<UserProfileSummary> {
+  if (!db || !userId) {
+    return {
+      name: '',
+      volunteerHours: 0,
+      paidOpportunities: 0,
+      institutionRole: undefined,
+      membershipRole: undefined,
+    }
+  }
+
+  try {
+    const [userSnap, musicianSnap, membershipSnap] = await Promise.all([
+      getDoc(doc(db, 'users', userId)),
+      getDoc(doc(db, 'musicians', userId)),
+      getDoc(doc(db, 'ngoMemberships', userId)),
+    ])
+
+    const userData = userSnap.exists() ? userSnap.data() : null
+    const musicianData = musicianSnap.exists() ? musicianSnap.data() : null
+    const membershipData = membershipSnap.exists() ? membershipSnap.data() : null
+
+    const resolvedName =
+      (typeof userData?.displayName === 'string' && userData.displayName.trim()) ||
+      (typeof userData?.name === 'string' && userData.name.trim()) ||
+      (typeof musicianData?.name === 'string' && musicianData.name.trim()) ||
+      ''
+
+    const membershipRole =
+      (typeof membershipData?.role === 'string' && membershipData.role.trim()) ||
+      ''
+
+    const fallbackRole =
+      (typeof userData?.role === 'string' && userData.role.trim()) ||
+      ''
+
+    const institutionRole =
+      (typeof userData?.institutionRole === 'string' && userData.institutionRole.trim()) ||
+      (membershipRole
+        ? MEMBERSHIP_ROLE_LABELS[membershipRole] || membershipRole
+        : fallbackRole
+          ? MEMBERSHIP_ROLE_LABELS[fallbackRole] || fallbackRole
+          : undefined)
+
+    return {
+      name: resolvedName,
+      volunteerHours:
+        typeof userData?.volunteerHours === 'number'
+          ? userData.volunteerHours
+          : typeof musicianData?.volunteerHours === 'number'
+            ? musicianData.volunteerHours
+            : 0,
+      paidOpportunities:
+        typeof userData?.paidOpportunities === 'number'
+          ? userData.paidOpportunities
+          : typeof musicianData?.paidOpportunities === 'number'
+            ? musicianData.paidOpportunities
+            : 0,
+      institutionRole,
+      membershipRole: membershipRole || undefined,
+    }
+  } catch (error) {
+    console.error('Unable to fetch user profile:', error)
+    return {
+      name: '',
+      volunteerHours: 0,
+      paidOpportunities: 0,
+      institutionRole: undefined,
+      membershipRole: undefined,
+    }
   }
 }
 

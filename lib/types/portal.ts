@@ -63,6 +63,7 @@ export interface UserProfileSummary {
   volunteerHours: number
   paidOpportunities: number
   institutionRole?: string
+  membershipRole?: string
 }
 
 export interface AdminTableRow {

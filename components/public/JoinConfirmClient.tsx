@@ -3,17 +3,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth'
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { AlertCircle, ArrowRight, CheckCircle2, Mail } from 'lucide-react'
 import { auth, db } from '@/lib/firebase'
 import { completeEmailSignIn, isSignInWithEmailLink, signInWithEmail } from '@/lib/authClient'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import {
+  claimExistingContributions,
   getParticipantIntentLabel,
   isParticipantIntent,
+  markContributionClaimed,
   resolveParticipantIntentDestination,
+  writeCachedParticipantRole,
   type ParticipantIntent,
-} from '@/lib/portal/onboarding'
+} from '@/lib/participantOnboarding'
 
 type JoinConfirmClientProps = {
   initialIntent?: string | null
@@ -89,15 +92,33 @@ export default function JoinConfirmClient({ initialIntent }: JoinConfirmClientPr
       throw new Error('Firestore is not initialized.')
     }
 
-    await setDoc(
-      doc(db, 'ngoMemberships', signedInUser.uid),
-      {
-        ngo: 'orchestra',
-        role: intent,
-        joinedAt: serverTimestamp(),
-      },
-      { merge: true },
-    )
+    const membershipRef = doc(db, 'ngoMemberships', signedInUser.uid)
+    const membershipSnap = await getDoc(membershipRef)
+    const membershipData = membershipSnap.exists() ? (membershipSnap.data() as { ngo?: unknown; role?: unknown }) : null
+
+    let resolvedRole: string = intent
+
+    if (membershipData?.ngo === 'orchestra') {
+      console.info('Existing membership found, skipping write.')
+      if (typeof membershipData.role === 'string' && membershipData.role.trim()) {
+        resolvedRole = membershipData.role.trim()
+      }
+    } else {
+      await setDoc(
+        membershipRef,
+        {
+          ngo: 'orchestra',
+          role: intent,
+          joinedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+    }
+
+    const resolvedEmail = signedInUser.email?.trim() || email.trim()
+    await claimExistingContributions(signedInUser.uid, resolvedEmail)
+    markContributionClaimed(signedInUser.uid)
+    writeCachedParticipantRole(signedInUser.uid, resolvedRole)
 
     router.replace(resolveParticipantIntentDestination('orchestra', intent))
   }
