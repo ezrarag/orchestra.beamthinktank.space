@@ -189,6 +189,12 @@ service cloud.firestore {
       allow write: if isAdmin() || viewerAdminBypassEnabled();
     }
 
+    // Home hero slide overrides shown on /home
+    match /portalHomeSlides/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.token.admin == true);
+    }
+
     // Publishing applications
     match /publishingApplications/{applicationId} {
       // Admins can read/write all applications

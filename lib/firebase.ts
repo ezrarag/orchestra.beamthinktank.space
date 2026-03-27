@@ -14,6 +14,9 @@ const firebaseConfig = {
 
 // Check if Firebase config is complete
 const isFirebaseConfigured = Object.values(firebaseConfig).every(value => value && value !== 'undefined')
+const missingFirebaseKeys = Object.entries(firebaseConfig)
+  .filter(([_, value]) => !value || value === 'undefined')
+  .map(([key]) => key)
 
 let app: any = null
 let db: any = null
@@ -33,11 +36,13 @@ if (isFirebaseConfigured) {
     console.error('Firebase initialization failed:', error)
   }
 } else {
+  if (!firebaseConfig.projectId || firebaseConfig.projectId === 'undefined') {
+    console.error(
+      'beam-orchestra-platform Firebase client: missing env vars. Chamber content will not load.'
+    )
+  }
   console.warn('Firebase configuration incomplete. Please check your environment variables.')
-  console.warn('Missing variables:', Object.entries(firebaseConfig)
-    .filter(([_, value]) => !value || value === 'undefined')
-    .map(([key]) => key)
-  )
+  console.warn('Missing variables:', missingFirebaseKeys)
 }
 
 export { db, auth, storage }

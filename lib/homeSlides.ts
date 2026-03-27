@@ -49,6 +49,9 @@ export function sanitizeHomeSlide(input: Partial<HeroSlide>, index: number): Her
 
   const videoUrl = readTrimmedString(input.videoUrl)
   if (videoUrl) {
+    if (videoUrl.startsWith('http://localhost')) {
+      console.warn('Home slide videoUrl is a localhost URL — will not work in production.')
+    }
     slide.videoUrl = videoUrl
   }
 

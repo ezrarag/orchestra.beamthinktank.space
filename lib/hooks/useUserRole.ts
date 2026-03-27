@@ -5,7 +5,7 @@ import { User, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 
-export type UserRole = 'beam_admin' | 'partner_admin' | 'board' | 'musician' | 'subscriber' | 'audience'
+export type UserRole = 'beam_admin' | 'partner_admin' | 'admin_staff' | 'board' | 'musician' | 'subscriber' | 'audience'
 
 const adminAuthBypassEnabled =
   process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS === '1' ||

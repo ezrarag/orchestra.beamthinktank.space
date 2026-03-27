@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { ArrowUpRight, Calendar, Disc3, LibraryBig, Microscope, Users } from 'lucide-react'
+import { ArrowUpRight, Calendar, Disc3, LibraryBig, Microscope, SlidersHorizontal, Users } from 'lucide-react'
 import { getFirestoreTimestampMillis, truncateChamberResearchExcerpt } from '@/lib/chamberWorks'
 import type { ChamberResearchRef, ChamberWorkDocument } from '@/lib/types/chamber'
 
-export type ChamberViewerTab = 'performance' | 'research' | 'critique' | 'otherVersions'
+export type ChamberViewerTab = 'performance' | 'research' | 'session' | 'critique' | 'otherVersions'
+export type ChamberViewerIntent = 'select' | 'subscriber' | 'student' | 'instructor' | 'partner'
 
 type ChamberPlaybackStory = {
   title: string
@@ -20,6 +21,11 @@ type ChamberPlaybackStory = {
   researchStatus?: string
 }
 
+type ChamberRecentWatch = {
+  contentId: string
+  title: string
+}
+
 type Props = {
   activeTab: ChamberViewerTab
   onTabChange: (tab: ChamberViewerTab) => void
@@ -28,14 +34,30 @@ type Props = {
   researchLoadState: 'idle' | 'loading' | 'ready' | 'error'
   researchError?: string | null
   adminResearchHref?: string | null
+  variant?: 'inline' | 'overlay'
+  viewerIntent?: ChamberViewerIntent
+  onViewerIntentChange?: (intent: ChamberViewerIntent) => void
+  partnerType?: string
+  onPartnerTypeChange?: (partnerType: string) => void
+  continueHref?: string
+  continueLabel?: string
+  sessionActionLabel?: string | null
+  onSessionAction?: (() => void) | null
+  recentWatched?: ChamberRecentWatch[]
+  onSelectRecentWatched?: (contentId: string) => void
+  referenceHref?: string | null
+  bookHref?: string | null
 }
 
 const TAB_OPTIONS: Array<{ id: ChamberViewerTab; label: string }> = [
   { id: 'performance', label: 'Performance' },
   { id: 'research', label: 'Research' },
+  { id: 'session', label: 'Session' },
   { id: 'critique', label: 'Critique' },
   { id: 'otherVersions', label: 'Other versions' },
 ]
+
+const PARTNER_TYPE_OPTIONS = ['Community Partner', 'Institutional Partner', 'Presenter', 'Sponsor']
 
 function getSourceLabel(source: ChamberResearchRef['source']): string {
   if (source === 'doaj') return 'DOAJ'
@@ -75,16 +97,36 @@ export default function ChamberViewerPanels({
   researchLoadState,
   researchError,
   adminResearchHref,
+  variant = 'inline',
+  viewerIntent = 'select',
+  onViewerIntentChange,
+  partnerType = 'Community Partner',
+  onPartnerTypeChange,
+  continueHref,
+  continueLabel = 'Continue Watching',
+  sessionActionLabel,
+  onSessionAction,
+  recentWatched = [],
+  onSelectRecentWatched,
+  referenceHref,
+  bookHref,
 }: Props) {
   const researchRefs = [...(work?.researchRefs ?? [])].sort(
     (a, b) => getFirestoreTimestampMillis(b.addedAt) - getFirestoreTimestampMillis(a.addedAt),
   )
   const composerLabel = story?.composerName || story?.composer || work?.composerName || 'Composer metadata pending'
   const workLabel = story?.workTitle || work?.workTitle || 'Work metadata pending'
+  const containerClassName =
+    variant === 'overlay' ? 'flex h-full flex-col' : 'mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8'
+  const panelClassName =
+    variant === 'overlay'
+      ? 'flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#090B10]/92 shadow-[0_24px_80px_rgba(0,0,0,0.48)] backdrop-blur-xl'
+      : 'overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.035]'
+  const contentClassName = variant === 'overlay' ? 'flex-1 overflow-y-auto p-4 sm:p-5' : 'p-4 sm:p-5'
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-      <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.035]">
+    <section className={containerClassName}>
+      <div className={panelClassName}>
         <div className="border-b border-white/10 px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -111,7 +153,7 @@ export default function ChamberViewerPanels({
           </div>
         </div>
 
-        <div className="p-4 sm:p-5">
+        <div className={contentClassName}>
           {activeTab === 'performance' ? (
             <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
               <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
@@ -136,7 +178,7 @@ export default function ChamberViewerPanels({
                     </p>
                   </div>
                 ) : null}
-              </article>
+                </article>
 
               <div className="grid gap-4">
                 <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
@@ -169,6 +211,31 @@ export default function ChamberViewerPanels({
                     </div>
                   </div>
                 </article>
+                {referenceHref || bookHref ? (
+                  <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">Reference links</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {referenceHref ? (
+                        <Link
+                          href={referenceHref}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3.5 py-2 text-xs font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/16"
+                        >
+                          Open Reference Materials
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                      ) : null}
+                      {bookHref ? (
+                        <Link
+                          href={bookHref}
+                          className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/20 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:border-white/24 hover:text-white"
+                        >
+                          Book Participants
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                      ) : null}
+                    </div>
+                  </article>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -247,6 +314,103 @@ export default function ChamberViewerPanels({
                 ))}
               </div>
             )
+          ) : null}
+
+          {activeTab === 'session' ? (
+            <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">
+              <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
+                <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Access
+                </p>
+                {continueHref ? (
+                  <Link
+                    href={continueHref}
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-4 py-2 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/16"
+                  >
+                    {continueLabel}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                ) : null}
+                <div className="mt-5 grid gap-3">
+                  <label className="grid gap-2 text-sm text-white/70">
+                    <span className="text-[11px] uppercase tracking-[0.14em] text-white/45">Viewer mode</span>
+                    <select
+                      value={viewerIntent}
+                      onChange={(event) => onViewerIntentChange?.(event.target.value as ChamberViewerIntent)}
+                      className="rounded-2xl border border-white/14 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-[#D4AF37]"
+                    >
+                      <option value="select">Select</option>
+                      <option value="subscriber">Subscriber</option>
+                      <option value="student">Student Learner</option>
+                      <option value="instructor">Institutional Instructor</option>
+                      <option value="partner">Partner</option>
+                    </select>
+                  </label>
+                  {viewerIntent === 'partner' ? (
+                    <label className="grid gap-2 text-sm text-white/70">
+                      <span className="text-[11px] uppercase tracking-[0.14em] text-white/45">Partner type</span>
+                      <select
+                        value={partnerType}
+                        onChange={(event) => onPartnerTypeChange?.(event.target.value)}
+                        className="rounded-2xl border border-white/14 bg-black/30 px-4 py-3 text-sm text-white outline-none transition focus:border-[#D4AF37]"
+                      >
+                        {PARTNER_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {sessionActionLabel && onSessionAction ? (
+                    <button
+                      type="button"
+                      onClick={onSessionAction}
+                      className="inline-flex items-center justify-center rounded-full bg-[#D4AF37] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
+                    >
+                      {sessionActionLabel}
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+
+              <div className="grid gap-4">
+                {recentWatched.length > 0 ? (
+                  <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">Recently watched</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {recentWatched.map((item) => (
+                        <button
+                          key={item.contentId}
+                          type="button"
+                          onClick={() => onSelectRecentWatched?.(item.contentId)}
+                          className="rounded-full border border-white/12 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white/82 transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                        >
+                          {item.title}
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ) : null}
+
+                <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">Session context</p>
+                  <div className="mt-4 grid gap-3 text-sm text-white/78">
+                    <div className="rounded-2xl border border-white/8 bg-black/25 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Currently playing</p>
+                      <p className="mt-1 font-medium text-white">{story?.versionLabel || story?.title || 'Selected recording'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/8 bg-black/25 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Other versions</p>
+                      <p className="mt-1 font-medium text-white">
+                        {story ? `${story.relatedVersionCount} linked` : 'Not listed'}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
           ) : null}
 
           {activeTab === 'critique' ? (

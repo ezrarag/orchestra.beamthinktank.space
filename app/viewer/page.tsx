@@ -26,6 +26,7 @@ import { buildChamberWorkId, buildChamberWorkResearchAdminHref, loadChamberWorks
 import type { ChamberWorkDocument } from '@/lib/types/chamber'
 import ChamberSeriesBrowser from '@/app/viewer/_components/ChamberSeriesBrowser'
 import ChamberViewerPanels, { type ChamberViewerTab } from '@/components/viewer/ChamberViewerPanels'
+import ViewerStreamingCanvas from '@/components/viewer/ViewerStreamingCanvas'
 
 type AreaSection = {
   id: string
@@ -131,6 +132,7 @@ const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
 const LOCAL_LAST_ACTIVE_VIDEO_STORAGE_KEY = 'viewer-last-active-video'
 const PROGRESS_SAVE_INTERVAL_MS = 1200
+const PLAYBACK_UI_UPDATE_STEP_SECONDS = 0.5
 const BROAD_FETCH_LIMIT = 50
 const VIEWER_DOCUMENT_CATEGORY_OPTIONS: Array<{ value: ViewerDocumentCategory; label: string }> = [
   { value: 'score', label: 'Score Related' },
@@ -203,21 +205,6 @@ type ViewerDocument = {
   createdAt?: unknown
 }
 
-type HlsConstructor = {
-  new (config: Record<string, unknown>): any
-  isSupported: () => boolean
-  Events: {
-    ERROR: string
-    MANIFEST_PARSED: string
-  }
-  ErrorTypes: {
-    NETWORK_ERROR: string
-    MEDIA_ERROR: string
-  }
-}
-
-let hlsCtorPromise: Promise<HlsConstructor | null> | null = null
-
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
     const withCode = error as { code?: unknown; message?: unknown }
@@ -255,36 +242,6 @@ function toMediaOrigin(url: string): string | null {
   } catch {
     return null
   }
-}
-
-async function ensureHlsCtor(): Promise<HlsConstructor | null> {
-  if (typeof window === 'undefined') return null
-  if (!hlsCtorPromise) {
-    hlsCtorPromise = new Promise<HlsConstructor | null>((resolve, reject) => {
-      const win = window as Window & { Hls?: HlsConstructor }
-      if (win.Hls) {
-        resolve(win.Hls)
-        return
-      }
-
-      const existing = document.querySelector('script[data-hlsjs-cdn="1"]') as HTMLScriptElement | null
-      if (existing) {
-        existing.addEventListener('load', () => resolve(win.Hls ?? null), { once: true })
-        existing.addEventListener('error', () => reject(new Error('hls.js CDN failed to load')), { once: true })
-        return
-      }
-
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
-      script.async = true
-      script.dataset.hlsjsCdn = '1'
-      script.onload = () => resolve(win.Hls ?? null)
-      script.onerror = () => reject(new Error('hls.js CDN failed to load'))
-      document.head.appendChild(script)
-    })
-  }
-
-  return hlsCtorPromise
 }
 
 function normalizeViewerContent(id: string, data: Partial<ViewerContent>): ViewerContent {
@@ -555,7 +512,6 @@ function ViewerPageContent() {
   const initialArea = viewerAreas.find((area) => area.id === initialAreaId) ?? viewerAreas[0]
   const playerViewportRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const hlsRef = useRef<any>(null)
   const lastPlaybackUiUpdateRef = useRef(0)
   const landscapePlaybackAttemptRef = useRef('')
   const progressSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -627,6 +583,7 @@ function ViewerPageContent() {
   const [documentUploadFile, setDocumentUploadFile] = useState<File | null>(null)
   const [isStudentPipCollapsed, setIsStudentPipCollapsed] = useState(false)
   const [chamberViewerTab, setChamberViewerTab] = useState<ChamberViewerTab>('performance')
+  const [isChamberViewerOpen, setIsChamberViewerOpen] = useState(false)
 
   const requestedAreaFilter = useMemo(() => {
     const area = searchParams.get('area')
@@ -679,11 +636,11 @@ function ViewerPageContent() {
   }
 
   useEffect(() => {
-    document.body.style.overflow = isLibraryOpen ? 'hidden' : ''
+    document.body.style.overflow = isLibraryOpen || isChamberViewerOpen ? 'hidden' : ''
     return () => {
       document.body.style.overflow = ''
     }
-  }, [isLibraryOpen])
+  }, [isChamberViewerOpen, isLibraryOpen])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -798,7 +755,9 @@ function ViewerPageContent() {
     if (!isChamberArea || !activeStory) return null
     return buildChamberWorkResearchAdminHref(activeStory)
   }, [activeStory, isChamberArea])
-  const canManageChamberResearch = Boolean(user && (role === 'beam_admin' || role === 'partner_admin'))
+  const canManageChamberResearch = Boolean(
+    user && (role === 'beam_admin' || role === 'partner_admin' || role === 'admin_staff')
+  )
 
   const selectedAreaRoleDoc = useMemo(() => {
     return viewerAreaRolesMap?.[selectedAreaId] ?? null
@@ -846,7 +805,30 @@ function ViewerPageContent() {
     if (storiesLoadState === 'loading') return 'loading'
     return chamberWorksLoadState
   }, [chamberWorksLoadState, isChamberArea, storiesLoadState])
-  const shouldShowChamberViewerPanels = isChamberArea && Boolean(activeVideo.contentId) && activeVideo.sourceType !== 'role-explainer'
+  const shouldShowChamberViewerPanels = Boolean(activeStory) && (selectedAreaId === 'chamber' || activeStory?.areaId === 'chamber')
+  const chamberViewerContinueHref = user ? '/studio' : '/subscriber'
+  const chamberViewerContinueLabel = user ? 'Continue Watching' : 'Log In'
+  const chamberViewerStory = useMemo(() => {
+    if (!activeStory) return null
+    return {
+      title: activeStory.title,
+      description: activeStory.description,
+      composer: activeStory.composer,
+      composerName: activeStory.composerName,
+      workTitle: activeStory.workTitle,
+      versionLabel: activeStory.versionLabel,
+      submittedBy: activeStory.submittedBy,
+      institutionName: activeStory.institutionName,
+      recordedLabel,
+      participantNames: activeStory.participantNames,
+      relatedVersionCount: activeStory.relatedVersionIds?.length ?? 0,
+      researchStatus: activeStory.researchStatus,
+    }
+  }, [activeStory, recordedLabel])
+  const chamberRecentWatched = useMemo(
+    () => recentWatchedStories.map((item) => ({ contentId: item.contentId, title: item.title })),
+    [recentWatchedStories],
+  )
 
   const getStoryProgressPercent = (contentId: string): number => {
     const progress = contentProgress[contentId]
@@ -870,11 +852,6 @@ function ViewerPageContent() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const isHlsSource = (url: string): boolean => {
-    const normalized = url.toLowerCase()
-    return normalized.includes('.m3u8') || normalized.includes('format=m3u8')
-  }
-
   const saveProgressToStorage = (next: Record<string, ContentProgress>) => {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(LOCAL_PROGRESS_STORAGE_KEY, JSON.stringify(next))
@@ -884,6 +861,26 @@ function ViewerPageContent() {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(LOCAL_WATCHED_HISTORY_STORAGE_KEY, JSON.stringify(next))
   }
+
+  useEffect(() => {
+    if (shouldShowChamberViewerPanels) return
+    setIsChamberViewerOpen(false)
+  }, [shouldShowChamberViewerPanels])
+
+  useEffect(() => {
+    if (!isChamberViewerOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsChamberViewerOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isChamberViewerOpen])
 
   useEffect(() => {
     setActiveVideo((current) => {
@@ -1349,14 +1346,16 @@ function ViewerPageContent() {
   useEffect(() => {
     if (typeof document === 'undefined') return
 
-    const hlsCandidates = [activeVideo.url, activeVideo.fallbackUrl, ...selectedAreaStories.map((item) => item.hlsUrl || item.videoUrl)]
-      .filter((url): url is string => Boolean(url))
-      .filter((url) => isHlsSource(url))
+    const streamingCandidates = [
+      activeVideo.url,
+      activeVideo.fallbackUrl,
+      ...selectedAreaStories.map((item) => item.hlsUrl || item.videoUrl),
+    ].filter((url): url is string => Boolean(url))
 
-    if (hlsCandidates.length === 0) return
+    if (streamingCandidates.length === 0) return
 
     const links: HTMLLinkElement[] = []
-    const cdnOrigin = 'https://cdn.jsdelivr.net'
+    const cdnOrigin = 'https://vjs.zencdn.net'
     const preconnectLink = document.createElement('link')
     preconnectLink.rel = 'preconnect'
     preconnectLink.href = cdnOrigin
@@ -1369,10 +1368,6 @@ function ViewerPageContent() {
     dnsLink.href = cdnOrigin
     document.head.appendChild(dnsLink)
     links.push(dnsLink)
-
-    void ensureHlsCtor().catch((error) => {
-      console.warn('Unable to preload hls.js:', error)
-    })
 
     return () => {
       links.forEach((link) => link.remove())
@@ -2035,105 +2030,6 @@ function ViewerPageContent() {
     studentCameraPreviewRef.current.srcObject = studentCameraStreamRef.current
   }, [isStudentCameraEnabled, isStudentPipCollapsed])
 
-  useEffect(() => {
-    const element = videoRef.current
-    if (!element || !activeVideo.url) return
-
-    let canceled = false
-    setPlaybackNotice(null)
-
-    const clearHls = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy()
-        hlsRef.current = null
-      }
-    }
-
-    const applyDirectSource = (url: string) => {
-      clearHls()
-      element.src = url
-      element.load()
-    }
-
-    const setupSource = async () => {
-      const sourceUrl = activeVideo.url
-      if (!isHlsSource(sourceUrl)) {
-        applyDirectSource(sourceUrl)
-        return
-      }
-
-      if (element.canPlayType('application/vnd.apple.mpegurl')) {
-        applyDirectSource(sourceUrl)
-        return
-      }
-
-      try {
-        const HlsCtor = await ensureHlsCtor()
-        if (canceled || !HlsCtor) return
-        if (!HlsCtor.isSupported()) {
-          if (activeVideo.fallbackUrl) {
-            applyDirectSource(activeVideo.fallbackUrl)
-          } else {
-            applyDirectSource(sourceUrl)
-            setPlaybackNotice('This browser may not support adaptive stream playback for this video.')
-          }
-          return
-        }
-
-        clearHls()
-        const hls = new HlsCtor({
-          enableWorker: true,
-          backBufferLength: 30,
-          maxBufferLength: 12,
-          maxMaxBufferLength: 24,
-          capLevelToPlayerSize: true,
-          lowLatencyMode: false,
-        })
-        hlsRef.current = hls
-        hls.loadSource(sourceUrl)
-        hls.attachMedia(element)
-        hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
-          setPlaybackNotice(null)
-        })
-        hls.on(HlsCtor.Events.ERROR, (_event: unknown, data: any) => {
-          if (!data?.fatal) return
-          if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
-            hls.startLoad()
-            return
-          }
-          if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError()
-            return
-          }
-          if (activeVideo.fallbackUrl) {
-            applyDirectSource(activeVideo.fallbackUrl)
-            setPlaybackNotice('Stream quality fallback activated.')
-          } else {
-            setPlaybackNotice('Adaptive stream failed to recover for this video.')
-          }
-        })
-      } catch (error) {
-        console.error('Error initializing HLS playback:', error)
-        if (activeVideo.fallbackUrl) {
-          applyDirectSource(activeVideo.fallbackUrl)
-          setPlaybackNotice('Adaptive stream unavailable, using fallback video source.')
-        } else {
-          applyDirectSource(sourceUrl)
-          setPlaybackNotice('Adaptive stream library unavailable in this environment.')
-        }
-      }
-    }
-
-    void setupSource()
-    return () => {
-      canceled = true
-      if (hlsRef.current) {
-        hlsRef.current.destroy()
-        hlsRef.current = null
-      }
-    }
-  }, [activeVideo.url, activeVideo.fallbackUrl])
-
   async function handleOpenContent(content: ViewerContent, areaId: ViewerArea['id']) {
     const area = viewerAreas.find((item) => item.id === areaId)
     const fallbackOverlay = area?.visual ?? viewerAreas[0].visual
@@ -2194,6 +2090,22 @@ function ViewerPageContent() {
     }
   }
 
+  const handleSelectRecentWatched = async (contentId: string) => {
+    const watchedItem = recentWatchedStories.find((item) => item.contentId === contentId)
+    if (!watchedItem || !db) return
+
+    const currentMatch = selectedAreaCatalog.find((story) => story.id === contentId)
+    if (currentMatch) {
+      await handleOpenContent(currentMatch, watchedItem.areaId)
+      return
+    }
+
+    const watchedDoc = await getDoc(doc(db, 'viewerContent', contentId))
+    if (!watchedDoc.exists()) return
+    const watchedData = watchedDoc.data() as Omit<ViewerContent, 'id'>
+    await handleOpenContent({ id: watchedDoc.id, ...watchedData }, watchedItem.areaId)
+  }
+
   const handlePlayerInteraction = () => {
     // Keep the initial landing overlay persistent until a specific content video is selected.
     if (activeVideo.sourceType === 'area-default' && !activeVideo.contentId) return
@@ -2239,6 +2151,34 @@ function ViewerPageContent() {
     void requestMobileLandscapePlayback(false, explainerUrl)
   }
 
+  const chamberSessionActionLabel =
+    viewerIntent === 'student'
+      ? 'Open Student Learner'
+      : viewerIntent === 'instructor'
+        ? 'Open Instructor Dashboard'
+        : viewerIntent === 'partner'
+          ? 'Open Partner Dashboard'
+          : null
+
+  const handleOpenChamberSessionAction = () => {
+    const target = buildRoleDashboardTargetId(activeStory, activeVideo.contentId)
+    if (!target) return
+
+    if (viewerIntent === 'student') {
+      router.push(`/viewer/student-learner/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+      return
+    }
+
+    if (viewerIntent === 'instructor') {
+      router.push(`/viewer/instructor/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+      return
+    }
+
+    if (viewerIntent === 'partner') {
+      router.push(`/viewer/partner/${encodeURIComponent(target)}${activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''}`)
+    }
+  }
+
   const runPreviewLoopTransition = (element: HTMLVideoElement, startSeconds: number) => {
     if (previewLoopTransitioningRef.current) return
     previewLoopTransitioningRef.current = true
@@ -2282,17 +2222,14 @@ function ViewerPageContent() {
         ) : null}
 
         {activeVideo.url ? (
-          <video
-            ref={videoRef}
-            key={`${activeVideo.areaId}-${activeVideo.contentId ?? 'area-default'}`}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
-              isPreviewLoopFading ? 'opacity-0' : 'opacity-100'
-            }`}
-            autoPlay
+          <ViewerStreamingCanvas
+            src={activeVideo.url}
+            fallbackSrc={activeVideo.fallbackUrl}
             loop={viewerIntent === 'select'}
-            preload="auto"
             muted={isMuted}
-            playsInline
+            isPreviewLoopFading={isPreviewLoopFading}
+            videoRef={videoRef}
+            onPlaybackNotice={setPlaybackNotice}
             onLoadedMetadata={(event) => {
               const element = event.currentTarget
               setVideoDuration(Number.isFinite(element.duration) ? element.duration : 0)
@@ -2327,7 +2264,7 @@ function ViewerPageContent() {
                 runPreviewLoopTransition(event.currentTarget, previewWindow.start)
                 return
               }
-              if (Math.abs(current - lastPlaybackUiUpdateRef.current) >= 0.35) {
+              if (Math.abs(current - lastPlaybackUiUpdateRef.current) >= PLAYBACK_UI_UPDATE_STEP_SECONDS) {
                 lastPlaybackUiUpdateRef.current = current
                 setCurrentPlaybackTime(current)
               }
@@ -2370,130 +2307,121 @@ function ViewerPageContent() {
             isPlayerOverlayVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
-          <div className="absolute right-4 top-8 flex items-center gap-2 sm:right-6 lg:right-8 md:hidden">
-            <Link
-              href={user ? '/studio' : '/subscriber'}
-              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-sm text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-            >
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/10 text-xs font-semibold uppercase">
-                {user?.displayName?.charAt(0) ?? 'U'}
-              </span>
-              <span>{user ? 'Studio' : 'Log In'}</span>
-            </Link>
-            {activeVideo.contentId || activeVideo.sourceType === 'role-explainer' ? (
-              <button
-                type="button"
-                onClick={() => setShowMoreInfo((current) => !current)}
-                className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/20"
+          {!shouldShowChamberViewerPanels ? (
+            <div className="absolute right-4 top-8 flex items-center gap-2 sm:right-6 lg:right-8 md:hidden">
+              <Link
+                href={user ? '/studio' : '/subscriber'}
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-sm text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
               >
-                Details <ChevronDown className={`h-3.5 w-3.5 transition ${showMoreInfo ? 'rotate-180' : ''}`} />
-              </button>
-            ) : null}
-          </div>
-
-          <div className="hidden md:flex md:justify-end">
-            <div className="w-[360px] rounded-2xl border border-white/20 bg-black/35 p-3 text-white">
-              <div className="flex items-center justify-between gap-3">
-                <Link
-                  href={user ? '/studio' : '/subscriber'}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-sm text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-                >
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/10 text-xs font-semibold uppercase">
-                    {user?.displayName?.charAt(0) ?? 'U'}
-                  </span>
-                  <span>{user ? 'Continue Watching' : 'Log In'}</span>
-                </Link>
-                {activeVideo.contentId ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreInfo((current) => !current)}
-                    className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/20"
-                  >
-                    More Info <ChevronDown className={`h-3.5 w-3.5 transition ${showMoreInfo ? 'rotate-180' : ''}`} />
-                  </button>
-                ) : null}
-              </div>
-
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/10 text-xs font-semibold uppercase">
+                  {user?.displayName?.charAt(0) ?? 'U'}
+                </span>
+                <span>{user ? 'Studio' : 'Log In'}</span>
+              </Link>
               {activeVideo.contentId || activeVideo.sourceType === 'role-explainer' ? (
-                <div className="mt-3 space-y-2 text-xs text-white/85">
-                  {activeVideo.sourceType === 'role-explainer' ? (
-                    <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                      Role overview for {selectedArea.title}. Browse content to return to story playback.
-                    </p>
-                  ) : (
-                    <>
-                      {viewerIntent !== 'select' ? (
-                        <>
-                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                            Institution: {activeStory?.institutionName ?? 'Not listed'}
-                          </p>
-                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                            Recorded: {recordedLabel}
-                          </p>
-                          <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                            Research Status: {activeStory?.researchStatus ?? 'General release'}
-                          </p>
-                        </>
-                      ) : null}
-                    </>
-                  )}
-
-                  {showMoreInfo && activeVideo.sourceType !== 'role-explainer' ? (
-                    <div className="space-y-2 rounded-xl border border-white/15 bg-black/30 p-3">
-                      <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
-                      <p>
-                        Other Versions:{' '}
-                        {activeStory?.relatedVersionIds && activeStory.relatedVersionIds.length > 0
-                          ? `${activeStory.relatedVersionIds.length} available`
-                          : 'Not listed yet.'}
-                      </p>
-                      <Link
-                        href={activeStory?.infoUrl || '/home'}
-                        className="inline-flex items-center gap-1 font-semibold text-[#F5D37A] hover:text-[#EACE7B]"
-                      >
-                        Open Reference Materials <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                      <Link
-                        href="/viewer/book"
-                        className="inline-flex items-center gap-1 font-semibold text-[#F5D37A] hover:text-[#EACE7B]"
-                      >
-                        Book Participants <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  ) : null}
-
-                  {recentWatchedStories.length > 0 ? (
-                    <div>
-                      <p className="mb-1 text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">Recently Watched</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {recentWatchedStories.map((item) => (
-                          <button
-                            key={`${item.contentId}-${item.watchedAt}`}
-                            type="button"
-                            onClick={async () => {
-                              if (!db) return
-                              const currentMatch = selectedAreaCatalog.find((story) => story.id === item.contentId)
-                              if (currentMatch) {
-                                await handleOpenContent(currentMatch, item.areaId)
-                                return
-                              }
-                              const watchedDoc = await getDoc(doc(db, 'viewerContent', item.contentId))
-                              if (!watchedDoc.exists()) return
-                              const watchedData = watchedDoc.data() as Omit<ViewerContent, 'id'>
-                              await handleOpenContent({ id: watchedDoc.id, ...watchedData }, item.areaId)
-                            }}
-                            className="rounded-full border border-white/20 bg-black/35 px-2.5 py-1 text-[11px] text-white/85 transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-                          >
-                            {item.title}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                ) : null}
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMoreInfo((current) => !current)}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/20"
+                >
+                  Details <ChevronDown className={`h-3.5 w-3.5 transition ${showMoreInfo ? 'rotate-180' : ''}`} />
+                </button>
               ) : null}
             </div>
-          </div>
+          ) : null}
+
+          {!shouldShowChamberViewerPanels ? (
+            <div className="hidden md:flex md:justify-end">
+              <div className="w-[360px] rounded-2xl border border-white/20 bg-black/35 p-3 text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <Link
+                    href={user ? '/studio' : '/subscriber'}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-sm text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  >
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/10 text-xs font-semibold uppercase">
+                      {user?.displayName?.charAt(0) ?? 'U'}
+                    </span>
+                    <span>{user ? 'Continue Watching' : 'Log In'}</span>
+                  </Link>
+                  {activeVideo.contentId ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreInfo((current) => !current)}
+                      className="inline-flex items-center gap-1 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/20"
+                    >
+                      More Info <ChevronDown className={`h-3.5 w-3.5 transition ${showMoreInfo ? 'rotate-180' : ''}`} />
+                    </button>
+                  ) : null}
+                </div>
+
+                {activeVideo.contentId || activeVideo.sourceType === 'role-explainer' ? (
+                  <div className="mt-3 space-y-2 text-xs text-white/85">
+                    {activeVideo.sourceType === 'role-explainer' ? (
+                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                        Role overview for {selectedArea.title}. Browse content to return to story playback.
+                      </p>
+                    ) : viewerIntent !== 'select' ? (
+                      <>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Institution: {activeStory?.institutionName ?? 'Not listed'}
+                        </p>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Recorded: {recordedLabel}
+                        </p>
+                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                          Research Status: {activeStory?.researchStatus ?? 'General release'}
+                        </p>
+                      </>
+                    ) : null}
+
+                    {showMoreInfo && activeVideo.sourceType !== 'role-explainer' ? (
+                      <div className="space-y-2 rounded-xl border border-white/15 bg-black/30 p-3">
+                        <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
+                        <p>
+                          Other Versions:{' '}
+                          {activeStory?.relatedVersionIds && activeStory.relatedVersionIds.length > 0
+                            ? `${activeStory.relatedVersionIds.length} available`
+                            : 'Not listed yet.'}
+                        </p>
+                        <Link
+                          href={activeStory?.infoUrl || '/home'}
+                          className="inline-flex items-center gap-1 font-semibold text-[#F5D37A] hover:text-[#EACE7B]"
+                        >
+                          Open Reference Materials <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                        <Link
+                          href="/viewer/book"
+                          className="inline-flex items-center gap-1 font-semibold text-[#F5D37A] hover:text-[#EACE7B]"
+                        >
+                          Book Participants <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    ) : null}
+
+                    {recentWatchedStories.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">Recently Watched</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {recentWatchedStories.map((item) => (
+                            <button
+                              key={`${item.contentId}-${item.watchedAt}`}
+                              type="button"
+                              onClick={() => {
+                                void handleSelectRecentWatched(item.contentId)
+                              }}
+                              className="rounded-full border border-white/20 bg-black/35 px-2.5 py-1 text-[11px] text-white/85 transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                            >
+                              {item.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <div className="w-full pb-2 text-left md:pb-5">
             <h1 className="max-w-3xl text-4xl font-bold leading-tight sm:text-5xl md:text-7xl">BEAM Viewer</h1>
@@ -2534,7 +2462,16 @@ function ViewerPageContent() {
                 <PlayCircle className="h-4 w-4" />
                 {activeVideo.contentId ? 'Browse' : 'Start Watching'}
               </button>
-              {(buildRoleOverviewTargetId(activeStory, activeVideo.contentId) || canOpenAreaRolesPage) ? (
+              {shouldShowChamberViewerPanels ? (
+                <button
+                  type="button"
+                  onClick={() => setIsChamberViewerOpen((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  {isChamberViewerOpen ? 'Close Chamber Viewer' : 'Open Chamber Viewer'}
+                </button>
+              ) : (buildRoleOverviewTargetId(activeStory, activeVideo.contentId) || canOpenAreaRolesPage) ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -2560,7 +2497,7 @@ function ViewerPageContent() {
               </Link>
             </div>
 
-            {showMoreInfo && (activeVideo.contentId || activeVideo.sourceType === 'role-explainer') ? (
+            {!shouldShowChamberViewerPanels && showMoreInfo && (activeVideo.contentId || activeVideo.sourceType === 'role-explainer') ? (
               <div className="mt-3 max-h-[30vh] space-y-2 overflow-y-auto rounded-xl border border-white/20 bg-black/45 p-3 text-xs text-white/85 md:hidden">
                 {activeVideo.sourceType === 'role-explainer' ? (
                   <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
@@ -2666,7 +2603,7 @@ function ViewerPageContent() {
                     onChange={(event) => handleVolumeChange(Number(event.target.value))}
                     className="w-full accent-[#D4AF37] sm:w-36"
                   />
-                  {!isRoleOverview ? (
+                  {!isRoleOverview && !shouldShowChamberViewerPanels ? (
                     <>
                       <select
                         value={viewerIntent}
@@ -2694,7 +2631,7 @@ function ViewerPageContent() {
                     </>
                   ) : null}
                 </div>
-                {!isRoleOverview && viewerIntent === 'student' ? (
+                {!isRoleOverview && !shouldShowChamberViewerPanels && viewerIntent === 'student' ? (
                   <div className="mt-3">
                     <button
                       type="button"
@@ -2711,7 +2648,7 @@ function ViewerPageContent() {
                     </button>
                   </div>
                 ) : null}
-                {!isRoleOverview && viewerIntent === 'instructor' ? (
+                {!isRoleOverview && !shouldShowChamberViewerPanels && viewerIntent === 'instructor' ? (
                   <div className="mt-3">
                     <button
                       type="button"
@@ -2728,7 +2665,7 @@ function ViewerPageContent() {
                     </button>
                   </div>
                 ) : null}
-                {!isRoleOverview && viewerIntent === 'partner' ? (
+                {!isRoleOverview && !shouldShowChamberViewerPanels && viewerIntent === 'partner' ? (
                   <div className="mt-3">
                     <button
                       type="button"
@@ -2884,36 +2821,50 @@ function ViewerPageContent() {
             ) : null}
           </div>
         </div>
-      </section>
 
-      {shouldShowChamberViewerPanels ? (
-        <ChamberViewerPanels
-          activeTab={chamberViewerTab}
-          onTabChange={setChamberViewerTab}
-          story={
-            activeStory
-              ? {
-                  title: activeStory.title,
-                  description: activeStory.description,
-                  composer: activeStory.composer,
-                  composerName: activeStory.composerName,
-                  workTitle: activeStory.workTitle,
-                  versionLabel: activeStory.versionLabel,
-                  submittedBy: activeStory.submittedBy,
-                  institutionName: activeStory.institutionName,
-                  recordedLabel,
-                  participantNames: activeStory.participantNames,
-                  relatedVersionCount: activeStory.relatedVersionIds?.length ?? 0,
-                  researchStatus: activeStory.researchStatus,
-                }
-              : null
-          }
-          work={activeChamberWork}
-          researchLoadState={chamberResearchLoadState}
-          researchError={chamberWorksLoadState === 'error' ? chamberWorksError || 'Research references unavailable.' : null}
-          adminResearchHref={canManageChamberResearch ? chamberResearchAdminHref : null}
-        />
-      ) : null}
+        {shouldShowChamberViewerPanels && isChamberViewerOpen ? (
+          <div className="absolute inset-0 z-40 bg-black/72 backdrop-blur-xl">
+            <div className="flex h-full min-h-[100svh] flex-col p-3 sm:p-5">
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsChamberViewerOpen(false)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  aria-label="Close chamber viewer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1">
+                <ChamberViewerPanels
+                  variant="overlay"
+                  activeTab={chamberViewerTab}
+                  onTabChange={setChamberViewerTab}
+                  story={chamberViewerStory}
+                  work={activeChamberWork}
+                  researchLoadState={chamberResearchLoadState}
+                  researchError={chamberWorksLoadState === 'error' ? chamberWorksError || 'Research references unavailable.' : null}
+                  adminResearchHref={canManageChamberResearch ? chamberResearchAdminHref : null}
+                  viewerIntent={viewerIntent}
+                  onViewerIntentChange={setViewerIntent}
+                  partnerType={partnerType}
+                  onPartnerTypeChange={setPartnerType}
+                  continueHref={chamberViewerContinueHref}
+                  continueLabel={chamberViewerContinueLabel}
+                  sessionActionLabel={chamberSessionActionLabel}
+                  onSessionAction={chamberSessionActionLabel ? handleOpenChamberSessionAction : null}
+                  recentWatched={chamberRecentWatched}
+                  onSelectRecentWatched={(contentId) => {
+                    void handleSelectRecentWatched(contentId)
+                  }}
+                  referenceHref={activeStory?.infoUrl || null}
+                  bookHref="/viewer/book"
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       {viewerIntent === 'student' && isStudentCameraEnabled ? (
         <div className="pointer-events-none fixed bottom-5 right-5 z-40">

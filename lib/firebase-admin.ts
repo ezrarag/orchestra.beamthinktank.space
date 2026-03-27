@@ -11,6 +11,36 @@ let adminAuth: ReturnType<typeof getAuth> | null = null
 let adminStorage: ReturnType<typeof getStorage> | null = null
 const ADMIN_APP_NAME = 'beam-admin-sdk'
 const isVercelRuntime = process.env.VERCEL === '1' || process.env.VERCEL === 'true' || Boolean(process.env.VERCEL_ENV)
+const DEFAULT_FIREBASE_PROJECT_ID = 'beam-orchestra-platform'
+
+function getAdminProjectId() {
+  return (
+    process.env.FIREBASE_ADMIN_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    DEFAULT_FIREBASE_PROJECT_ID
+  )
+}
+
+function getNormalizedAdminPrivateKey() {
+  return process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n') ?? ''
+}
+
+function getMissingAdminEnvVars() {
+  const missing: string[] = []
+
+  if (!process.env.FIREBASE_ADMIN_PROJECT_ID && !process.env.GOOGLE_CLOUD_PROJECT && !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+    missing.push('FIREBASE_ADMIN_PROJECT_ID')
+  }
+  if (!process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+    missing.push('FIREBASE_ADMIN_CLIENT_EMAIL')
+  }
+  if (!process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
+    missing.push('FIREBASE_ADMIN_PRIVATE_KEY')
+  }
+
+  return missing
+}
 
 // Initialize Firebase Admin SDK with fallback options
 function initializeAdminSDK() {
@@ -38,11 +68,7 @@ function initializeAdminSDK() {
             }
 
             if (parsed.private_key && parsed.client_email) {
-              const localProjectId =
-                parsed.project_id ||
-                process.env.GOOGLE_CLOUD_PROJECT ||
-                process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-                'beam-orchestra-platform'
+              const localProjectId = parsed.project_id || getAdminProjectId()
 
               app = initializeApp({
                 credential: cert({
@@ -62,18 +88,29 @@ function initializeAdminSDK() {
       }
 
       const initFromEnvServiceAccount = () => {
-        if (!process.env.FIREBASE_ADMIN_PRIVATE_KEY || !process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+        const missingAdminEnvVars = getMissingAdminEnvVars()
+        if (missingAdminEnvVars.length > 0) {
+          console.error('Firebase Admin SDK: missing env vars. Home slides API will not work.', {
+            missing: missingAdminEnvVars,
+          })
           return
         }
+
         try {
-          const envProjectId =
-            process.env.GOOGLE_CLOUD_PROJECT ||
-            process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-            'beam-orchestra-platform'
+          const envProjectId = getAdminProjectId()
+          const normalizedPrivateKey = getNormalizedAdminPrivateKey()
+
+          if (!normalizedPrivateKey) {
+            console.error('Firebase Admin SDK: missing env vars. Home slides API will not work.', {
+              missing: ['FIREBASE_ADMIN_PRIVATE_KEY'],
+            })
+            return
+          }
+
           app = initializeApp({
             credential: cert({
               projectId: envProjectId,
-              privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY.replace(/\\n/g, '\n'),
+              privateKey: normalizedPrivateKey,
               clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
             }),
             projectId: envProjectId,
@@ -81,7 +118,7 @@ function initializeAdminSDK() {
           }, ADMIN_APP_NAME)
           console.info(`Firebase Admin SDK initialized from env service account (${envProjectId})`)
         } catch (certError) {
-          console.warn('Failed to initialize with env service account cert:', certError)
+          console.error('Firebase Admin SDK: invalid env credentials. Home slides API will not work.', certError)
         }
       }
 
@@ -99,7 +136,7 @@ function initializeAdminSDK() {
       if (!app && !isVercelRuntime) {
         app = initializeApp({
           credential: applicationDefault(),
-          projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+          projectId: getAdminProjectId(),
           storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
         }, ADMIN_APP_NAME)
         console.info('Firebase Admin SDK initialized from application default credentials')
