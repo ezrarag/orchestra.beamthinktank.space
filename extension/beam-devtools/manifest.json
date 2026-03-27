@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "BEAM DevTools",
+  "version": "1.0.0",
+  "description": "Checklist, page context, and dev console for BEAM Orchestra development",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://orchestra.beamthinktank.space/*",
+    "https://*.beamthinktank.space/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "https://orchestra.beamthinktank.space/*",
+        "https://*.beamthinktank.space/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar/sidebar.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["page-bridge.js"],
+      "matches": [
+        "http://localhost:3000/*",
+        "https://orchestra.beamthinktank.space/*",
+        "https://*.beamthinktank.space/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "BEAM DevTools"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

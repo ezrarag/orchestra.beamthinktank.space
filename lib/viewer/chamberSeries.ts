@@ -6,6 +6,10 @@ import {
   toChamberSlug,
   trimChamberValue,
 } from '@/lib/chamberWorks'
+import {
+  formatViewerRecordedDate,
+  getViewerRecordedDateSortValue,
+} from '@/lib/viewer/recordedDate'
 
 export type ChamberSeriesSourceEntry = {
   id: string
@@ -75,22 +79,11 @@ export type ChamberSeriesComposer = {
 }
 
 function formatRecordedLabel(recordedAt?: string): string {
-  const value = trimChamberValue(recordedAt)
-  if (!value) return 'Date not provided'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return formatViewerRecordedDate(trimChamberValue(recordedAt))
 }
 
 function getRecordedSortValue(recordedAt?: string): number {
-  const value = trimChamberValue(recordedAt)
-  if (!value) return 0
-  const parsed = Date.parse(value)
-  return Number.isNaN(parsed) ? 0 : parsed
+  return getViewerRecordedDateSortValue(trimChamberValue(recordedAt))
 }
 
 function getCityLabel(entry: ChamberSeriesSourceEntry): string {

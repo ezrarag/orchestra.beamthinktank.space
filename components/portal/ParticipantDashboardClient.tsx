@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { signInWithCustomToken } from 'firebase/auth'
-import { useSearchParams } from 'next/navigation'
+import { signInWithCustomToken, signOut } from 'firebase/auth'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ParticipantShell from '@/components/participant/ParticipantShell'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { auth, db } from '@/lib/firebase'
@@ -20,6 +20,7 @@ import {
   getContributionClaimStorageKey,
   markContributionClaimed,
   writeCachedParticipantRole,
+  writeCachedParticipantRoles,
 } from '@/lib/participantOnboarding'
 import { resolvePortalPath } from '@/lib/portal/routes'
 import { OpenCallCard, SessionCard } from '@/components/portal/SessionCard'
@@ -52,6 +53,7 @@ export default function ParticipantDashboardClient({
   scopedRoutes = false,
   copy,
 }: ParticipantDashboardClientProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading } = useUserRole({ allowAdminBypass: false })
   const allowTestAccess = process.env.NODE_ENV !== 'production'
@@ -65,6 +67,7 @@ export default function ParticipantDashboardClient({
   const [adminStaffResumeStatus, setAdminStaffResumeStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [adminStaffResumeError, setAdminStaffResumeError] = useState<string | null>(null)
   const [restoredSelections, setRestoredSelections] = useState<AdminStaffAreaSelectionPayload[]>([])
+  const [signingOut, setSigningOut] = useState(false)
 
   const selectedAreaIds = useMemo(() => {
     const raw = searchParams.get('areas')
@@ -173,10 +176,16 @@ export default function ParticipantDashboardClient({
 
   useEffect(() => {
     if (!user?.uid) return
+    const nextRoles = (profile?.membershipRoles ?? []).map((role) => role.trim()).filter(Boolean)
+    if (nextRoles.length > 0) {
+      writeCachedParticipantRoles(user.uid, nextRoles)
+      return
+    }
+
     const nextRole = profile?.membershipRole?.trim()
     if (!nextRole) return
     writeCachedParticipantRole(user.uid, nextRole)
-  }, [profile?.membershipRole, user?.uid])
+  }, [profile?.membershipRole, profile?.membershipRoles, user?.uid])
 
   useEffect(() => {
     if (!db) return
@@ -239,8 +248,10 @@ export default function ParticipantDashboardClient({
 
   useEffect(() => {
     if (loading || !user?.uid) return
+    const membershipRoles = (profile?.membershipRoles ?? []).map((role) => role.trim()).filter(Boolean)
     const membershipRole = profile?.membershipRole?.trim()
-    if (!membershipRole || typeof window === 'undefined') return
+    if (membershipRoles.length === 0 && !membershipRole) return
+    if (typeof window === 'undefined') return
 
     const claimStorageKey = getContributionClaimStorageKey(user.uid)
     if (window.localStorage.getItem(claimStorageKey) === 'true') return
@@ -249,7 +260,7 @@ export default function ParticipantDashboardClient({
 
     const claim = async () => {
       try {
-        await claimExistingContributions(user.uid, user.email ?? '')
+        await claimExistingContributions(user.uid, [user.email ?? ''])
         if (!cancelled) {
           markContributionClaimed(user.uid)
         }
@@ -263,13 +274,28 @@ export default function ParticipantDashboardClient({
     return () => {
       cancelled = true
     }
-  }, [loading, profile?.membershipRole, user?.email, user?.uid])
+  }, [loading, profile?.membershipRole, profile?.membershipRoles, user?.email, user?.uid])
+
+  const handleSignOut = async () => {
+    if (!auth) return
+
+    setSigningOut(true)
+
+    try {
+      await signOut(auth)
+      router.push(resolvePortalPath('/home', ngo, scopedRoutes))
+    } catch (error) {
+      console.error('Unable to sign out participant:', error)
+      setSigningOut(false)
+    }
+  }
 
   return (
     <ParticipantShell
       title="Participant Dashboard"
       subtitle="Schedule, calls, profile context, and role tracks in one workspace."
       membershipRole={profile?.membershipRole ?? null}
+      membershipRoles={profile?.membershipRoles ?? null}
       membershipRoleLoading={Boolean(user && dashboardDataLoading && !profile?.membershipRole?.trim())}
     >
       {loading || beamReturnStatus === 'processing' ? (
@@ -291,6 +317,19 @@ export default function ParticipantDashboardClient({
         </div>
       ) : (
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3">
+          {user ? (
+            <div className="flex justify-end lg:col-span-3">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="inline-flex rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {signingOut ? 'Signing out...' : 'Log Out'}
+              </button>
+            </div>
+          ) : null}
+
           {(isAdminStaffReturn || selectedAreaIds.length > 0 || beamReturnStatus === 'ready') && (
             <section className={`${PARTICIPANT_UI.card} lg:col-span-3`}>
               <h2 className="text-xl font-semibold text-white">BEAM Return</h2>

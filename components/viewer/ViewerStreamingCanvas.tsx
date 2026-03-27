@@ -26,6 +26,7 @@ type Props = {
   fallbackSrc?: string
   loop: boolean
   muted: boolean
+  volume: number
   isPreviewLoopFading: boolean
   videoRef: MutableRefObject<HTMLVideoElement | null>
   onPlaybackNotice: (message: string | null) => void
@@ -47,13 +48,25 @@ declare global {
 
 let videoJsPromise: Promise<VideoJsFactory | null> | null = null
 
-function inferSourceType(url: string): string | undefined {
-  const normalized = url.toLowerCase()
-  if (normalized.includes('.m3u8') || normalized.includes('format=m3u8')) {
-    return 'application/x-mpegURL'
+function getNormalizedMediaPath(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url, typeof window !== 'undefined' ? window.location.href : 'http://localhost').pathname).toLowerCase()
+  } catch {
+    return url.split('?')[0]?.toLowerCase() ?? ''
   }
-  if (normalized.endsWith('.mp4')) return 'video/mp4'
-  if (normalized.endsWith('.webm')) return 'video/webm'
+}
+
+function isAdaptiveStreamUrl(url: string): boolean {
+  const normalizedUrl = url.toLowerCase()
+  const path = getNormalizedMediaPath(url)
+  return path.endsWith('.m3u8') || normalizedUrl.includes('format=m3u8')
+}
+
+function inferSourceType(url: string): string | undefined {
+  const path = getNormalizedMediaPath(url)
+  if (path.endsWith('.m3u8')) return 'application/vnd.apple.mpegurl'
+  if (path.endsWith('.mp4')) return 'video/mp4'
+  if (path.endsWith('.webm')) return 'video/webm'
   return undefined
 }
 
@@ -107,6 +120,7 @@ function applyDirectSource(element: HTMLVideoElement, url: string) {
     element.src = url
   }
   element.load()
+  void element.play().catch(() => {})
 }
 
 function ViewerStreamingCanvas({
@@ -114,6 +128,7 @@ function ViewerStreamingCanvas({
   fallbackSrc,
   loop,
   muted,
+  volume,
   isPreviewLoopFading,
   videoRef,
   onPlaybackNotice,
@@ -148,9 +163,21 @@ function ViewerStreamingCanvas({
     fallbackInUseRef.current = false
     onPlaybackNotice(null)
 
+    const teardownPlayer = () => {
+      if (playerRef.current && errorHandlerRef.current) {
+        playerRef.current.off('error', errorHandlerRef.current)
+      }
+      playerRef.current?.dispose()
+      playerRef.current = null
+      errorHandlerRef.current = null
+    }
+
     const setSourceDirectly = (nextUrl: string, notice?: string) => {
       if (!elementRef.current) return
+      teardownPlayer()
       fallbackInUseRef.current = nextUrl === fallbackSrc && Boolean(fallbackSrc)
+      elementRef.current.volume = volume
+      elementRef.current.muted = muted
       applyDirectSource(elementRef.current, nextUrl)
       onPlaybackNotice(notice ?? null)
     }
@@ -160,8 +187,12 @@ function ViewerStreamingCanvas({
         const videojs = await ensureVideoJsFactory()
         if (cancelled || !elementRef.current) return
 
-        if (!videojs) {
-          setSourceDirectly(fallbackSrc || src, 'Streaming player unavailable. Using direct playback.')
+        const shouldUseDirectPlayback = !isAdaptiveStreamUrl(src) || supportsNativeHls(elementRef.current)
+        if (shouldUseDirectPlayback || !videojs) {
+          setSourceDirectly(
+            src,
+            !videojs && isAdaptiveStreamUrl(src) ? 'Streaming player unavailable. Using direct playback.' : undefined,
+          )
           return
         }
 
@@ -198,18 +229,24 @@ function ViewerStreamingCanvas({
           })
 
           const handlePlayerError = () => {
-            if (!fallbackSrc || fallbackInUseRef.current || !playerRef.current) {
-              const message = playerRef.current?.error()?.message ?? 'Stream playback failed.'
-              onPlaybackNotice(message)
+            if (!playerRef.current) return
+
+            if (fallbackSrc && !fallbackInUseRef.current) {
+              if (isAdaptiveStreamUrl(fallbackSrc)) {
+                fallbackInUseRef.current = true
+                playerRef.current.src({
+                  src: fallbackSrc,
+                  type: inferSourceType(fallbackSrc),
+                })
+                onPlaybackNotice('Stream fallback activated.')
+                return
+              }
+
+              setSourceDirectly(fallbackSrc, 'Stream fallback activated.')
               return
             }
 
-            fallbackInUseRef.current = true
-            playerRef.current.src({
-              src: fallbackSrc,
-              type: inferSourceType(fallbackSrc),
-            })
-            onPlaybackNotice('Stream fallback activated.')
+            setSourceDirectly(src, playerRef.current.error()?.message ?? 'Stream playback failed. Using direct playback.')
           }
 
           errorHandlerRef.current = handlePlayerError
@@ -220,6 +257,7 @@ function ViewerStreamingCanvas({
         player.autoplay(true)
         player.loop(loop)
         player.muted(muted)
+        player.volume(volume)
         player.src({
           src,
           type: inferSourceType(src),
@@ -235,21 +273,23 @@ function ViewerStreamingCanvas({
     return () => {
       cancelled = true
     }
-  }, [fallbackSrc, loop, muted, onPlaybackNotice, src])
+  }, [fallbackSrc, onPlaybackNotice, src])
 
   useEffect(() => {
     const player = playerRef.current
     if (player) {
       player.loop(loop)
       player.muted(muted)
+      player.volume(volume)
       return
     }
 
     if (elementRef.current) {
       elementRef.current.loop = loop
       elementRef.current.muted = muted
+      elementRef.current.volume = volume
     }
-  }, [loop, muted])
+  }, [loop, muted, volume])
 
   useEffect(() => {
     return () => {

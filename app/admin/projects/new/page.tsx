@@ -35,7 +35,7 @@ export default function NewProjectPage() {
 
   if (role !== 'beam_admin') {
     return (
-      <div className="min-h-screen bg-orchestra-dark flex items-center justify-center p-4">
+      <div className="flex min-h-[420px] items-center justify-center rounded-[28px] border border-red-500/20 bg-red-500/10 p-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-orchestra-gold mb-4">Access Denied</h1>
           <p className="text-orchestra-cream">Only beam admins can create projects.</p>
@@ -255,7 +255,6 @@ export default function NewProjectPage() {
     </div>
   )
 }
-
 
 
 

@@ -153,7 +153,7 @@ export default function BoardDashboard() {
 
   if (loading || loadingStats) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[420px] items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orchestra-gold"></div>
       </div>
     )
@@ -164,11 +164,11 @@ export default function BoardDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+    <div className="space-y-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Board Dashboard</h1>
-          <p className="text-gray-300">
+          <p className="text-orchestra-cream/70">
             Black Diaspora Symphony Orchestra - Read-Only Analytics
             {isReadOnly && (
               <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-sm">
@@ -291,4 +291,3 @@ export default function BoardDashboard() {
     </div>
   )
 }
-

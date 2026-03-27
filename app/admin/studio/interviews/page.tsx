@@ -246,7 +246,7 @@ export default function AdminInterviewsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="space-y-8">
       <div className="mb-8">
         <Link href="/admin/studio" className="text-orchestra-gold hover:text-orchestra-gold/80 mb-4 inline-block">
           ← Back to Studio Manager
@@ -579,4 +579,3 @@ export default function AdminInterviewsPage() {
     </div>
   )
 }
-

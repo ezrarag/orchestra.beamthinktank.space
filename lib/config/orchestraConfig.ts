@@ -14,6 +14,12 @@ export const roleNavConfig: Record<string, NavItem[]> = {
     { label: 'My Submissions', href: '/dashboard#submissions', group: 'SUBMISSIONS' },
     { label: 'My Schedule', href: '/dashboard#schedule', group: 'SUBMISSIONS' },
   ],
+  recruit_mentor: [
+    { label: 'Dashboard', href: '/dashboard', group: 'WORKSPACE' },
+    { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
+    { label: 'Recruit & Mentor Cohort', href: '/join/cohort', group: 'PATHWAYS' },
+    { label: 'My Schedule', href: '/dashboard#schedule', group: 'SUBMISSIONS' },
+  ],
   admin_staff: [
     { label: 'Dashboard', href: '/dashboard', group: 'WORKSPACE' },
     { label: 'Browse Viewer', href: '/viewer', group: 'WORKSPACE' },
@@ -33,7 +39,22 @@ export const roleNavConfig: Record<string, NavItem[]> = {
   ],
 }
 
-export function getRoleNavItems(role?: string | null): NavItem[] {
+export function getRoleNavItems(role?: string | null, roles: string[] = []): NavItem[] {
+  const resolvedRoles = roles.filter((item) => item.trim().length > 0)
+
+  if (resolvedRoles.length > 0) {
+    const seen = new Set<string>()
+
+    return resolvedRoles.flatMap((resolvedRole) => {
+      const items = roleNavConfig[resolvedRole] ?? roleNavConfig.perform
+      return items.filter((item) => {
+        if (seen.has(item.href)) return false
+        seen.add(item.href)
+        return true
+      })
+    })
+  }
+
   if (!role) {
     return roleNavConfig.perform
   }

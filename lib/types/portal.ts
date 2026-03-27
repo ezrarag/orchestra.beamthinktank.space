@@ -64,6 +64,7 @@ export interface UserProfileSummary {
   paidOpportunities: number
   institutionRole?: string
   membershipRole?: string
+  membershipRoles?: string[]
 }
 
 export interface AdminTableRow {

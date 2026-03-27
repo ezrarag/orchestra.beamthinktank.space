@@ -15,8 +15,10 @@ import {
   markContributionClaimed,
   resolveParticipantIntentDestination,
   writeCachedParticipantRole,
+  writeCachedParticipantRoles,
   type ParticipantIntent,
 } from '@/lib/participantOnboarding'
+import { mergeParticipantRoles, resolvePrimaryParticipantRole } from '@/lib/participantIdentity'
 
 type JoinConfirmClientProps = {
   initialIntent?: string | null
@@ -94,31 +96,27 @@ export default function JoinConfirmClient({ initialIntent }: JoinConfirmClientPr
 
     const membershipRef = doc(db, 'ngoMemberships', signedInUser.uid)
     const membershipSnap = await getDoc(membershipRef)
-    const membershipData = membershipSnap.exists() ? (membershipSnap.data() as { ngo?: unknown; role?: unknown }) : null
+    const membershipData = membershipSnap.exists() ? (membershipSnap.data() as { ngo?: unknown; role?: unknown; roles?: unknown }) : null
+    const resolvedRoles = mergeParticipantRoles(membershipData, [intent])
+    const resolvedRole = resolvePrimaryParticipantRole(resolvedRoles) ?? intent
 
-    let resolvedRole: string = intent
-
-    if (membershipData?.ngo === 'orchestra') {
-      console.info('Existing membership found, skipping write.')
-      if (typeof membershipData.role === 'string' && membershipData.role.trim()) {
-        resolvedRole = membershipData.role.trim()
-      }
-    } else {
-      await setDoc(
-        membershipRef,
-        {
-          ngo: 'orchestra',
-          role: intent,
-          joinedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
-    }
+    await setDoc(
+      membershipRef,
+      {
+        ngo: 'orchestra',
+        role: resolvedRole,
+        roles: resolvedRoles,
+        updatedAt: serverTimestamp(),
+        ...(membershipData?.ngo === 'orchestra' ? {} : { joinedAt: serverTimestamp() }),
+      },
+      { merge: true },
+    )
 
     const resolvedEmail = signedInUser.email?.trim() || email.trim()
-    await claimExistingContributions(signedInUser.uid, resolvedEmail)
+    await claimExistingContributions(signedInUser.uid, [resolvedEmail])
     markContributionClaimed(signedInUser.uid)
     writeCachedParticipantRole(signedInUser.uid, resolvedRole)
+    writeCachedParticipantRoles(signedInUser.uid, resolvedRoles)
 
     router.replace(resolveParticipantIntentDestination('orchestra', intent))
   }

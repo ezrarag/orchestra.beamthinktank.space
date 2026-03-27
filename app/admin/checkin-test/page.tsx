@@ -76,23 +76,23 @@ export default function CheckInTestPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[420px] items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orchestra-gold"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+    <div className="space-y-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Check-In Test Utility</h1>
-          <p className="text-gray-300">
+          <p className="text-orchestra-cream/70">
             Test QR check-in functionality before rehearsals
           </p>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 mb-6">
+        <div className="mb-6 rounded-[24px] border border-orchestra-gold/20 bg-white/[0.04] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
           <h2 className="text-2xl font-bold text-white mb-4">Upcoming Rehearsals</h2>
           
           <div className="space-y-4">
@@ -102,7 +102,7 @@ export default function CheckInTestPage() {
               return (
                 <div
                   key={rehearsal.date}
-                  className="bg-white/5 rounded-lg p-4 border border-white/10"
+                  className="rounded-2xl border border-white/10 bg-black/20 p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -114,15 +114,15 @@ export default function CheckInTestPage() {
                           day: 'numeric'
                         })}
                       </h3>
-                      <p className="text-gray-300 text-sm">{rehearsal.time} - {rehearsal.location}</p>
+                      <p className="text-sm text-orchestra-cream/70">{rehearsal.time} - {rehearsal.location}</p>
                       {rehearsal.type && (
-                        <p className="text-purple-300 text-xs mt-1">Type: {rehearsal.type}</p>
+                        <p className="mt-1 text-xs text-orchestra-gold/80">Type: {rehearsal.type}</p>
                       )}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => copyCheckInURL(rehearsal.date)}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm flex items-center gap-2"
+                        className="flex items-center gap-2 rounded-lg border border-orchestra-gold/25 bg-orchestra-gold/10 px-3 py-2 text-sm text-orchestra-gold transition hover:bg-orchestra-gold/15"
                       >
                         <Copy className="w-4 h-4" />
                         Copy URL
@@ -132,8 +132,8 @@ export default function CheckInTestPage() {
                   
                   <div className="mt-4 flex items-center gap-4">
                     <div className="flex-1">
-                      <p className="text-xs text-gray-400 mb-1">Check-In URL:</p>
-                      <code className="text-xs text-gray-300 bg-black/20 px-2 py-1 rounded break-all">
+                      <p className="mb-1 text-xs text-white/45">Check-In URL:</p>
+                      <code className="break-all rounded bg-black/20 px-2 py-1 text-xs text-white/70">
                         {checkInURL}
                       </code>
                     </div>
@@ -147,22 +147,22 @@ export default function CheckInTestPage() {
           </div>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <div className="rounded-[24px] border border-orchestra-gold/20 bg-white/[0.04] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
           <h2 className="text-2xl font-bold text-white mb-4">Test Check-In</h2>
-          <p className="text-gray-300 text-sm mb-4">
+          <p className="mb-4 text-sm text-orchestra-cream/70">
             Simulate a check-in to verify Firestore writes are working correctly.
           </p>
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="rehearsal-select" className="block text-sm font-medium text-gray-200 mb-2">
+              <label htmlFor="rehearsal-select" className="mb-2 block text-sm font-medium text-orchestra-cream/75">
                 Select Rehearsal
               </label>
               <select
                 id="rehearsal-select"
                 value={selectedRehearsal}
                 onChange={(e) => setSelectedRehearsal(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
               >
                 <option value="">-- Select a rehearsal --</option>
                 {upcomingRehearsals.map((rehearsal) => (
@@ -176,7 +176,7 @@ export default function CheckInTestPage() {
             <button
               onClick={handleTestCheckIn}
               disabled={testing || !selectedRehearsal || !user}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-orchestra-gold px-6 py-3 text-orchestra-dark font-semibold transition-all duration-200 hover:bg-orchestra-gold/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {testing ? (
                 <>
@@ -221,4 +221,3 @@ export default function CheckInTestPage() {
     </div>
   )
 }
-

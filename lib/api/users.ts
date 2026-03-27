@@ -1,6 +1,7 @@
 import type { AdminTableRow, UserProfileSummary } from '@/lib/types/portal'
 import { db } from '@/lib/firebase'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { readParticipantRoles, resolvePrimaryParticipantRole } from '@/lib/participantIdentity'
 
 const MEMBERSHIP_ROLE_LABELS: Record<string, string> = {
   perform: 'Performer',
@@ -17,6 +18,7 @@ export async function fetchUserProfile(_ngo: string, userId?: string): Promise<U
       paidOpportunities: 0,
       institutionRole: undefined,
       membershipRole: undefined,
+      membershipRoles: undefined,
     }
   }
 
@@ -37,18 +39,21 @@ export async function fetchUserProfile(_ngo: string, userId?: string): Promise<U
       (typeof musicianData?.name === 'string' && musicianData.name.trim()) ||
       ''
 
-    const membershipRole =
-      (typeof membershipData?.role === 'string' && membershipData.role.trim()) ||
-      ''
+    const membershipRoles = readParticipantRoles(membershipData)
+    const membershipRole = resolvePrimaryParticipantRole(membershipRoles) || ''
 
     const fallbackRole =
       (typeof userData?.role === 'string' && userData.role.trim()) ||
       ''
 
+    const membershipRoleLabel = membershipRoles
+      .map((role) => MEMBERSHIP_ROLE_LABELS[role] || role)
+      .join(' / ')
+
     const institutionRole =
       (typeof userData?.institutionRole === 'string' && userData.institutionRole.trim()) ||
-      (membershipRole
-        ? MEMBERSHIP_ROLE_LABELS[membershipRole] || membershipRole
+      (membershipRoleLabel
+        ? membershipRoleLabel
         : fallbackRole
           ? MEMBERSHIP_ROLE_LABELS[fallbackRole] || fallbackRole
           : undefined)
@@ -69,6 +74,7 @@ export async function fetchUserProfile(_ngo: string, userId?: string): Promise<U
             : 0,
       institutionRole,
       membershipRole: membershipRole || undefined,
+      membershipRoles: membershipRoles.length > 0 ? membershipRoles : undefined,
     }
   } catch (error) {
     console.error('Unable to fetch user profile:', error)
@@ -78,6 +84,7 @@ export async function fetchUserProfile(_ngo: string, userId?: string): Promise<U
       paidOpportunities: 0,
       institutionRole: undefined,
       membershipRole: undefined,
+      membershipRoles: undefined,
     }
   }
 }

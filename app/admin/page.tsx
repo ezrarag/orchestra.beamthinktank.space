@@ -8,7 +8,7 @@ export default async function AdminHomePage() {
   const rowsByTab = await fetchAdminRows(config.id)
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="overflow-hidden rounded-[28px] border border-orchestra-gold/15 bg-white shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
       <AdminScaffold title={locale.admin.title} labels={locale.admin} rowsByTab={rowsByTab} />
     </div>
   )

@@ -4,7 +4,7 @@ import ViewerSectionsManager from '@/components/viewer/ViewerSectionsManager'
 
 export default function AdminViewerSectionsPage() {
   return (
-    <div className="p-4 md:p-6">
+    <div className="space-y-4">
       <ViewerSectionsManager />
     </div>
   )

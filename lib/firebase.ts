@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
-import { getAuth } from 'firebase/auth'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -32,6 +32,15 @@ if (isFirebaseConfigured) {
     db = getFirestore(app)
     auth = getAuth(app)
     storage = getStorage(app)
+
+    if (auth && typeof window !== 'undefined' && !(window as any).__BEAM_AUTH_LISTENER_ATTACHED__) {
+      ;(window as any).__BEAM_AUTH_LISTENER_ATTACHED__ = true
+      onAuthStateChanged(auth, (user) => {
+        ;(window as any).__BEAM_AUTH_USER__ = user
+          ? { uid: user.uid, email: user.email, displayName: user.displayName }
+          : null
+      })
+    }
   } catch (error) {
     console.error('Firebase initialization failed:', error)
   }

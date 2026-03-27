@@ -13,6 +13,10 @@ const ADMIN_APP_NAME = 'beam-admin-sdk'
 const isVercelRuntime = process.env.VERCEL === '1' || process.env.VERCEL === 'true' || Boolean(process.env.VERCEL_ENV)
 const DEFAULT_FIREBASE_PROJECT_ID = 'beam-orchestra-platform'
 
+function getAdminClientEmail() {
+  return process.env.FIREBASE_ADMIN_CLIENT_EMAIL || process.env.NEXT_PUBLIC_FIREBASE_ADMIN_CLIENT_EMAIL || ''
+}
+
 function getAdminProjectId() {
   return (
     process.env.FIREBASE_ADMIN_PROJECT_ID ||
@@ -23,7 +27,11 @@ function getAdminProjectId() {
 }
 
 function getNormalizedAdminPrivateKey() {
-  return process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n') ?? ''
+  return (
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
+    process.env.NEXT_PUBLIC_FIREBASE_ADMIN_PRIVATE_KEY ||
+    ''
+  ).replace(/\\n/g, '\n')
 }
 
 function getMissingAdminEnvVars() {
@@ -32,10 +40,10 @@ function getMissingAdminEnvVars() {
   if (!process.env.FIREBASE_ADMIN_PROJECT_ID && !process.env.GOOGLE_CLOUD_PROJECT && !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
     missing.push('FIREBASE_ADMIN_PROJECT_ID')
   }
-  if (!process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+  if (!getAdminClientEmail()) {
     missing.push('FIREBASE_ADMIN_CLIENT_EMAIL')
   }
-  if (!process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
+  if (!getNormalizedAdminPrivateKey()) {
     missing.push('FIREBASE_ADMIN_PRIVATE_KEY')
   }
 
@@ -111,7 +119,7 @@ function initializeAdminSDK() {
             credential: cert({
               projectId: envProjectId,
               privateKey: normalizedPrivateKey,
-              clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+              clientEmail: getAdminClientEmail(),
             }),
             projectId: envProjectId,
             storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,

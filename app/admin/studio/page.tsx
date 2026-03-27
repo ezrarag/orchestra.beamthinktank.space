@@ -234,7 +234,7 @@ export default function AdminStudioPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="space-y-8">
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
           <Video className="h-10 w-10 text-orchestra-gold" />
@@ -505,4 +505,3 @@ export default function AdminStudioPage() {
     </div>
   )
 }
-

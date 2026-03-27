@@ -7,13 +7,19 @@ import { Menu, X } from 'lucide-react'
 import { PARTICIPANT_UI } from '@/components/participant/ui'
 import { getRoleNavItems, roleNavConfig, type NavItem } from '@/lib/config/orchestraConfig'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { readCachedParticipantRole, writeCachedParticipantRole } from '@/lib/participantOnboarding'
+import {
+  readCachedParticipantRole,
+  readCachedParticipantRoles,
+  writeCachedParticipantRole,
+  writeCachedParticipantRoles,
+} from '@/lib/participantOnboarding'
 
 type ParticipantShellProps = {
   title?: string
   subtitle?: string
   children: ReactNode
   membershipRole?: string | null
+  membershipRoles?: string[] | null
   membershipRoleLoading?: boolean
 }
 
@@ -44,12 +50,14 @@ export default function ParticipantShell({
   subtitle,
   children,
   membershipRole,
+  membershipRoles,
   membershipRoleLoading = false,
 }: ParticipantShellProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const [currentHash, setCurrentHash] = useState('')
   const [cachedMembershipRole, setCachedMembershipRole] = useState<string | null>(null)
+  const [cachedMembershipRoles, setCachedMembershipRoles] = useState<string[]>([])
   const { user } = useUserRole({ allowAdminBypass: false })
 
   useEffect(() => {
@@ -70,35 +78,60 @@ export default function ParticipantShell({
   useEffect(() => {
     if (!user?.uid) {
       setCachedMembershipRole(null)
+      setCachedMembershipRoles([])
       return
     }
 
     const nextMembershipRole = membershipRole?.trim()
+    const nextMembershipRoles = (membershipRoles ?? []).map((role) => role.trim()).filter(Boolean)
+
+    if (nextMembershipRoles.length > 0) {
+      writeCachedParticipantRoles(user.uid, nextMembershipRoles)
+      setCachedMembershipRoles(nextMembershipRoles)
+      setCachedMembershipRole(nextMembershipRoles[0] ?? null)
+      return
+    }
+
     if (nextMembershipRole) {
       writeCachedParticipantRole(user.uid, nextMembershipRole)
       setCachedMembershipRole(nextMembershipRole)
+      setCachedMembershipRoles([nextMembershipRole])
       return
     }
 
     setCachedMembershipRole(readCachedParticipantRole(user.uid))
-  }, [membershipRole, user?.uid])
+    setCachedMembershipRoles(readCachedParticipantRoles(user.uid))
+  }, [membershipRole, membershipRoles, user?.uid])
+
+  const resolvedMembershipRoles = useMemo(() => {
+    if (!user) return []
+
+    const explicitRoles = (membershipRoles ?? []).map((role) => role.trim()).filter(Boolean)
+    if (explicitRoles.length > 0) return explicitRoles
+
+    const explicitRole = membershipRole?.trim()
+    if (explicitRole) return [explicitRole]
+
+    if (cachedMembershipRoles.length > 0) return cachedMembershipRoles
+
+    const cachedRole = cachedMembershipRole?.trim()
+    return cachedRole ? [cachedRole] : []
+  }, [cachedMembershipRole, cachedMembershipRoles, membershipRole, membershipRoles, user])
 
   const resolvedMembershipRole = useMemo(() => {
     if (!user) return 'unauthenticated'
-    const explicitRole = membershipRole?.trim()
-    const cachedRole = cachedMembershipRole?.trim()
-    return explicitRole || cachedRole || null
-  }, [cachedMembershipRole, membershipRole, user])
+    return resolvedMembershipRoles[0] ?? null
+  }, [resolvedMembershipRoles, user])
 
-  const showRoleSkeleton = Boolean(user && membershipRoleLoading && !resolvedMembershipRole)
+  const showRoleSkeleton = Boolean(user && membershipRoleLoading && resolvedMembershipRoles.length === 0)
 
   const toolGroups = useMemo(() => {
     const navItems = !user
       ? roleNavConfig.unauthenticated
-      : getRoleNavItems(resolvedMembershipRole)
+      : getRoleNavItems(resolvedMembershipRole, resolvedMembershipRoles)
 
     return groupNavItems(navItems)
-  }, [resolvedMembershipRole, user])
+  }, [resolvedMembershipRole, resolvedMembershipRoles, user])
 
   const breadcrumb = useMemo(() => {
     const map: Array<{ prefix: string; label: string }> = [

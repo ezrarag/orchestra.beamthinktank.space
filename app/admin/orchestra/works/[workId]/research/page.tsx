@@ -57,6 +57,21 @@ const EMPTY_FORM: ResearchFormState = {
   relevantTo: '',
 }
 
+const SOURCE_OPTIONS: Array<{ value: ChamberResearchSource; label: string }> = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'doaj', label: 'DOAJ' },
+  { value: 'europeana', label: 'Europeana' },
+  { value: 'jstor', label: 'JSTOR' },
+  { value: 'hathitrust', label: 'HathiTrust' },
+]
+
+const INPUT_CLASS_NAME =
+  'w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-orchestra-gold/60 focus:bg-black/40'
+
+function sourceLabel(source: ChamberResearchSource): string {
+  return SOURCE_OPTIONS.find((option) => option.value === source)?.label ?? source
+}
+
 function fallbackWorkTitle(workId: string, explicitTitle?: string, explicitSlug?: string): string {
   if (trimChamberValue(explicitTitle)) return trimChamberValue(explicitTitle)
   if (trimChamberValue(explicitSlug)) return humanizeChamberSlug(explicitSlug)
@@ -184,7 +199,7 @@ export default function AdminWorkResearchPage() {
   const [europeanaLoading, setEuropeanaLoading] = useState(false)
   const [europeanaError, setEuropeanaError] = useState<string | null>(null)
 
-  const hasAccess = role === 'beam_admin' || role === 'partner_admin'
+  const hasAccess = role === 'beam_admin' || role === 'partner_admin' || role === 'admin_staff'
   const queryComposerName = searchParams.get('composerName') ?? ''
   const queryComposerSlug = searchParams.get('composerSlug') ?? ''
   const queryWorkTitle = searchParams.get('workTitle') ?? ''
@@ -431,6 +446,10 @@ export default function AdminWorkResearchPage() {
     }
   }
 
+  const currentWork = work ?? fallbackWork
+  const referenceCount = sortedRefs.length
+  const excerptLength = form.excerpt.length
+
   if (roleLoading || loading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
@@ -441,7 +460,7 @@ export default function AdminWorkResearchPage() {
 
   if (!user || !hasAccess) {
     return (
-      <div className="space-y-4 p-4 md:p-6">
+      <div className="space-y-4">
         <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
           This page requires admin access.
         </div>
@@ -450,66 +469,125 @@ export default function AdminWorkResearchPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 text-white md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link
-            href="/admin/viewer"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-orchestra-gold hover:text-orchestra-gold/80"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Viewer Admin
-          </Link>
-          <h1 className="mt-3 text-3xl font-bold text-white">Work Research References</h1>
-          <p className="mt-2 text-sm text-white/70">
-            {work?.composerName ?? fallbackWork.composerName} / {work?.workTitle ?? fallbackWork.workTitle}
-          </p>
-          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-white/45">Firestore: chamberWorks/{workId}</p>
-        </div>
-      </div>
-
-      {loadError ? (
-        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
-          {loadError}
-        </div>
-      ) : null}
-
-      {!workExists ? (
-        <div className="rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-4 text-sm text-[#F5D37A]">
-          This work document does not exist yet. Adding the first research reference will create it.
-        </div>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[1.05fr,0.95fr]">
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-white/15 bg-white/[0.03] p-5">
-            <div className="flex items-center gap-2">
-              <BookOpenText className="h-5 w-5 text-[#F5D37A]" />
-              <h2 className="text-lg font-semibold">Current References</h2>
+    <div className="space-y-6 text-white xl:space-y-8">
+      <section className="overflow-hidden rounded-[28px] border border-orchestra-gold/20 bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.22),_transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
+        <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] xl:p-8">
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <Link
+                href="/admin/viewer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-orchestra-gold transition hover:text-orchestra-gold/80"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Viewer Admin
+              </Link>
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-orchestra-gold/20 bg-orchestra-gold/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/90">
+                  <BookOpenText className="h-3.5 w-3.5" />
+                  Work Research
+                </div>
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                    {currentWork.workTitle}
+                  </h1>
+                  <p className="mt-2 text-base text-orchestra-cream/70">{currentWork.composerName}</p>
+                </div>
+              </div>
+              <p className="max-w-2xl text-sm leading-6 text-orchestra-cream/70">
+                Manage the work-level references surfaced in the Chamber viewer. Discovery tools stay on the right,
+                while the saved bibliography remains visible for review and cleanup on the left.
+              </p>
             </div>
-            <div className="mt-4 space-y-3">
-              {sortedRefs.length === 0 ? (
-                <p className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/70">
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {loadError ? (
+                <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {loadError}
+                </div>
+              ) : null}
+              {!workExists ? (
+                <div className="rounded-2xl border border-orchestra-gold/30 bg-orchestra-gold/10 px-4 py-3 text-sm text-[#F5D37A]">
+                  This work document does not exist yet. Adding the first reference will create it.
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/70">Document</p>
+              <p className="mt-3 break-all text-sm text-white/85">chamberWorks/{workId}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/70">Status</p>
+              <p className="mt-3 text-sm text-white/85">
+                {workExists ? 'Work document is active.' : 'Pending first research entry.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/70">References</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{referenceCount}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-white/45">Attached to this work</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] xl:items-start">
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.035] shadow-[0_16px_60px_rgba(0,0,0,0.24)]">
+            <div className="border-b border-white/10 px-5 py-4 md:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Current References</h2>
+                  <p className="mt-1 text-sm text-orchestra-cream/65">
+                    Review the saved bibliography exactly as it will appear in the viewer research panel.
+                  </p>
+                </div>
+                <div className="rounded-full border border-orchestra-gold/25 bg-orchestra-gold/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold">
+                  {referenceCount} {referenceCount === 1 ? 'item' : 'items'}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5 md:p-6">
+              {referenceCount === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 px-5 py-8 text-center text-sm text-orchestra-cream/70">
                   No research references added yet.
-                </p>
+                </div>
               ) : (
                 sortedRefs.map((reference) => (
                   <article
                     key={reference.id}
-                    className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                    className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(0,0,0,0.16))] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.18)] md:p-5"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
+                    <div className="grid gap-4 md:grid-cols-[88px,minmax(0,1fr)] xl:grid-cols-[96px,minmax(0,1fr)_auto] xl:items-start">
+                      <div className="flex md:justify-start">
+                        {reference.imageUrl ? (
+                          <img
+                            src={reference.imageUrl}
+                            alt={reference.title}
+                            className="h-[88px] w-[88px] rounded-2xl border border-white/10 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/20 text-[11px] uppercase tracking-[0.18em] text-white/35">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F5D37A]">
-                            {reference.source}
+                          <span className="rounded-full border border-orchestra-gold/35 bg-orchestra-gold/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F5D37A]">
+                            {sourceLabel(reference.source)}
                           </span>
                           {reference.relevantTo ? (
-                            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/55">
+                            <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/60">
                               {reference.relevantTo}
                             </span>
                           ) : null}
                         </div>
+
                         <a
                           href={reference.url}
                           target="_blank"
@@ -519,24 +597,29 @@ export default function AdminWorkResearchPage() {
                           <span>{reference.title}</span>
                           <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0" />
                         </a>
+
                         {reference.author || reference.year ? (
                           <p className="mt-2 text-sm text-white/65">
                             {[reference.author, reference.year].filter(Boolean).join(' • ')}
                           </p>
                         ) : null}
+
                         {reference.excerpt ? (
-                          <p className="mt-3 text-sm leading-6 text-white/74">{reference.excerpt}</p>
+                          <p className="mt-3 text-sm leading-6 text-orchestra-cream/75">{reference.excerpt}</p>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(reference.id)}
-                        disabled={deletingId === reference.id}
-                        className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {deletingId === reference.id ? 'Removing…' : 'Delete'}
-                      </button>
+
+                      <div className="flex md:justify-end xl:justify-start">
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(reference.id)}
+                          disabled={deletingId === reference.id}
+                          className="inline-flex items-center gap-2 rounded-full border border-red-400/35 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {deletingId === reference.id ? 'Removing…' : 'Delete'}
+                        </button>
+                      </div>
                     </div>
                   </article>
                 ))
@@ -545,179 +628,300 @@ export default function AdminWorkResearchPage() {
           </section>
         </div>
 
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-white/15 bg-white/[0.03] p-5">
-            <h2 className="text-lg font-semibold">DOAJ Quick Search</h2>
-            <p className="mt-2 text-sm text-white/70">
-              Search the DOAJ API and click a result to prefill the manual form for review.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <input
-                value={doajQuery}
-                onChange={(event) => setDoajQuery(event.target.value)}
-                placeholder="Search DOAJ articles"
-                className="w-full rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <button
-                type="button"
-                onClick={() => void searchDoaj()}
-                disabled={doajLoading}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/12 px-4 py-2 text-sm font-semibold text-[#F5D37A] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Search className="h-4 w-4" />
-                {doajLoading ? 'Searching…' : 'Search'}
-              </button>
+        <div className="space-y-6 xl:sticky xl:top-6">
+          <section className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.035] shadow-[0_16px_60px_rgba(0,0,0,0.24)]">
+            <div className="border-b border-white/10 px-5 py-4 md:px-6">
+              <h2 className="text-xl font-semibold text-white">Research Discovery</h2>
+              <p className="mt-1 text-sm text-orchestra-cream/65">
+                Search source APIs, prefill the form, then review before saving the reference onto this work.
+              </p>
             </div>
-            {doajError ? <p className="mt-3 text-sm text-red-200">{doajError}</p> : null}
-            <div className="mt-4 space-y-2">
-              {doajResults.map((result) => (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() => handlePrefill(result)}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-[#D4AF37]/35"
-                >
-                  <p className="text-sm font-semibold text-white">{result.title}</p>
-                  <p className="mt-1 text-xs text-white/60">
-                    {[result.author, result.year].filter(Boolean).join(' • ') || 'DOAJ result'}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </section>
 
-          <section className="rounded-2xl border border-white/15 bg-white/[0.03] p-5">
-            <h2 className="text-lg font-semibold">Europeana Quick Search</h2>
-            <p className="mt-2 text-sm text-white/70">
-              Search Europeana with your public API key and prefill the manual form from archival records.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <input
-                value={europeanaQuery}
-                onChange={(event) => setEuropeanaQuery(event.target.value)}
-                placeholder="Search Europeana records"
-                className="w-full rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <button
-                type="button"
-                onClick={() => void searchEuropeana()}
-                disabled={europeanaLoading}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/12 px-4 py-2 text-sm font-semibold text-[#F5D37A] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Search className="h-4 w-4" />
-                {europeanaLoading ? 'Searching…' : 'Search'}
-              </button>
-            </div>
-            {europeanaError ? <p className="mt-3 text-sm text-red-200">{europeanaError}</p> : null}
-            <div className="mt-4 space-y-2">
-              {europeanaResults.map((result) => (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() => handlePrefill(result)}
-                  className="grid w-full gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-[#D4AF37]/35 md:grid-cols-[72px,1fr]"
-                >
-                  {result.imageUrl ? (
-                    <img
-                      src={result.imageUrl}
-                      alt={result.title}
-                      className="h-[72px] w-[72px] rounded-lg border border-white/10 object-cover"
-                    />
-                  ) : (
-                    <div className="hidden h-[72px] w-[72px] rounded-lg border border-dashed border-white/10 bg-black/20 md:block" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white">{result.title}</p>
-                    <p className="mt-1 text-xs text-white/60">
-                      {[result.author, result.year].filter(Boolean).join(' • ') || 'Europeana result'}
-                    </p>
+            <div className="divide-y divide-white/10">
+              <div className="space-y-4 px-5 py-5 md:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-orchestra-gold/85">DOAJ</h3>
+                    <p className="mt-1 text-sm text-white/60">Search open-access scholarship and prefill article metadata.</p>
                   </div>
-                </button>
-              ))}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={doajQuery}
+                    onChange={(event) => setDoajQuery(event.target.value)}
+                    placeholder="Search DOAJ articles"
+                    className={INPUT_CLASS_NAME}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void searchDoaj()}
+                    disabled={doajLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orchestra-gold/35 bg-orchestra-gold/10 px-4 py-3 text-sm font-semibold text-[#F5D37A] transition hover:bg-orchestra-gold/15 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[132px]"
+                  >
+                    <Search className="h-4 w-4" />
+                    {doajLoading ? 'Searching…' : 'Search'}
+                  </button>
+                </div>
+
+                {doajError ? <p className="text-sm text-red-200">{doajError}</p> : null}
+
+                <div className="space-y-2">
+                  {doajResults.length === 0 && !doajLoading && !doajError ? (
+                    <p className="text-sm text-white/45">No DOAJ results loaded.</p>
+                  ) : null}
+
+                  {doajResults.map((result) => (
+                    <button
+                      key={result.id}
+                      type="button"
+                      onClick={() => handlePrefill(result)}
+                      className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-orchestra-gold/35 hover:bg-black/25"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-orchestra-gold/25 bg-orchestra-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-orchestra-gold">
+                          {sourceLabel(result.source)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-white">{result.title}</p>
+                      <p className="mt-1 text-xs text-white/60">
+                        {[result.author, result.year].filter(Boolean).join(' • ') || 'Open-access article'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4 px-5 py-5 md:px-6">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-orchestra-gold/85">Europeana</h3>
+                  <p className="mt-1 text-sm text-white/60">
+                    Search archival records and artworks using your public Europeana API key.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={europeanaQuery}
+                    onChange={(event) => setEuropeanaQuery(event.target.value)}
+                    placeholder="Search Europeana records"
+                    className={INPUT_CLASS_NAME}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void searchEuropeana()}
+                    disabled={europeanaLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orchestra-gold/35 bg-orchestra-gold/10 px-4 py-3 text-sm font-semibold text-[#F5D37A] transition hover:bg-orchestra-gold/15 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[132px]"
+                  >
+                    <Search className="h-4 w-4" />
+                    {europeanaLoading ? 'Searching…' : 'Search'}
+                  </button>
+                </div>
+
+                {europeanaError ? <p className="text-sm text-red-200">{europeanaError}</p> : null}
+
+                <div className="space-y-2">
+                  {europeanaResults.length === 0 && !europeanaLoading && !europeanaError ? (
+                    <p className="text-sm text-white/45">No Europeana results loaded.</p>
+                  ) : null}
+
+                  {europeanaResults.map((result) => (
+                    <button
+                      key={result.id}
+                      type="button"
+                      onClick={() => handlePrefill(result)}
+                      className="grid w-full gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-orchestra-gold/35 hover:bg-black/25 md:grid-cols-[72px,minmax(0,1fr)]"
+                    >
+                      {result.imageUrl ? (
+                        <img
+                          src={result.imageUrl}
+                          alt={result.title}
+                          className="h-[72px] w-[72px] rounded-xl border border-white/10 object-cover"
+                        />
+                      ) : (
+                        <div className="hidden h-[72px] w-[72px] rounded-xl border border-dashed border-white/10 bg-black/20 md:block" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-full border border-orchestra-gold/25 bg-orchestra-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-orchestra-gold">
+                          {sourceLabel(result.source)}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-white">{result.title}</p>
+                        <p className="mt-1 text-xs text-white/60">
+                          {[result.author, result.year].filter(Boolean).join(' • ') || 'Archival record'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/15 bg-white/[0.03] p-5">
-            <h2 className="text-lg font-semibold">Add Reference Manually</h2>
-            <div className="mt-4 grid gap-3">
-              <select
-                value={form.source}
-                onChange={(event) => setForm((current) => ({ ...current, source: event.target.value as ChamberResearchSource }))}
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              >
-                <option value="manual">manual</option>
-                <option value="doaj">doaj</option>
-                <option value="europeana">europeana</option>
-                <option value="jstor">jstor</option>
-                <option value="hathitrust">hathitrust</option>
-              </select>
-              <input
-                value={form.title}
-                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Title *"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <input
-                value={form.author}
-                onChange={(event) => setForm((current) => ({ ...current, author: event.target.value }))}
-                placeholder="Author"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <input
-                value={form.year}
-                onChange={(event) => setForm((current) => ({ ...current, year: event.target.value }))}
-                placeholder="Year"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <input
-                value={form.url}
-                onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
-                placeholder="URL *"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <textarea
-                rows={4}
-                value={form.excerpt}
-                maxLength={280}
-                onChange={(event) => setForm((current) => ({ ...current, excerpt: event.target.value }))}
-                placeholder="Excerpt (max 280 chars)"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <p className="text-right text-xs text-white/45">{form.excerpt.length}/280</p>
-              <input
-                value={form.imageUrl}
-                onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))}
-                placeholder="Image URL"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
-              <input
-                value={form.relevantTo}
-                onChange={(event) => setForm((current) => ({ ...current, relevantTo: event.target.value }))}
-                placeholder="Relevant to"
-                className="rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#D4AF37]"
-              />
+          <section className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.035] shadow-[0_16px_60px_rgba(0,0,0,0.24)]">
+            <div className="border-b border-white/10 px-5 py-4 md:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Compose Reference</h2>
+                  <p className="mt-1 text-sm text-orchestra-cream/65">
+                    Add manual entries or refine the values pulled in from the quick-search helpers.
+                  </p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white/50">
+                  {sourceLabel(form.source)}
+                </div>
+              </div>
             </div>
 
-            {formError ? (
-              <p className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-                {formError}
-              </p>
-            ) : null}
-            {formSuccess ? (
-              <p className="mt-4 rounded-xl border border-green-400/30 bg-green-500/10 px-3 py-2 text-sm text-green-100">
-                {formSuccess}
-              </p>
-            ) : null}
+            <div className="space-y-5 p-5 md:p-6">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr),120px]">
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">Source</span>
+                  <select
+                    value={form.source}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        source: event.target.value as ChamberResearchSource,
+                      }))
+                    }
+                    className={INPUT_CLASS_NAME}
+                  >
+                    {SOURCE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={isSaving}
-                className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/14 px-4 py-2 text-sm font-semibold text-[#F5D37A] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSaving ? 'Saving…' : 'Add Research Reference'}
-              </button>
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">Year</span>
+                  <input
+                    value={form.year}
+                    onChange={(event) => setForm((current) => ({ ...current, year: event.target.value }))}
+                    placeholder="1849"
+                    className={INPUT_CLASS_NAME}
+                  />
+                </label>
+              </div>
+
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">
+                  Title *
+                </span>
+                <input
+                  value={form.title}
+                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Article or document title"
+                  className={INPUT_CLASS_NAME}
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">URL *</span>
+                <input
+                  value={form.url}
+                  onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
+                  placeholder="https://..."
+                  className={INPUT_CLASS_NAME}
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">Author</span>
+                  <input
+                    value={form.author}
+                    onChange={(event) => setForm((current) => ({ ...current, author: event.target.value }))}
+                    placeholder="Author or editor"
+                    className={INPUT_CLASS_NAME}
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">
+                    Relevant To
+                  </span>
+                  <input
+                    value={form.relevantTo}
+                    onChange={(event) => setForm((current) => ({ ...current, relevantTo: event.target.value }))}
+                    placeholder="Why this matters to the work"
+                    className={INPUT_CLASS_NAME}
+                  />
+                </label>
+              </div>
+
+              <label className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">Excerpt</span>
+                  <span className="text-xs text-white/45">{excerptLength}/280</span>
+                </div>
+                <textarea
+                  rows={5}
+                  value={form.excerpt}
+                  maxLength={280}
+                  onChange={(event) => setForm((current) => ({ ...current, excerpt: event.target.value }))}
+                  placeholder="Short contextual snippet for the viewer research card"
+                  className={`${INPUT_CLASS_NAME} min-h-[132px] resize-y`}
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),128px]">
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">
+                    Image URL
+                  </span>
+                  <input
+                    value={form.imageUrl}
+                    onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))}
+                    placeholder="Optional thumbnail"
+                    className={INPUT_CLASS_NAME}
+                  />
+                </label>
+
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-orchestra-gold/80">
+                    Preview
+                  </span>
+                  <div className="flex h-[84px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+                    {form.imageUrl ? (
+                      <img
+                        src={form.imageUrl}
+                        alt="Reference preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[11px] uppercase tracking-[0.16em] text-white/35">Optional</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {formError ? (
+                <p className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {formError}
+                </p>
+              ) : null}
+
+              {formSuccess ? (
+                <p className="rounded-2xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-100">
+                  {formSuccess}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-white/55">
+                  Saved references are written onto the work document, not individual versions.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleSubmit()}
+                  disabled={isSaving}
+                  className="inline-flex items-center justify-center rounded-full border border-orchestra-gold/40 bg-orchestra-gold/14 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:bg-orchestra-gold/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSaving ? 'Saving…' : 'Add Research Reference'}
+                </button>
+              </div>
             </div>
           </section>
         </div>

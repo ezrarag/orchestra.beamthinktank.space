@@ -1,22 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStorage } from 'firebase-admin/storage'
-import { initializeApp, getApps, cert } from 'firebase-admin/app'
-
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
-  try {
-    initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    })
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error)
-  }
-}
+import { adminStorage } from '@/lib/firebase-admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +13,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const bucket = getStorage().bucket()
+    if (!adminStorage) {
+      return NextResponse.json(
+        { error: 'Storage service not initialized' },
+        { status: 503 }
+      )
+    }
+
+    const bucket = adminStorage.bucket()
     const file = bucket.file(storagePath)
 
     // Generate a signed URL that expires in 1 hour
@@ -51,4 +41,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

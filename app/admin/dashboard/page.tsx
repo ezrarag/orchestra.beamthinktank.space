@@ -537,14 +537,14 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[420px] items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orchestra-gold"></div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 space-y-10 py-8">
+    <div className="space-y-10">
       {/* Staging Mode Ribbon */}
       {isDev && (
         <div className="bg-yellow-500/20 border-2 border-yellow-400 rounded-lg p-4 text-center">

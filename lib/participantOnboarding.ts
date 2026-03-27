@@ -1,5 +1,5 @@
-import { collection, getDocs, query, where, writeBatch } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth } from '@/lib/firebase'
+import { normalizeEmailList } from '@/lib/participantIdentity'
 
 export {
   getParticipantIntentLabel,
@@ -9,64 +9,11 @@ export {
 } from '@/lib/portal/onboarding'
 
 const PARTICIPANT_ROLE_STORAGE_KEY_PREFIX = 'participant_role_'
+const PARTICIPANT_ROLES_STORAGE_KEY_PREFIX = 'participant_roles_'
 const CONTRIBUTION_CLAIM_STORAGE_KEY_PREFIX = 'claimed_'
-const CLAIM_BATCH_SIZE = 400
 
 function isBrowser() {
   return typeof window !== 'undefined'
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim()
-}
-
-function getSubmittedByClaimState(data: Record<string, unknown>) {
-  const hasSubmittedBy = Object.prototype.hasOwnProperty.call(data, 'submittedBy')
-  return {
-    hasSubmittedBy,
-    submittedBy: data.submittedBy,
-  }
-}
-
-async function claimCollectionByEmail(
-  collectionName: string,
-  uid: string,
-  email: string,
-  options: { optional?: boolean } = {},
-): Promise<number> {
-  if (!db || !email) return 0
-
-  try {
-    const snapshot = await getDocs(query(collection(db, collectionName), where('email', '==', email)))
-    const docsToClaim = snapshot.docs.filter((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>
-      const { hasSubmittedBy, submittedBy } = getSubmittedByClaimState(data)
-      return !hasSubmittedBy || submittedBy === null
-    })
-
-    if (docsToClaim.length === 0) {
-      return 0
-    }
-
-    for (let index = 0; index < docsToClaim.length; index += CLAIM_BATCH_SIZE) {
-      const batch = writeBatch(db)
-      docsToClaim.slice(index, index + CLAIM_BATCH_SIZE).forEach((docSnap) => {
-        batch.update(docSnap.ref, {
-          submittedBy: uid,
-        })
-      })
-      await batch.commit()
-    }
-
-    return docsToClaim.length
-  } catch (error) {
-    if (options.optional) {
-      console.warn(`Skipping optional contribution claim for ${collectionName}:`, error)
-      return 0
-    }
-
-    throw error
-  }
 }
 
 export function getContributionClaimStorageKey(uid: string): string {
@@ -82,9 +29,32 @@ export function getParticipantRoleStorageKey(uid: string): string {
   return `${PARTICIPANT_ROLE_STORAGE_KEY_PREFIX}${uid}`
 }
 
+export function getParticipantRolesStorageKey(uid: string): string {
+  return `${PARTICIPANT_ROLES_STORAGE_KEY_PREFIX}${uid}`
+}
+
 export function readCachedParticipantRole(uid: string): string | null {
   if (!isBrowser()) return null
   return window.localStorage.getItem(getParticipantRoleStorageKey(uid))
+}
+
+export function readCachedParticipantRoles(uid: string): string[] {
+  if (!isBrowser()) return []
+
+  const stored = window.localStorage.getItem(getParticipantRolesStorageKey(uid))
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.filter((role): role is string => typeof role === 'string' && role.trim().length > 0)
+      }
+    } catch (error) {
+      console.warn('Unable to parse cached participant roles:', error)
+    }
+  }
+
+  const fallbackRole = readCachedParticipantRole(uid)
+  return fallbackRole ? [fallbackRole] : []
 }
 
 export function writeCachedParticipantRole(uid: string, role: string): void {
@@ -94,20 +64,45 @@ export function writeCachedParticipantRole(uid: string, role: string): void {
   window.localStorage.setItem(getParticipantRoleStorageKey(uid), nextRole)
 }
 
-export async function claimExistingContributions(uid: string, email: string): Promise<number> {
-  const normalizedEmail = normalizeEmail(email)
+export function writeCachedParticipantRoles(uid: string, roles: string[]): void {
+  if (!isBrowser()) return
 
-  if (!db || !uid || !normalizedEmail) {
-    console.info(`claimed 0 documents for ${normalizedEmail}`)
+  const normalizedRoles = roles
+    .map((role) => role.trim())
+    .filter(Boolean)
+
+  if (normalizedRoles.length === 0) return
+
+  window.localStorage.setItem(getParticipantRolesStorageKey(uid), JSON.stringify(normalizedRoles))
+  writeCachedParticipantRole(uid, normalizedRoles[0])
+}
+
+export async function claimExistingContributions(uid: string, emails: string | string[]): Promise<number> {
+  const normalizedEmails = normalizeEmailList(Array.isArray(emails) ? emails : [emails])
+
+  if (!auth?.currentUser || auth.currentUser.uid !== uid || normalizedEmails.length === 0) {
+    console.info(`claimed 0 documents for ${normalizedEmails.join(', ')}`)
     return 0
   }
 
-  const [cohortApplicationsClaimed, chamberVersionsClaimed] = await Promise.all([
-    claimCollectionByEmail('cohortApplications', uid, normalizedEmail),
-    claimCollectionByEmail('chamberVersions', uid, normalizedEmail, { optional: true }),
-  ])
+  const token = await auth.currentUser.getIdToken()
+  const response = await fetch('/api/participant/claim-contributions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      emails: normalizedEmails,
+    }),
+  })
 
-  const claimedCount = cohortApplicationsClaimed + chamberVersionsClaimed
-  console.info(`claimed ${claimedCount} documents for ${normalizedEmail}`)
+  const data = (await response.json().catch(() => ({}))) as { claimedCount?: number; error?: string }
+  if (!response.ok) {
+    throw new Error(data.error || 'Unable to claim participant contributions.')
+  }
+
+  const claimedCount = typeof data.claimedCount === 'number' ? data.claimedCount : 0
+  console.info(`claimed ${claimedCount} documents for ${normalizedEmails.join(', ')}`)
   return claimedCount
 }

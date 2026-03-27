@@ -608,6 +608,26 @@ service cloud.firestore {
         (isAuthenticated() && request.resource.data.userId == request.auth.uid);
       allow read, update, delete: if isAdmin() || viewerAdminBypassEnabled();
     }
+
+    // Work-level metadata for Chamber Series viewer, including research references.
+    match /chamberWorks/{workId} {
+      allow read: if true;
+      allow write: if isAdmin() || viewerAdminBypassEnabled();
+    }
+
+    // Shared BEAM DevTools checklist synced across Chrome profiles.
+    // The extension does not establish Firebase Auth, so access is intentionally
+    // limited to the single shared development session document.
+    match /devChecklists/{sessionId} {
+      allow read: if sessionId == 'beam-orchestra-main';
+      allow create, update: if
+        sessionId == 'beam-orchestra-main' &&
+        request.resource.data.keys().hasOnly(['items', 'lastUpdatedBy', 'updatedAt']) &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() <= 200 &&
+        request.resource.data.lastUpdatedBy is string;
+      allow delete: if false;
+    }
     
     // Default deny rule for any unmatched paths
     match /{document=**} {

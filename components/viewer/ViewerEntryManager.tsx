@@ -16,7 +16,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { BookOpenText, CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Trash2, Video, X } from 'lucide-react'
+import { BookOpenText, CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, RefreshCw, Save, Search, Sparkles, Trash2, Video, X } from 'lucide-react'
 import { auth, db } from '@/lib/firebase'
 import { buildChamberWorkResearchAdminHref } from '@/lib/chamberWorks'
 import { DEFAULT_VIEWER_AREA_ROLE_TEMPLATES } from '@/lib/config/viewerRoleTemplates'
@@ -61,6 +61,8 @@ type ViewerEntry = {
   confirmed?: boolean
   confirmedAt?: string
   createdByUid?: string
+  createdAt?: unknown
+  updatedAt?: unknown
   submissionSessionId?: string
   submissionDisplayName?: string
   status?: 'open' | 'archived'
@@ -110,6 +112,25 @@ type MetadataOptionItem = {
 }
 
 type MetadataOptionsMap = Record<MetadataCategory, MetadataOptionItem[]>
+
+type ChamberWorkContext = {
+  workId: string
+  composerLabel: string
+  workLabel: string
+}
+
+type DetectedWorkContext = {
+  workId: string
+  composerLabel: string
+  workLabel: string
+  relatedEntries: ViewerEntry[]
+  duplicateEntry: ViewerEntry | null
+  mediaSource: ViewerEntry | null
+  placementSource: ViewerEntry | null
+  metadataDefaults: Partial<
+    Pick<FormState, 'composerName' | 'composerSlug' | 'composerImage' | 'workTitle' | 'workSlug' | 'infoUrl' | 'researchStatus'>
+  >
+}
 
 type SubmissionGuideFocus = 'entries' | 'form_core' | 'form_meta' | 'submit'
 
@@ -269,6 +290,62 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function buildChamberWorkContextFromEntry(entry: ViewerEntry): ChamberWorkContext | null {
+  if (entry.areaId !== 'chamber') return null
+  const composerLabel = (entry.composerName ?? entry.composer ?? '').trim()
+  const workLabel = (entry.workTitle ?? '').trim()
+  const composerKey = toSlug(entry.composerSlug ?? '') || toSlug(composerLabel)
+  const workKey = toSlug(entry.workSlug ?? '') || toSlug(workLabel)
+  if (!composerKey || !workKey) return null
+
+  return {
+    workId: `${composerKey}__${workKey}`,
+    composerLabel: composerLabel || entry.composerSlug?.trim() || 'Composer',
+    workLabel: workLabel || entry.workSlug?.trim() || 'Work',
+  }
+}
+
+function buildChamberWorkContextFromForm(
+  form: Pick<FormState, 'areaId' | 'composerName' | 'composerSlug' | 'workTitle' | 'workSlug'>,
+): ChamberWorkContext | null {
+  if (form.areaId !== 'chamber') return null
+  const composerLabel = form.composerName.trim()
+  const workLabel = form.workTitle.trim()
+  const composerKey = toSlug(form.composerSlug) || toSlug(composerLabel)
+  const workKey = toSlug(form.workSlug) || toSlug(workLabel)
+  if (!composerKey || !workKey) return null
+
+  return {
+    workId: `${composerKey}__${workKey}`,
+    composerLabel: composerLabel || form.composerSlug.trim() || 'Composer',
+    workLabel: workLabel || form.workSlug.trim() || 'Work',
+  }
+}
+
+function getEntryRecency(entry: ViewerEntry): number {
+  return toMillis(entry.updatedAt) || toMillis(entry.createdAt)
+}
+
+function pickDetectedValue(entries: ViewerEntry[], getter: (entry: ViewerEntry) => string | undefined): string {
+  const ranked = new Map<string, { count: number; latest: number }>()
+
+  entries.forEach((entry) => {
+    const value = getter(entry)?.trim() ?? ''
+    if (!value) return
+    const current = ranked.get(value) ?? { count: 0, latest: 0 }
+    current.count += 1
+    current.latest = Math.max(current.latest, getEntryRecency(entry))
+    ranked.set(value, current)
+  })
+
+  return Array.from(ranked.entries())
+    .sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count
+      if (b[1].latest !== a[1].latest) return b[1].latest - a[1].latest
+      return b[0].length - a[0].length
+    })[0]?.[0] ?? ''
+}
+
 function createSessionId(): string {
   return `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`
 }
@@ -339,7 +416,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
   const [sectionOpen, setSectionOpen] = useState({
     required: true,
     media: true,
-    publishing: true,
+    publishing: false,
     advanced: false,
   })
   const [submissionGuideOpen, setSubmissionGuideOpen] = useState(false)
@@ -381,6 +458,8 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
   const [customState, setCustomState] = useState('')
   const [customRegion, setCustomRegion] = useState('')
   const [claimedSessionOwnership, setClaimedSessionOwnership] = useState(false)
+  const [showSlugOverrides, setShowSlugOverrides] = useState(false)
+  const [lastAutoDetectedWorkId, setLastAutoDetectedWorkId] = useState('')
 
   const canManageAll = mode === 'admin'
   const mineOnly = mode === 'participant' && scope === 'mine'
@@ -477,6 +556,56 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [entries, form.areaId, form.sectionId, sections])
+
+  const detectedWorkContext = useMemo<DetectedWorkContext | null>(() => {
+    const draftContext = buildChamberWorkContextFromForm(form)
+    if (!draftContext) return null
+
+    const relatedEntries = entries
+      .filter((entry) => entry.id !== selectedId)
+      .filter((entry) => buildChamberWorkContextFromEntry(entry)?.workId === draftContext.workId)
+      .sort((a, b) => getEntryRecency(b) - getEntryRecency(a))
+
+    if (relatedEntries.length === 0) return null
+
+    const duplicateEntry = form.title.trim()
+      ? relatedEntries.find((entry) => toSlug(entry.title) === toSlug(form.title.trim())) ?? null
+      : null
+    const mediaSource =
+      relatedEntries.find((entry) => entry.videoUrl || entry.hlsUrl || entry.thumbnailUrl) ?? null
+    const placementSource =
+      relatedEntries.find((entry) => entry.sectionId?.trim()) ?? relatedEntries[0] ?? null
+
+    return {
+      workId: draftContext.workId,
+      composerLabel:
+        pickDetectedValue(relatedEntries, (entry) => entry.composerName ?? entry.composer) ||
+        draftContext.composerLabel,
+      workLabel: pickDetectedValue(relatedEntries, (entry) => entry.workTitle) || draftContext.workLabel,
+      relatedEntries,
+      duplicateEntry,
+      mediaSource,
+      placementSource,
+      metadataDefaults: {
+        composerName: pickDetectedValue(relatedEntries, (entry) => entry.composerName ?? entry.composer),
+        composerSlug: pickDetectedValue(relatedEntries, (entry) => entry.composerSlug),
+        composerImage: pickDetectedValue(relatedEntries, (entry) => entry.composerImage),
+        workTitle: pickDetectedValue(relatedEntries, (entry) => entry.workTitle),
+        workSlug: pickDetectedValue(relatedEntries, (entry) => entry.workSlug),
+        infoUrl: pickDetectedValue(relatedEntries, (entry) => entry.infoUrl),
+        researchStatus: pickDetectedValue(relatedEntries, (entry) => entry.researchStatus),
+      },
+    }
+  }, [entries, form, selectedId])
+
+  const derivedComposerSlug = useMemo(
+    () => toSlug(form.composerSlug) || toSlug(form.composerName),
+    [form.composerName, form.composerSlug],
+  )
+  const derivedWorkSlug = useMemo(
+    () => toSlug(form.workSlug) || toSlug(form.workTitle),
+    [form.workSlug, form.workTitle],
+  )
 
   const loadData = async () => {
     if (!db) {
@@ -652,6 +781,28 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     }
   }, [form.areaId, form.sectionId, formSectionOptions])
 
+  useEffect(() => {
+    if (!detectedWorkContext || selectedId) return
+    if (detectedWorkContext.workId === lastAutoDetectedWorkId) return
+
+    setForm((prev) => {
+      const next = { ...prev }
+      let changed = false
+
+      ;(['composerName', 'composerSlug', 'composerImage', 'workTitle', 'workSlug', 'infoUrl', 'researchStatus'] as const).forEach((field) => {
+        const detectedValue = detectedWorkContext.metadataDefaults[field]?.trim() ?? ''
+        if (!detectedValue) return
+        if (prev[field].trim()) return
+        next[field] = detectedValue
+        changed = true
+      })
+
+      return changed ? next : prev
+    })
+
+    setLastAutoDetectedWorkId(detectedWorkContext.workId)
+  }, [detectedWorkContext, lastAutoDetectedWorkId, selectedId])
+
   const sectionHighlightClass = (focus: SubmissionGuideFocus) => {
     if (mode !== 'participant') return ''
     if (!submissionGuideOpen) return ''
@@ -661,6 +812,8 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
 
   const selectEntry = (entry: ViewerEntry) => {
     setSelectedId(entry.id)
+    setShowSlugOverrides(Boolean(entry.composerSlug || entry.workSlug))
+    setLastAutoDetectedWorkId('')
     setForm({
       submissionDisplayName: entry.submissionDisplayName ?? '',
       areaId: entry.areaId,
@@ -698,9 +851,19 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     })
   }
 
-  const clearForm = () => {
+  const clearForm = (options?: { preservePlacement?: boolean }) => {
+    const preservePlacement = options?.preservePlacement !== false
+    const nextAreaId = preservePlacement ? form.areaId || DEFAULT_FORM.areaId : DEFAULT_FORM.areaId
+    const nextSectionId = preservePlacement ? form.sectionId || DEFAULT_FORM.sectionId : DEFAULT_FORM.sectionId
     setSelectedId(null)
-    setForm((prev) => ({ ...DEFAULT_FORM, submissionDisplayName: auth?.currentUser?.displayName?.trim() ?? prev.submissionDisplayName }))
+    setShowSlugOverrides(false)
+    setLastAutoDetectedWorkId('')
+    setForm((prev) => ({
+      ...DEFAULT_FORM,
+      submissionDisplayName: auth?.currentUser?.displayName?.trim() ?? prev.submissionDisplayName,
+      areaId: nextAreaId,
+      sectionId: nextSectionId,
+    }))
     setSubmitError(null)
     setSubmitSuccess(null)
   }
@@ -1232,6 +1395,73 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     }
   }
 
+  const applyDetectedMetadata = (mode: 'all' | 'empty' = 'all') => {
+    if (!detectedWorkContext) return
+
+    setForm((prev) => {
+      const next = { ...prev }
+      let changed = false
+
+      ;(['composerName', 'composerSlug', 'composerImage', 'workTitle', 'workSlug', 'infoUrl', 'researchStatus'] as const).forEach((field) => {
+        const detectedValue = detectedWorkContext.metadataDefaults[field]?.trim() ?? ''
+        if (!detectedValue) return
+        if (mode === 'empty' && prev[field].trim()) return
+        next[field] = detectedValue
+        changed = true
+      })
+
+      return changed ? next : prev
+    })
+  }
+
+  const applyDetectedMedia = () => {
+    if (!detectedWorkContext?.mediaSource) return
+
+    setForm((prev) => ({
+      ...prev,
+      videoUrl: detectedWorkContext.mediaSource?.videoUrl ?? prev.videoUrl,
+      hlsUrl: detectedWorkContext.mediaSource?.hlsUrl ?? prev.hlsUrl,
+      thumbnailUrl: detectedWorkContext.mediaSource?.thumbnailUrl ?? prev.thumbnailUrl,
+    }))
+  }
+
+  const startVersionDraft = (source: ViewerEntry) => {
+    const nextWorkId = buildChamberWorkContextFromEntry(source)?.workId ?? ''
+    setSelectedId(null)
+    setShowSlugOverrides(Boolean(source.composerSlug || source.workSlug))
+    setLastAutoDetectedWorkId(nextWorkId)
+    setForm((prev) => ({
+      ...DEFAULT_FORM,
+      submissionDisplayName: auth?.currentUser?.displayName?.trim() ?? prev.submissionDisplayName,
+      areaId: source.areaId || prev.areaId || DEFAULT_FORM.areaId,
+      sectionId: source.sectionId || prev.sectionId || DEFAULT_FORM.sectionId,
+      composerName: source.composerName ?? source.composer ?? '',
+      composerSlug: source.composerSlug ?? '',
+      composerImage: source.composerImage ?? '',
+      workTitle: source.workTitle ?? '',
+      workSlug: source.workSlug ?? '',
+      researchStatus: source.researchStatus ?? '',
+      infoUrl: source.infoUrl ?? '',
+      accessLevel: source.accessLevel ?? prev.accessLevel ?? DEFAULT_FORM.accessLevel,
+      institutionName: source.institutionName ?? '',
+    }))
+    setSubmitError(null)
+    setSubmitSuccess(`Version draft started from "${source.title}". Add the new title, media, and recording details.`)
+  }
+
+  const isAdminWorkspace = mode === 'admin'
+  const workspaceCardClass = isAdminWorkspace
+    ? 'rounded-[28px] border border-white/10 bg-white/[0.035] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl'
+    : 'rounded-2xl border border-white/15 bg-white/[0.03] p-4'
+  const metricCardClass = isAdminWorkspace
+    ? 'rounded-[24px] border border-white/10 bg-white/[0.04] p-5 shadow-[0_16px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+    : 'rounded-xl border border-white/15 bg-white/[0.03] p-4'
+  const contentGridClass = mineOnly
+    ? ''
+    : isAdminWorkspace
+      ? 'xl:grid-cols-[minmax(340px,0.92fr)_minmax(0,1.08fr)]'
+      : 'lg:grid-cols-[1fr,1.4fr]'
+
   return (
     <div className="space-y-6 text-white">
       {loadError ? (
@@ -1240,23 +1470,45 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">
-          {mode === 'admin'
-            ? 'Viewer Content Admin'
-            : mineOnly
-              ? 'My Viewer Submissions'
-              : 'Participant Viewer Submissions'}
-        </h1>
-        <button
-          type="button"
-          onClick={() => void loadData()}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:border-[#D4AF37] hover:text-[#F5D37A]"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </button>
-      </div>
+      {isAdminWorkspace ? (
+        <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.14),_transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+          <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:p-6">
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/82">
+                Content Workspace
+              </p>
+              <h1 className="text-3xl font-semibold tracking-[-0.03em] text-white">Viewer Content Admin</h1>
+              <p className="max-w-2xl text-sm leading-6 text-white/66">
+                Review the current viewer library, open an existing entry from the list, or compose a new one in the adjacent editor.
+              </p>
+            </div>
+            <div className="flex items-start justify-start lg:justify-end">
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2.5 text-sm font-semibold text-white/82 transition hover:border-orchestra-gold/35 hover:text-[#F5D37A]"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">
+            {mineOnly ? 'My Viewer Submissions' : 'Participant Viewer Submissions'}
+          </h1>
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:border-[#D4AF37] hover:text-[#F5D37A]"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+      )}
 
       {mineOnly ? (
         <div className="rounded-xl border border-[#D4AF37]/35 bg-[#D4AF37]/10 p-3 text-sm text-[#F5D37A]">
@@ -1265,28 +1517,28 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       ) : null}
 
       <div className={`grid gap-4 md:grid-cols-3 ${sectionHighlightClass('entries')}`}>
-        <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={metricCardClass}>
           <p className="text-xs uppercase tracking-[0.12em] text-white/60">Entries</p>
           <p className="mt-1 text-2xl font-semibold">{entries.length}</p>
         </div>
-        <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={metricCardClass}>
           <p className="text-xs uppercase tracking-[0.12em] text-white/60">Published</p>
           <p className="mt-1 text-2xl font-semibold">{entries.filter((item) => item.isPublished).length}</p>
         </div>
-        <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={metricCardClass}>
           <p className="text-xs uppercase tracking-[0.12em] text-white/60">Needs Confirm</p>
           <p className="mt-1 text-2xl font-semibold">{entries.filter((item) => !item.confirmed).length}</p>
         </div>
       </div>
 
-      <div className={`grid gap-6 ${mineOnly ? '' : 'lg:grid-cols-[1fr,1.4fr]'}`}>
-        <div className={`rounded-2xl border border-white/15 bg-white/[0.03] p-4 max-h-[72vh] flex flex-col ${sectionHighlightClass('entries')}`}>
+      <div className={`grid gap-6 ${contentGridClass}`}>
+        <div className={`${workspaceCardClass} max-h-[72vh] flex flex-col ${sectionHighlightClass('entries')}`}>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Current Entries</h2>
             <button
               type="button"
-              onClick={clearForm}
-              className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1 text-xs hover:border-[#D4AF37] hover:text-[#F5D37A]"
+              onClick={() => clearForm()}
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
             >
               <Plus className="h-3.5 w-3.5" />
               New
@@ -1300,7 +1552,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
                 value={entriesSearch}
                 onChange={(event) => setEntriesSearch(event.target.value)}
                 placeholder="Search title, description, area, section, or id"
-                className="w-full rounded-lg border border-white/20 bg-black/30 py-2 pl-9 pr-9 text-sm"
+                className="w-full rounded-xl border border-white/15 bg-black/25 py-3 pl-9 pr-9 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
               />
               {entriesSearch.trim() ? (
                 <button
@@ -1321,10 +1573,10 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
             {filteredEntries.map((entry) => (
               <div
                 key={entry.id}
-                className={`w-full rounded-lg border px-3 py-2 transition ${
+                className={`w-full rounded-2xl border px-3 py-3 transition ${
                   selectedId === entry.id
-                    ? 'border-[#D4AF37] bg-[#D4AF37]/10'
-                    : 'border-white/15 bg-black/25 hover:border-white/30'
+                    ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-[0_12px_32px_rgba(212,175,55,0.12)]'
+                    : 'border-white/12 bg-black/20 hover:border-white/24 hover:bg-black/24'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -1394,7 +1646,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
         </div>
 
         {!mineOnly ? (
-          <form onSubmit={onSubmit} className="rounded-2xl border border-white/15 bg-white/[0.03] p-4 max-h-[72vh] flex flex-col">
+          <form onSubmit={onSubmit} className={`${workspaceCardClass} max-h-[72vh] flex flex-col`}>
           <h2 className="mb-3 text-lg font-semibold">{selectedId ? 'Edit Entry' : 'Add Entry'}</h2>
           <div className="space-y-3 overflow-y-auto pr-1">
             <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_core')}`}>
@@ -1408,12 +1660,14 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
               </button>
               {sectionOpen.required ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
-                  <input
-                    value={form.submissionDisplayName}
-                    onChange={(e) => setForm((p) => ({ ...p, submissionDisplayName: e.target.value }))}
-                    placeholder="your name (used before account creation)"
-                    className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
-                  />
+                  {!canManageAll ? (
+                    <input
+                      value={form.submissionDisplayName}
+                      onChange={(e) => setForm((p) => ({ ...p, submissionDisplayName: e.target.value }))}
+                      placeholder="your name (used before account creation)"
+                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
+                    />
+                  ) : null}
                   <select
                     value={form.areaId}
                     onChange={(e) => setForm((p) => ({ ...p, areaId: e.target.value }))}
@@ -1446,6 +1700,85 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
                           Presentation-layer metadata for composer → work → version aggregation on the public viewer. Composer cards read from composer metadata, not work titles.
                         </p>
                       </div>
+                      {detectedWorkContext ? (
+                        <div className="mb-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F5D37A]">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Detected Work Context
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-white">
+                                {detectedWorkContext.composerLabel} / {detectedWorkContext.workLabel}
+                              </p>
+                              <p className="mt-1 text-xs text-white/65">
+                                {detectedWorkContext.relatedEntries.length} related {detectedWorkContext.relatedEntries.length === 1 ? 'entry' : 'entries'} already exist for this work.
+                              </p>
+                              {detectedWorkContext.placementSource ? (
+                                <p className="mt-1 text-xs text-white/55">
+                                  Suggested placement: {detectedWorkContext.placementSource.sectionId}
+                                  {detectedWorkContext.placementSource.title ? ` from ${detectedWorkContext.placementSource.title}` : ''}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {detectedWorkContext.placementSource ? (
+                                <button
+                                  type="button"
+                                  onClick={() => startVersionDraft(detectedWorkContext.placementSource as ViewerEntry)}
+                                  className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/35 hover:text-white"
+                                >
+                                  Start Version Draft
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => applyDetectedMetadata('all')}
+                                className="rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/12 px-3 py-1.5 text-xs font-semibold text-[#F5D37A] transition hover:bg-[#D4AF37]/18"
+                              >
+                                Use Work Metadata
+                              </button>
+                              {detectedWorkContext.mediaSource ? (
+                                <button
+                                  type="button"
+                                  onClick={applyDetectedMedia}
+                                  className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/35 hover:text-white"
+                                >
+                                  Use Latest Media URLs
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          {detectedWorkContext.duplicateEntry ? (
+                            <div className="mt-3 rounded-xl border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                              Potential duplicate title detected: <span className="font-semibold">{detectedWorkContext.duplicateEntry.title}</span>.
+                              <button
+                                type="button"
+                                onClick={() => selectEntry(detectedWorkContext.duplicateEntry as ViewerEntry)}
+                                className="ml-2 font-semibold text-[#F5D37A] hover:text-[#F8E2A2]"
+                              >
+                                Open existing
+                              </button>
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {detectedWorkContext.relatedEntries.slice(0, 4).map((entry) => (
+                              <button
+                                key={entry.id}
+                                type="button"
+                                onClick={() => selectEntry(entry)}
+                                className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/72 transition hover:border-white/20 hover:text-white"
+                              >
+                                {entry.versionLabel?.trim() || entry.title}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : form.composerName.trim() || form.workTitle.trim() ? (
+                        <div className="mb-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/65">
+                          No matching chamber work detected yet. Once composer and work metadata match an existing entry, this form can reuse the canonical fields for new versions.
+                        </div>
+                      ) : null}
                       <div className="grid gap-3 md:grid-cols-2">
                         <input
                           value={form.composerName}
@@ -1472,23 +1805,44 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
                           className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
                         />
                         <input
-                          value={form.composerSlug}
-                          onChange={(e) => setForm((p) => ({ ...p, composerSlug: e.target.value }))}
-                          placeholder="composerSlug (auto if blank)"
-                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
-                        />
-                        <input
-                          value={form.workSlug}
-                          onChange={(e) => setForm((p) => ({ ...p, workSlug: e.target.value }))}
-                          placeholder="workSlug (auto if blank)"
-                          className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
-                        />
-                        <input
                           value={form.composerImage}
                           onChange={(e) => setForm((p) => ({ ...p, composerImage: e.target.value }))}
                           placeholder="composerImage (portrait URL)"
                           className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2"
                         />
+                        <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/65 md:col-span-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-semibold uppercase tracking-[0.14em] text-white/55">Derived Slugs</p>
+                              <p className="mt-1">
+                                {derivedComposerSlug || 'composer-slug'} / {derivedWorkSlug || 'work-slug'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowSlugOverrides((current) => !current)}
+                              className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold text-white/75 transition hover:border-white/30 hover:text-white"
+                            >
+                              {showSlugOverrides ? 'Hide Overrides' : 'Edit Overrides'}
+                            </button>
+                          </div>
+                        </div>
+                        {showSlugOverrides ? (
+                          <>
+                            <input
+                              value={form.composerSlug}
+                              onChange={(e) => setForm((p) => ({ ...p, composerSlug: e.target.value }))}
+                              placeholder="composerSlug override"
+                              className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                            />
+                            <input
+                              value={form.workSlug}
+                              onChange={(e) => setForm((p) => ({ ...p, workSlug: e.target.value }))}
+                              placeholder="workSlug override"
+                              className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                            />
+                          </>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}
@@ -1511,7 +1865,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
                   <input value={form.hlsUrl} onChange={(e) => setForm((p) => ({ ...p, hlsUrl: e.target.value }))} placeholder="hlsUrl (optional .m3u8 for adaptive playback)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <input value={form.thumbnailUrl} onChange={(e) => setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))} placeholder="thumbnailUrl" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <input value={form.institutionName} onChange={(e) => setForm((p) => ({ ...p, institutionName: e.target.value }))} placeholder="institutionName" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
-                  <input value={form.recordedAt} onChange={(e) => setForm((p) => ({ ...p, recordedAt: e.target.value }))} placeholder="recordedAt (YYYY-MM-DD)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+                  <input type="date" value={form.recordedAt} onChange={(e) => setForm((p) => ({ ...p, recordedAt: e.target.value }))} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                 </div>
               ) : null}
             </div>
@@ -1741,7 +2095,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
           ) : null}
           </form>
         ) : (
-          <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+          <div className={workspaceCardClass}>
             <button
               type="button"
               onClick={() => router.push('/studio/viewer-submissions')}
@@ -1754,7 +2108,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       </div>
 
       {canManageAll ? (
-        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={workspaceCardClass}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Submission Area Options (viewerAreas)</h2>
             <button
@@ -1840,7 +2194,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       ) : null}
 
       {canManageAll ? (
-        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={workspaceCardClass}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Metadata Option Lists</h2>
             <p className="text-xs text-white/60">Used by participant metadata dropdowns</p>
@@ -1915,7 +2269,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       ) : null}
 
       {canManageAll ? (
-        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={workspaceCardClass}>
           <h2 className="mb-3 text-lg font-semibold">Bookings Related To Viewer Flow</h2>
           <div className="space-y-2">
             {bookings.map((booking) => (
@@ -1934,7 +2288,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       ) : null}
 
       {canManageAll ? (
-        <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-4">
+        <div className={workspaceCardClass}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Narrative Arcs (viewerSections)</h2>
             <button
@@ -2014,7 +2368,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-white/15 bg-white/[0.03] p-4 text-xs text-white/70">
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 text-xs text-white/70 shadow-[0_16px_48px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <p className="inline-flex items-center gap-2"><Video className="h-3.5 w-3.5" /> Changes write directly to Firestore documents used by viewer playback and overlay metadata.</p>
       </div>
 

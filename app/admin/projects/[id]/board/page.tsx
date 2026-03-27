@@ -155,7 +155,7 @@ export default function ProjectBoardPage() {
 
   if (loading || loadingStats) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[420px] items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orchestra-gold"></div>
       </div>
     )
@@ -166,18 +166,18 @@ export default function ProjectBoardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+    <div className="space-y-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <Link 
             href="/admin/board"
-            className="inline-flex items-center gap-2 text-gray-300 hover:text-white mb-4"
+            className="mb-4 inline-flex items-center gap-2 text-orchestra-cream/70 hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board Dashboard
           </Link>
           <h1 className="text-4xl font-bold text-white mb-2">Project Board View</h1>
-          <p className="text-gray-300">
+          <p className="text-orchestra-cream/70">
             {projectId === 'black-diaspora-symphony' ? 'Black Diaspora Symphony Orchestra' : projectId} - Read-Only Analytics
             {isReadOnly && (
               <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-sm">
@@ -297,4 +297,3 @@ export default function ProjectBoardPage() {
     </div>
   )
 }
-

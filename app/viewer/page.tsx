@@ -24,6 +24,7 @@ import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAre
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { buildChamberWorkId, buildChamberWorkResearchAdminHref, loadChamberWorksByIds } from '@/lib/chamberWorks'
 import type { ChamberWorkDocument } from '@/lib/types/chamber'
+import { formatViewerRecordedDate } from '@/lib/viewer/recordedDate'
 import ChamberSeriesBrowser from '@/app/viewer/_components/ChamberSeriesBrowser'
 import ChamberViewerPanels, { type ChamberViewerTab } from '@/components/viewer/ChamberViewerPanels'
 import ViewerStreamingCanvas from '@/components/viewer/ViewerStreamingCanvas'
@@ -776,6 +777,8 @@ function ViewerPageContent() {
       .sort((a, b) => b.watchedAt - a.watchedAt)
       .slice(0, 5)
   }, [watchedHistory])
+  const activeHeroTitle = activeStory?.title ?? activeVideo.title
+  const shouldShowNowPlayingLabel = Boolean(activeVideo.url) && !isVideoPaused
   const hasVisibleStories = selectedAreaStories.length > 0
   const shouldShowStoriesSection =
     storiesLoadState === 'loading' || Boolean(storiesError) || hasVisibleStories
@@ -786,14 +789,7 @@ function ViewerPageContent() {
   const canUploadDocuments = canViewDocuments
 
   const recordedLabel = useMemo(() => {
-    if (!activeStory?.recordedAt) return 'Date not provided'
-    const parsed = new Date(activeStory.recordedAt)
-    if (Number.isNaN(parsed.getTime())) return activeStory.recordedAt
-    return parsed.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
+    return formatViewerRecordedDate(activeStory?.recordedAt)
   }, [activeStory?.recordedAt])
 
   const filteredDocuments = useMemo(() => {
@@ -1732,11 +1728,13 @@ function ViewerPageContent() {
   }
 
   const handleVolumeChange = (nextVolume: number) => {
-    const element = videoRef.current
-    if (!element || !Number.isFinite(nextVolume)) return
+    if (!Number.isFinite(nextVolume)) return
     const clamped = Math.max(0, Math.min(1, nextVolume))
-    element.volume = clamped
-    element.muted = clamped === 0
+    const element = videoRef.current
+    if (element) {
+      element.volume = clamped
+      element.muted = clamped === 0
+    }
     setVolume(clamped)
     setIsMuted(clamped === 0)
     if (clamped > 0) {
@@ -1746,12 +1744,15 @@ function ViewerPageContent() {
 
   const toggleMute = () => {
     const element = videoRef.current
-    if (!element) return
-    const nextMuted = !element.muted
-    element.muted = nextMuted
+    const nextMuted = element ? !element.muted : !isMuted
+    if (element) {
+      element.muted = nextMuted
+    }
     setIsMuted(nextMuted)
-    if (!nextMuted && element.volume === 0) {
-      element.volume = 0.6
+    if (!nextMuted && (element?.volume ?? volume) === 0) {
+      if (element) {
+        element.volume = 0.6
+      }
       setVolume(0.6)
     }
     if (!nextMuted) {
@@ -1761,17 +1762,22 @@ function ViewerPageContent() {
 
   const handleEnableAudio = () => {
     const element = videoRef.current
-    if (!element) return
-    if (element.volume === 0) {
-      element.volume = 0.6
+    if ((element?.volume ?? volume) === 0) {
+      if (element) {
+        element.volume = 0.6
+      }
       setVolume(0.6)
     }
-    element.muted = false
+    if (element) {
+      element.muted = false
+    }
     setIsMuted(false)
     setHasUserEnabledAudio(true)
-    void element.play().catch((error) => {
-      console.error('Unable to continue playback with audio enabled:', error)
-    })
+    if (element) {
+      void element.play().catch((error) => {
+        console.error('Unable to continue playback with audio enabled:', error)
+      })
+    }
   }
 
   const captureCommentThumbnail = (): string | null => {
@@ -2227,6 +2233,7 @@ function ViewerPageContent() {
             fallbackSrc={activeVideo.fallbackUrl}
             loop={viewerIntent === 'select'}
             muted={isMuted}
+            volume={volume}
             isPreviewLoopFading={isPreviewLoopFading}
             videoRef={videoRef}
             onPlaybackNotice={setPlaybackNotice}
@@ -2303,7 +2310,7 @@ function ViewerPageContent() {
         />
 
         <div
-          className={`relative mx-auto flex h-full w-full max-w-7xl flex-col justify-end px-4 pb-6 pt-8 transition-opacity duration-500 sm:px-6 lg:px-8 md:justify-between md:py-8 ${
+          className={`relative mx-auto flex h-full w-full max-w-6xl flex-col justify-end px-4 pb-8 pt-12 transition-opacity duration-500 sm:px-6 lg:px-8 ${
             isPlayerOverlayVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
@@ -2331,7 +2338,7 @@ function ViewerPageContent() {
           ) : null}
 
           {!shouldShowChamberViewerPanels ? (
-            <div className="hidden md:flex md:justify-end">
+            <div className="absolute right-6 top-8 z-10 hidden md:block lg:right-8">
               <div className="w-[360px] rounded-2xl border border-white/20 bg-black/35 p-3 text-white">
                 <div className="flex items-center justify-between gap-3">
                   <Link
@@ -2424,105 +2431,139 @@ function ViewerPageContent() {
           ) : null}
 
           <div className="w-full pb-2 text-left md:pb-5">
-            <h1 className="max-w-3xl text-4xl font-bold leading-tight sm:text-5xl md:text-7xl">BEAM Viewer</h1>
-            <p className="mt-3 text-sm text-white/85 md:text-base">
-              Now Playing: {activeStory?.title ?? activeVideo.title}
-            </p>
-            {isUsingFallbackContent ? (
-              <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
-                Using fallback content after Firestore returned no playable items.
-              </p>
-            ) : null}
-            {playbackNotice ? (
-              <p className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs text-white/85">
-                {playbackNotice}
-              </p>
-            ) : null}
-            {hasNoDefaultAreaVideoConfigured && activeVideo.sourceType === 'area-default' ? (
-              <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
-                No default area video configured.
-              </p>
-            ) : null}
-            {isMuted && !hasUserEnabledAudio && !isRoleOverview ? (
-              <button
-                type="button"
-                onClick={handleEnableAudio}
-                className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-              >
-                Tap to enable audio
-              </button>
-            ) : null}
+            <div className="w-full max-w-3xl rounded-[34px] border border-white/10 bg-white/[0.03] p-1 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-sm">
+              <div className="rounded-[30px] border border-white/12 bg-black/28 p-6 backdrop-blur-xl sm:p-8">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">orchestra.BEAM</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/60">
+                  <Link
+                    href="/home"
+                    className="rounded-full border border-white/15 bg-white/[0.03] px-2.5 py-1 text-white/72 transition hover:border-white/30 hover:text-white"
+                  >
+                    Home
+                  </Link>
+                  <span className="text-white/28">/</span>
+                  <span className="rounded-full border border-white/15 bg-white/[0.03] px-2.5 py-1 text-white/72">
+                    Viewer
+                  </span>
+                  <span className="text-white/28">/</span>
+                  <span className="rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-2.5 py-1 text-[#F5D37A]">
+                    {selectedArea.title}
+                  </span>
+                  {activeVideo.sourceType === 'role-explainer' ? (
+                    <>
+                      <span className="text-white/28">/</span>
+                      <span className="rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-2.5 py-1 text-[#F5D37A]">
+                        Role Overview
+                      </span>
+                    </>
+                  ) : null}
+                </div>
 
-            <div className="mt-7 flex flex-wrap justify-start gap-3">
-              <button
-                type="button"
-                onClick={() => setIsLibraryOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
-              >
-                <PlayCircle className="h-4 w-4" />
-                {activeVideo.contentId ? 'Browse' : 'Start Watching'}
-              </button>
-              {shouldShowChamberViewerPanels ? (
-                <button
-                  type="button"
-                  onClick={() => setIsChamberViewerOpen((current) => !current)}
-                  className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
-                >
-                  <PlayCircle className="h-4 w-4" />
-                  {isChamberViewerOpen ? 'Close Chamber Viewer' : 'Open Chamber Viewer'}
-                </button>
-              ) : (buildRoleOverviewTargetId(activeStory, activeVideo.contentId) || canOpenAreaRolesPage) ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = buildRoleOverviewTargetId(activeStory, activeVideo.contentId) ?? selectedAreaId
-                    if (!target) return
-                    router.push(
-                      `/viewer/role-overview/${encodeURIComponent(target)}${
-                        activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''
-                      }`
-                    )
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
-                >
-                  <PlayCircle className="h-4 w-4" />
-                  Open {selectedArea.title} Roles Page
-                </button>
-              ) : null}
-              <Link
-                href="/home"
-                className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-black/25 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
-              >
-                Back to Home <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
-            {!shouldShowChamberViewerPanels && showMoreInfo && (activeVideo.contentId || activeVideo.sourceType === 'role-explainer') ? (
-              <div className="mt-3 max-h-[30vh] space-y-2 overflow-y-auto rounded-xl border border-white/20 bg-black/45 p-3 text-xs text-white/85 md:hidden">
-                {activeVideo.sourceType === 'role-explainer' ? (
-                  <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                    Role overview for {selectedArea.title}. Browse content to return to story playback.
+                <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] sm:text-5xl md:text-7xl">
+                  BEAM Viewer
+                </h1>
+                {activeHeroTitle ? (
+                  <p className="mt-4 max-w-2xl text-sm text-white/85 md:text-base">
+                    {shouldShowNowPlayingLabel ? `Now Playing: ${activeHeroTitle}` : activeHeroTitle}
                   </p>
-                ) : (
-                  <>
-                    {viewerIntent !== 'select' ? (
+                ) : null}
+                {isUsingFallbackContent ? (
+                  <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
+                    Using fallback content after Firestore returned no playable items.
+                  </p>
+                ) : null}
+                {playbackNotice ? (
+                  <p className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs text-white/85">
+                    {playbackNotice}
+                  </p>
+                ) : null}
+                {hasNoDefaultAreaVideoConfigured && activeVideo.sourceType === 'area-default' ? (
+                  <p className="mt-2 inline-flex rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3 py-1 text-xs text-[#F5D37A]">
+                    No default area video configured.
+                  </p>
+                ) : null}
+                {isMuted && !hasUserEnabledAudio && !isRoleOverview ? (
+                  <button
+                    type="button"
+                    onClick={handleEnableAudio}
+                    className="mt-2 inline-flex rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  >
+                    Tap to enable audio
+                  </button>
+                ) : null}
+
+                <div className="mt-7 flex flex-wrap justify-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#D4AF37] px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E6C86A]"
+                  >
+                    <PlayCircle className="h-4 w-4" />
+                    {activeVideo.contentId ? 'Browse' : 'Start Watching'}
+                  </button>
+                  {shouldShowChamberViewerPanels ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsChamberViewerOpen((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {isChamberViewerOpen ? 'Close Chamber Viewer' : 'Open Chamber Viewer'}
+                    </button>
+                  ) : selectedAreaId !== 'chamber' && (buildRoleOverviewTargetId(activeStory, activeVideo.contentId) || canOpenAreaRolesPage) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = buildRoleOverviewTargetId(activeStory, activeVideo.contentId) ?? selectedAreaId
+                        if (!target) return
+                        router.push(
+                          `/viewer/role-overview/${encodeURIComponent(target)}${
+                            activeVideo.contentId ? `?contentId=${encodeURIComponent(activeVideo.contentId)}` : ''
+                          }`
+                        )
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 px-5 py-2.5 text-sm font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/22"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      Open {selectedArea.title} Roles Page
+                    </button>
+                  ) : null}
+                  <Link
+                    href="/home"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-black/25 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#F5D37A]"
+                  >
+                    Back to Home <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                {!shouldShowChamberViewerPanels && showMoreInfo && (activeVideo.contentId || activeVideo.sourceType === 'role-explainer') ? (
+                  <div className="mt-3 max-h-[30vh] space-y-2 overflow-y-auto rounded-xl border border-white/20 bg-black/45 p-3 text-xs text-white/85 md:hidden">
+                    {activeVideo.sourceType === 'role-explainer' ? (
+                      <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                        Role overview for {selectedArea.title}. Browse content to return to story playback.
+                      </p>
+                    ) : (
                       <>
-                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                          Institution: {activeStory?.institutionName ?? 'Not listed'}
-                        </p>
-                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                          Recorded: {recordedLabel}
-                        </p>
-                        <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
-                          Research Status: {activeStory?.researchStatus ?? 'General release'}
-                        </p>
+                        {viewerIntent !== 'select' ? (
+                          <>
+                            <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                              Institution: {activeStory?.institutionName ?? 'Not listed'}
+                            </p>
+                            <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                              Recorded: {recordedLabel}
+                            </p>
+                            <p className="rounded-lg border border-white/15 bg-black/30 px-3 py-2">
+                              Research Status: {activeStory?.researchStatus ?? 'General release'}
+                            </p>
+                          </>
+                        ) : null}
+                        <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
                       </>
-                    ) : null}
-                    <p>Participants: {activeStory?.participantNames?.join(', ') || 'Not listed yet.'}</p>
-                  </>
-                )}
+                    )}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
 
             {!isRoleOverview && activeVideo.url ? (
               <div className="mt-5 w-full max-w-3xl rounded-2xl border border-white/20 bg-black/35 p-3">
@@ -3105,19 +3146,15 @@ function ViewerPageContent() {
 
             {shouldShowStoriesSection ? (
               <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h3 className="text-xl font-semibold">
-                    {isChamberArea ? `${selectedArea.title} Composers` : `${selectedArea.title} Stories`}
-                  </h3>
-                  <p className="text-xs text-white/65">
-                    {isChamberArea
-                      ? 'Composer → Work → Version'
-                      : selectedAreaId === 'community'
-                        ? `City Filter: ${selectedCity || 'All'}`
-                        : 'All Markets'}
-                  </p>
-                </div>
-                {isDevelopment ? (
+                {!isChamberArea ? (
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-xl font-semibold">{`${selectedArea.title} Stories`}</h3>
+                    <p className="text-xs text-white/65">
+                      {selectedAreaId === 'community' ? `City Filter: ${selectedCity || 'All'}` : 'All Markets'}
+                    </p>
+                  </div>
+                ) : null}
+                {isDevelopment && !isChamberArea ? (
                   <div className="mb-4 rounded-xl border border-white/20 bg-black/35 p-3 text-xs text-white/80">
                     <p>Firebase projectId: {devProjectId}</p>
                     <p>

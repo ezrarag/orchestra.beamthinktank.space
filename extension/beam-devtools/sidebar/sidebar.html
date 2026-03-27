@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BEAM DevTools</title>
+    <link rel="stylesheet" href="sidebar.css" />
+    <script src="firebase-app-compat.js"></script>
+    <script src="firebase-firestore-compat.js"></script>
+    <script src="sidebar.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">BEAM Orchestra</p>
+          <h1>BEAM DevTools</h1>
+        </div>
+        <div id="syncStatus" class="status-pill">Booting</div>
+      </header>
+
+      <nav class="tabbar" aria-label="BEAM DevTools tabs">
+        <button class="tab-button is-active" data-tab="checklist" type="button">Checklist</button>
+        <button class="tab-button" data-tab="context" type="button">Context</button>
+        <button class="tab-button" data-tab="console" type="button">Console</button>
+      </nav>
+
+      <main class="panels">
+        <section class="panel is-active" data-panel="checklist">
+          <div id="setupCard" class="setup-card hidden">
+            <div class="setup-copy">
+              <span class="section-label">First-run setup</span>
+              <h2>Connect Firestore</h2>
+              <p>Enter the public BEAM Firebase client keys from `.env.local`.</p>
+            </div>
+
+            <form id="setupForm" class="setup-form">
+              <label>
+                <span>NEXT_PUBLIC_FIREBASE_API_KEY</span>
+                <input name="NEXT_PUBLIC_FIREBASE_API_KEY" type="text" required />
+              </label>
+
+              <label>
+                <span>NEXT_PUBLIC_FIREBASE_PROJECT_ID</span>
+                <input name="NEXT_PUBLIC_FIREBASE_PROJECT_ID" type="text" required />
+              </label>
+
+              <label>
+                <span>NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</span>
+                <input name="NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" type="text" required />
+              </label>
+
+              <label>
+                <span>NEXT_PUBLIC_FIREBASE_APP_ID</span>
+                <input name="NEXT_PUBLIC_FIREBASE_APP_ID" type="text" required />
+              </label>
+
+              <details class="setup-advanced">
+                <summary>Optional BEAM env keys</summary>
+
+                <label>
+                  <span>NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET</span>
+                  <input name="NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" type="text" />
+                </label>
+
+                <label>
+                  <span>NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID</span>
+                  <input name="NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" type="text" />
+                </label>
+              </details>
+
+              <button id="setupSubmit" class="primary-button" type="submit">Save and connect</button>
+              <p id="setupMessage" class="helper-text"></p>
+            </form>
+          </div>
+
+          <div id="checklistContent" class="checklist-content hidden">
+            <div class="section-header">
+              <div>
+                <span class="section-label">Realtime sync</span>
+                <h2>Shared checklist</h2>
+              </div>
+              <div class="summary-chip">
+                <span id="pendingCount">0</span>
+                <span>pending</span>
+              </div>
+            </div>
+
+            <section class="composer-card">
+              <div class="composer-header">
+                <div>
+                  <span class="section-label">Current page</span>
+                  <h3 id="checklistRouteLabel">No BEAM page selected</h3>
+                </div>
+                <button id="refreshChecklistContextButton" class="secondary-button" type="button">
+                  Refresh route
+                </button>
+              </div>
+              <p id="checklistContextStatus" class="helper-text">
+                New checklist items will use the active BEAM route as their group.
+              </p>
+            </section>
+
+            <div id="checklistGroups" class="checklist-groups"></div>
+
+            <form id="addItemForm" class="add-item-form">
+              <label class="input-shell">
+                <span class="sr-only">Add checklist item</span>
+                <input
+                  id="newItemInput"
+                  type="text"
+                  maxlength="200"
+                  placeholder="Add checklist item"
+                  autocomplete="off"
+                />
+              </label>
+              <button class="primary-button" type="submit">Add item</button>
+            </form>
+
+            <section class="import-card">
+              <div class="composer-header">
+                <div>
+                  <span class="section-label">Claude import</span>
+                  <h3>Paste checklist items</h3>
+                </div>
+              </div>
+
+              <form id="claudeImportForm" class="import-form">
+                <label class="input-shell">
+                  <span class="sr-only">Paste checklist items from Claude</span>
+                  <textarea
+                    id="claudeImportInput"
+                    rows="6"
+                    placeholder="- Fix spacing on this page&#10;- Verify auth state messaging&#10;- Add console guardrails"
+                  ></textarea>
+                </label>
+                <button class="primary-button" type="submit">Import from Claude</button>
+                <p id="claudeImportStatus" class="helper-text">
+                  Bullet lists and numbered lists are supported. Imported items use the current page route unless the pasted text includes section headers.
+                </p>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="context">
+          <div class="section-header">
+            <div>
+              <span class="section-label">Current tab</span>
+              <h2>Page context</h2>
+            </div>
+            <button id="refreshContextButton" class="secondary-button" type="button">Refresh</button>
+          </div>
+
+          <div id="contextStatus" class="helper-text">Refresh to load the active BEAM tab.</div>
+
+          <div class="data-grid">
+            <label class="data-field">
+              <span>URL</span>
+              <input id="contextUrl" type="text" readonly value="-" />
+            </label>
+
+            <label class="data-field">
+              <span>Route</span>
+              <input id="contextRoute" type="text" readonly value="-" />
+            </label>
+
+            <label class="data-field">
+              <span>Auth user</span>
+              <input id="contextAuth" type="text" readonly value="not signed in" />
+            </label>
+
+            <label class="data-field">
+              <span>Timestamp</span>
+              <input id="contextTimestamp" type="text" readonly value="-" />
+            </label>
+          </div>
+
+          <button id="copyClaudeButton" class="primary-button full-width" type="button">
+            Copy for Claude
+          </button>
+        </section>
+
+        <section class="panel" data-panel="console">
+          <div class="section-header">
+            <div>
+              <span class="section-label">Captured logs</span>
+              <h2>Dev console</h2>
+            </div>
+            <div class="button-row">
+              <button id="refreshConsoleButton" class="secondary-button" type="button">Refresh</button>
+              <button id="clearConsoleButton" class="secondary-button" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div id="consoleStatus" class="helper-text">Open a BEAM tab, then refresh logs.</div>
+          <div id="consoleList" class="console-list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
