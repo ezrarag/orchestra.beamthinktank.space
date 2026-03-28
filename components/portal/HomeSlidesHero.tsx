@@ -25,10 +25,12 @@ function HeroMedia({
   heroSlide,
   backgroundVideoUrl,
   onTimeUpdate,
+  onVideoError,
 }: {
   heroSlide?: HeroSlide
   backgroundVideoUrl?: string | null
   onTimeUpdate: (event: SyntheticEvent<HTMLVideoElement>) => void
+  onVideoError: (url: string) => void
 }) {
   if (backgroundVideoUrl) {
     return (
@@ -40,6 +42,7 @@ function HeroMedia({
           playsInline
           loop
           onTimeUpdate={onTimeUpdate}
+          onError={() => onVideoError(backgroundVideoUrl)}
           className="home-loop-video-fade h-full w-full object-cover"
         />
       </div>
@@ -71,6 +74,7 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
   const [slides, setSlides] = useState<HeroSlide[]>(fallbackSlides)
   const [collageVideoUrls, setCollageVideoUrls] = useState<string[]>([])
   const [showParticipationPaths, setShowParticipationPaths] = useState(false)
+  const [failedVideoUrls, setFailedVideoUrls] = useState<string[]>([])
   const { role } = useUserRole()
 
   const isParticipantAdmin =
@@ -167,11 +171,19 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
   }, [fallbackSlides, isParticipantAdmin, slides])
 
   const heroSlide = activeSlides[0]
-  const backgroundVideoUrl = heroSlide?.videoUrl?.trim() || collageVideoUrls[0] || null
+  const heroVideoUrl = heroSlide?.videoUrl?.trim() || null
+  const backgroundVideoUrl =
+    [heroVideoUrl, ...collageVideoUrls]
+      .filter((url): url is string => Boolean(url))
+      .find((url) => !failedVideoUrls.includes(url)) ?? null
 
   useEffect(() => {
     setShowParticipationPaths(false)
   }, [heroSlide?.id])
+
+  useEffect(() => {
+    setFailedVideoUrls([])
+  }, [heroSlide?.id, collageVideoUrls])
 
   const handleCollageTimeUpdate = (event: SyntheticEvent<HTMLVideoElement>) => {
     const video = event.currentTarget
@@ -181,10 +193,22 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
     }
   }
 
+  const handleVideoError = (url: string) => {
+    setFailedVideoUrls((current) => {
+      if (current.includes(url)) return current
+      return [...current, url]
+    })
+  }
+
   return (
     <main className="min-h-screen bg-[#0b0d10] text-white">
       <section className="relative isolate min-h-[78vh] overflow-hidden">
-        <HeroMedia heroSlide={heroSlide} backgroundVideoUrl={backgroundVideoUrl} onTimeUpdate={handleCollageTimeUpdate} />
+        <HeroMedia
+          heroSlide={heroSlide}
+          backgroundVideoUrl={backgroundVideoUrl}
+          onTimeUpdate={handleCollageTimeUpdate}
+          onVideoError={handleVideoError}
+        />
         <div className="home-eye-vignette absolute inset-0" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/78 via-black/56 to-black/28" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d10] via-black/18 to-transparent" />
