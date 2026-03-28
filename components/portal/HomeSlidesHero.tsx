@@ -17,6 +17,20 @@ type Props = {
 
 const HOME_LOOP_SECONDS = 5
 
+type HomeSlidesDebug = {
+  ngo?: string
+  reason?: string
+  collection?: string
+  docPath?: string
+  adminSdkAvailable?: boolean
+  adminDbReady?: boolean
+  adminProjectId?: string
+  vercelEnv?: string | null
+  missingAdminEnvVars?: string[]
+  slideCount?: number
+  error?: string
+}
+
 function isDuplicateJoinRoute(slide: HeroSlide) {
   return slide.id === 'participant-pathway' || slide.ctaPath === '/join' || slide.ctaPath === '/join/participant'
 }
@@ -75,6 +89,8 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
   const [collageVideoUrls, setCollageVideoUrls] = useState<string[]>([])
   const [showParticipationPaths, setShowParticipationPaths] = useState(false)
   const [failedVideoUrls, setFailedVideoUrls] = useState<string[]>([])
+  const [homeDebugEnabled, setHomeDebugEnabled] = useState(false)
+  const [homeSlidesDebug, setHomeSlidesDebug] = useState<HomeSlidesDebug | null>(null)
   const { role } = useUserRole()
 
   const isParticipantAdmin =
@@ -88,9 +104,22 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
 
     const loadSlides = async () => {
       try {
-        const response = await fetch(`/api/home-slides?ngo=${encodeURIComponent(ngo)}`, { cache: 'no-store' })
+        const debugEnabled =
+          typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('homeDebug') === '1'
+
+        if (mounted) {
+          setHomeDebugEnabled(debugEnabled)
+        }
+
+        const endpoint = `/api/home-slides?ngo=${encodeURIComponent(ngo)}${debugEnabled ? '&debug=1' : ''}`
+        const response = await fetch(endpoint, { cache: 'no-store' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) return
+
+        if (mounted && data?.debug) {
+          setHomeSlidesDebug(data.debug as HomeSlidesDebug)
+          console.warn('Home slides debug:', data.debug)
+        }
 
         const loaded = Array.isArray(data?.slides) ? (data.slides as HeroSlide[]) : []
         if (mounted && loaded.length > 0) {
@@ -289,6 +318,26 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
             )}
           </AnimatePresence>
         </div>
+
+        {homeDebugEnabled ? (
+          <div className="pointer-events-none absolute bottom-3 right-3 z-30 max-w-sm rounded-2xl border border-amber-300/30 bg-black/70 p-3 text-[11px] text-amber-50 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <p className="font-semibold uppercase tracking-[0.16em] text-amber-200/90">Home Debug</p>
+            <div className="mt-2 space-y-1 text-white/80">
+              <p><span className="text-white">Reason:</span> {homeSlidesDebug?.reason ?? 'not returned'}</p>
+              <p><span className="text-white">Doc:</span> {homeSlidesDebug?.docPath ?? 'n/a'}</p>
+              <p><span className="text-white">Admin DB:</span> {homeSlidesDebug?.adminDbReady ? 'ready' : 'missing'}</p>
+              <p><span className="text-white">Project:</span> {homeSlidesDebug?.adminProjectId ?? 'n/a'}</p>
+              <p><span className="text-white">Hero URL:</span> {heroVideoUrl ? 'set' : 'empty'}</p>
+              <p><span className="text-white">Using URL:</span> {backgroundVideoUrl ? 'video' : 'image/fallback'}</p>
+              {homeSlidesDebug?.missingAdminEnvVars && homeSlidesDebug.missingAdminEnvVars.length > 0 ? (
+                <p><span className="text-white">Missing env:</span> {homeSlidesDebug.missingAdminEnvVars.join(', ')}</p>
+              ) : null}
+              {homeSlidesDebug?.error ? (
+                <p><span className="text-white">Error:</span> {homeSlidesDebug.error}</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
     </main>
   )
