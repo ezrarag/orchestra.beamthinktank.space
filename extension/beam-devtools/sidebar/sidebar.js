@@ -41,6 +41,7 @@ const elements = {
   contextRoute: document.getElementById('contextRoute'),
   contextAuth: document.getElementById('contextAuth'),
   contextTimestamp: document.getElementById('contextTimestamp'),
+  contextDebug: document.getElementById('contextDebug'),
   refreshConsoleButton: document.getElementById('refreshConsoleButton'),
   clearConsoleButton: document.getElementById('clearConsoleButton'),
   consoleStatus: document.getElementById('consoleStatus'),
@@ -536,6 +537,9 @@ function renderContext() {
   elements.contextRoute.value = currentContext?.pathname || '-'
   elements.contextAuth.value = currentContext?.firebaseUser?.email || 'not signed in'
   elements.contextTimestamp.value = currentContext?.timestamp || '-'
+  elements.contextDebug.value = currentContext?.pageDebug
+    ? JSON.stringify(currentContext.pageDebug, null, 2)
+    : '-'
 }
 
 function renderChecklistComposerContext() {
@@ -565,6 +569,7 @@ async function copyContextForClaude() {
     `URL: ${currentContext.url}`,
     `Route: ${currentContext.pathname}`,
     `Auth: ${currentContext.firebaseUser?.email || 'not signed in'}`,
+    `Page debug: ${currentContext.pageDebug ? JSON.stringify(currentContext.pageDebug) : 'none'}`,
     `Open checklist items: ${getPendingItemCount()} items pending`,
     `Recent errors: ${consoleEntries.filter((entry) => entry.level === 'error').length}`,
     '---',

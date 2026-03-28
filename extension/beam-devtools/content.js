@@ -4,6 +4,7 @@ const EXTENSION_SOURCE = 'beam-devtools-extension'
 
 const consoleLogs = []
 let latestFirebaseUser = null
+let latestPageDebug = null
 let pendingContextResolver = null
 
 installPageBridge()
@@ -15,9 +16,13 @@ window.addEventListener('message', (event) => {
 
   if (event.data.type === 'PAGE_CONTEXT_BRIDGE') {
     latestFirebaseUser = event.data.firebaseUser ?? null
+    latestPageDebug = event.data.pageDebug ?? null
 
     if (pendingContextResolver) {
-      pendingContextResolver(latestFirebaseUser)
+      pendingContextResolver({
+        firebaseUser: latestFirebaseUser,
+        pageDebug: latestPageDebug,
+      })
       pendingContextResolver = null
     }
 
@@ -36,14 +41,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'GET_CONTEXT') {
     getPageContext()
-      .then((firebaseUser) => {
+      .then((context) => {
         sendResponse({
           type: 'PAGE_CONTEXT',
           url: window.location.href,
           pathname: window.location.pathname,
           search: window.location.search,
           title: document.title,
-          firebaseUser: firebaseUser ?? null,
+          firebaseUser: context?.firebaseUser ?? latestFirebaseUser,
+          pageDebug: context?.pageDebug ?? latestPageDebug,
           timestamp: new Date().toISOString(),
         })
       })
@@ -55,6 +61,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           search: window.location.search,
           title: document.title,
           firebaseUser: latestFirebaseUser,
+          pageDebug: latestPageDebug,
           timestamp: new Date().toISOString(),
         })
       })
@@ -95,12 +102,15 @@ function getPageContext() {
         pendingContextResolver = null
       }
 
-      resolve(latestFirebaseUser)
+      resolve({
+        firebaseUser: latestFirebaseUser,
+        pageDebug: latestPageDebug,
+      })
     }, 300)
 
-    pendingContextResolver = (firebaseUser) => {
+    pendingContextResolver = (context) => {
       window.clearTimeout(timeoutId)
-      resolve(firebaseUser)
+      resolve(context)
     }
 
     window.postMessage(

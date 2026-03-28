@@ -26,7 +26,11 @@ import { buildChamberWorkId, buildChamberWorkResearchAdminHref, loadChamberWorks
 import type { ChamberWorkDocument } from '@/lib/types/chamber'
 import { formatViewerRecordedDate } from '@/lib/viewer/recordedDate'
 import ChamberSeriesBrowser from '@/app/viewer/_components/ChamberSeriesBrowser'
-import ChamberViewerPanels, { type ChamberViewerTab } from '@/components/viewer/ChamberViewerPanels'
+import ChamberViewerPanels, {
+  type ChamberViewerMaterial,
+  type ChamberViewerMaterialId,
+  type ChamberViewerTab,
+} from '@/components/viewer/ChamberViewerPanels'
 import ViewerStreamingCanvas from '@/components/viewer/ViewerStreamingCanvas'
 
 type AreaSection = {
@@ -75,6 +79,9 @@ type ViewerContent = {
   institutionName?: string
   recordedAt?: string
   researchStatus?: string
+  scorePdfUrl?: string
+  violinPartPdfUrl?: string
+  pianoPartPdfUrl?: string
   participantNames?: string[]
   relatedVersionIds?: string[]
   infoUrl?: string
@@ -127,7 +134,6 @@ type ActiveVideo = {
 
 const placeholderVideoUrl = ''
 const OVERLAY_RESTORE_DELAY_MS = 1600
-const PREVIEW_FADE_DURATION_MS = 700
 const STUDENT_TELEMETRY_INTERVAL_MS = 5000
 const LOCAL_PROGRESS_STORAGE_KEY = 'viewer-content-progress'
 const LOCAL_WATCHED_HISTORY_STORAGE_KEY = 'viewer-watched-history'
@@ -274,6 +280,9 @@ function normalizeViewerContent(id: string, data: Partial<ViewerContent>): Viewe
     institutionName: data.institutionName,
     recordedAt: data.recordedAt,
     researchStatus: data.researchStatus,
+    scorePdfUrl: data.scorePdfUrl,
+    violinPartPdfUrl: data.violinPartPdfUrl,
+    pianoPartPdfUrl: data.pianoPartPdfUrl,
     participantNames: data.participantNames,
     relatedVersionIds: data.relatedVersionIds,
     infoUrl: data.infoUrl,
@@ -526,7 +535,6 @@ function ViewerPageContent() {
   })
   const [isPlayerOverlayVisible, setIsPlayerOverlayVisible] = useState(true)
   const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const previewLoopTransitioningRef = useRef(false)
   const [isLibraryOpen, setIsLibraryOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState('')
   const [availableCities, setAvailableCities] = useState<string[]>([])
@@ -557,8 +565,6 @@ function ViewerPageContent() {
   const [moduleBannerVisible, setModuleBannerVisible] = useState(false)
   const [allPublishedContent, setAllPublishedContent] = useState<ViewerContent[]>([])
   const [isUsingFallbackContent, setIsUsingFallbackContent] = useState(false)
-  const [previewWindow, setPreviewWindow] = useState<{ start: number; end: number } | null>(null)
-  const [isPreviewLoopFading, setIsPreviewLoopFading] = useState(false)
   const [hasAppliedQueryContentSelection, setHasAppliedQueryContentSelection] = useState(false)
   const [commentsLoadState, setCommentsLoadState] = useState<CommentLoadState>('idle')
   const [commentsError, setCommentsError] = useState<string | null>(null)
@@ -584,6 +590,7 @@ function ViewerPageContent() {
   const [documentUploadFile, setDocumentUploadFile] = useState<File | null>(null)
   const [isStudentPipCollapsed, setIsStudentPipCollapsed] = useState(false)
   const [chamberViewerTab, setChamberViewerTab] = useState<ChamberViewerTab>('performance')
+  const [activeChamberMaterialId, setActiveChamberMaterialId] = useState<ChamberViewerMaterialId | null>(null)
   const [isChamberViewerOpen, setIsChamberViewerOpen] = useState(false)
 
   const requestedAreaFilter = useMemo(() => {
@@ -825,6 +832,30 @@ function ViewerPageContent() {
     () => recentWatchedStories.map((item) => ({ contentId: item.contentId, title: item.title })),
     [recentWatchedStories],
   )
+  const chamberViewerMaterials = useMemo<ChamberViewerMaterial[]>(() => {
+    if (!activeStory) return []
+
+    return [
+      {
+        id: 'score',
+        label: 'Full Score',
+        url: activeStory.scorePdfUrl?.trim() ?? '',
+      },
+      {
+        id: 'violinPart',
+        label: 'Violin Part',
+        url: activeStory.violinPartPdfUrl?.trim() ?? '',
+      },
+      {
+        id: 'pianoPart',
+        label: 'Piano Part',
+        url: activeStory.pianoPartPdfUrl?.trim() ?? '',
+      },
+    ].filter((item): item is ChamberViewerMaterial => Boolean(item.url))
+  }, [activeStory])
+  const activeChamberMaterial = useMemo(() => {
+    return chamberViewerMaterials.find((item) => item.id === activeChamberMaterialId) ?? chamberViewerMaterials[0] ?? null
+  }, [activeChamberMaterialId, chamberViewerMaterials])
 
   const getStoryProgressPercent = (contentId: string): number => {
     const progress = contentProgress[contentId]
@@ -862,6 +893,16 @@ function ViewerPageContent() {
     if (shouldShowChamberViewerPanels) return
     setIsChamberViewerOpen(false)
   }, [shouldShowChamberViewerPanels])
+
+  useEffect(() => {
+    if (chamberViewerMaterials.length === 0) {
+      setActiveChamberMaterialId(null)
+      return
+    }
+    if (!activeChamberMaterial) {
+      setActiveChamberMaterialId(chamberViewerMaterials[0].id)
+    }
+  }, [activeChamberMaterial, chamberViewerMaterials])
 
   useEffect(() => {
     if (!isChamberViewerOpen) return
@@ -1153,7 +1194,7 @@ function ViewerPageContent() {
         if (direct.exists()) {
           const normalized = normalizeViewerContent(direct.id, direct.data() as Partial<ViewerContent>)
           const areaId = (normalized.areaId || selectedAreaId) as ViewerArea['id']
-          await handleOpenContent(normalized, areaId)
+          await handleOpenContent(normalized, areaId, { startMuted: false })
           setHasAppliedQueryContentSelection(true)
           return
         }
@@ -1308,8 +1349,8 @@ function ViewerPageContent() {
     if (typeof document === 'undefined') return
     const playbackTargets = selectedAreaStories
       .slice(0, 2)
-      .map((item) => item.hlsUrl || item.videoUrl)
-      .filter(Boolean)
+      .map((item) => item.videoUrl || item.hlsUrl)
+      .filter((url): url is string => Boolean(url))
     const origins = Array.from(
       new Set(
         playbackTargets
@@ -1340,43 +1381,9 @@ function ViewerPageContent() {
   }, [selectedAreaStories])
 
   useEffect(() => {
-    if (typeof document === 'undefined') return
-
-    const streamingCandidates = [
-      activeVideo.url,
-      activeVideo.fallbackUrl,
-      ...selectedAreaStories.map((item) => item.hlsUrl || item.videoUrl),
-    ].filter((url): url is string => Boolean(url))
-
-    if (streamingCandidates.length === 0) return
-
-    const links: HTMLLinkElement[] = []
-    const cdnOrigin = 'https://vjs.zencdn.net'
-    const preconnectLink = document.createElement('link')
-    preconnectLink.rel = 'preconnect'
-    preconnectLink.href = cdnOrigin
-    preconnectLink.crossOrigin = 'anonymous'
-    document.head.appendChild(preconnectLink)
-    links.push(preconnectLink)
-
-    const dnsLink = document.createElement('link')
-    dnsLink.rel = 'dns-prefetch'
-    dnsLink.href = cdnOrigin
-    document.head.appendChild(dnsLink)
-    links.push(dnsLink)
-
-    return () => {
-      links.forEach((link) => link.remove())
-    }
-  }, [activeVideo.fallbackUrl, activeVideo.url, selectedAreaStories])
-
-  useEffect(() => {
     const element = videoRef.current
     if (!element) return
     if (viewerIntent === 'select') return
-    setPreviewWindow(null)
-    setIsPreviewLoopFading(false)
-    previewLoopTransitioningRef.current = false
     if (viewerIntent === 'subscriber' && activeVideo.sourceType === 'content') {
       element.currentTime = 0
       setCurrentPlaybackTime(0)
@@ -1589,14 +1596,14 @@ function ViewerPageContent() {
     }
     const preferredFromArea = pickLatestOrTopSeeded(selectedAreaCatalog)
     if (preferredFromArea) {
-      void handleOpenContent(preferredFromArea, preferredFromArea.areaId as ViewerArea['id'])
+      void handleOpenContent(preferredFromArea, preferredFromArea.areaId as ViewerArea['id'], { startMuted: true })
       setHasAutoSelectedInitialContent(true)
       return
     }
 
     const preferredGlobal = pickLatestOrTopSeeded(allPublishedContent)
     if (preferredGlobal) {
-      void handleOpenContent(preferredGlobal, preferredGlobal.areaId as ViewerArea['id'])
+      void handleOpenContent(preferredGlobal, preferredGlobal.areaId as ViewerArea['id'], { startMuted: true })
       setHasAutoSelectedInitialContent(true)
     }
   }, [
@@ -2036,14 +2043,25 @@ function ViewerPageContent() {
     studentCameraPreviewRef.current.srcObject = studentCameraStreamRef.current
   }, [isStudentCameraEnabled, isStudentPipCollapsed])
 
-  async function handleOpenContent(content: ViewerContent, areaId: ViewerArea['id']) {
+  async function handleOpenContent(
+    content: ViewerContent,
+    areaId: ViewerArea['id'],
+    options?: { startMuted?: boolean }
+  ) {
     const area = viewerAreas.find((item) => item.id === areaId)
     const fallbackOverlay = area?.visual ?? viewerAreas[0].visual
+    const directPlaybackUrl = content.videoUrl?.trim() || ''
+    const adaptivePlaybackUrl = content.hlsUrl?.trim() || ''
+    const playbackUrl = directPlaybackUrl || adaptivePlaybackUrl
+    const startMuted = options?.startMuted ?? false
 
     lastPlaybackUiUpdateRef.current = 0
     setActiveVideo({
-      url: (content.hlsUrl && content.hlsUrl.trim()) || content.videoUrl,
-      fallbackUrl: content.hlsUrl ? content.videoUrl : undefined,
+      url: playbackUrl,
+      fallbackUrl:
+        directPlaybackUrl && adaptivePlaybackUrl && adaptivePlaybackUrl !== directPlaybackUrl
+          ? adaptivePlaybackUrl
+          : undefined,
       title: content.title,
       areaId,
       overlayClass: contentOverlayClass(content, fallbackOverlay),
@@ -2056,11 +2074,10 @@ function ViewerPageContent() {
     setIsPlayerOverlayVisible(false)
     setShowMoreInfo(false)
     setIsUsingFallbackContent(false)
-    setPreviewWindow(null)
-    setIsMuted(true)
-    setHasUserEnabledAudio(false)
+    setIsMuted(startMuted)
+    setHasUserEnabledAudio(!startMuted)
     setVolume((current) => (current > 0 ? current : 0.85))
-    void requestMobileLandscapePlayback(false, (content.hlsUrl && content.hlsUrl.trim()) || content.videoUrl)
+    void requestMobileLandscapePlayback(false, playbackUrl)
 
     setWatchedHistory((current) => {
       const deduped = current.filter((item) => item.contentId !== content.id)
@@ -2102,14 +2119,14 @@ function ViewerPageContent() {
 
     const currentMatch = selectedAreaCatalog.find((story) => story.id === contentId)
     if (currentMatch) {
-      await handleOpenContent(currentMatch, watchedItem.areaId)
+      await handleOpenContent(currentMatch, watchedItem.areaId, { startMuted: false })
       return
     }
 
     const watchedDoc = await getDoc(doc(db, 'viewerContent', contentId))
     if (!watchedDoc.exists()) return
     const watchedData = watchedDoc.data() as Omit<ViewerContent, 'id'>
-    await handleOpenContent({ id: watchedDoc.id, ...watchedData }, watchedItem.areaId)
+    await handleOpenContent({ id: watchedDoc.id, ...watchedData }, watchedItem.areaId, { startMuted: false })
   }
 
   const handlePlayerInteraction = () => {
@@ -2150,9 +2167,8 @@ function ViewerPageContent() {
     setIsLibraryOpen(false)
     setIsPlayerOverlayVisible(false)
     setIsUsingFallbackContent(false)
-    setPreviewWindow(null)
-    setIsMuted(true)
-    setHasUserEnabledAudio(false)
+    setIsMuted(false)
+    setHasUserEnabledAudio(true)
     setVolume((current) => (current > 0 ? current : 0.85))
     void requestMobileLandscapePlayback(false, explainerUrl)
   }
@@ -2185,24 +2201,6 @@ function ViewerPageContent() {
     }
   }
 
-  const runPreviewLoopTransition = (element: HTMLVideoElement, startSeconds: number) => {
-    if (previewLoopTransitioningRef.current) return
-    previewLoopTransitioningRef.current = true
-    setIsPreviewLoopFading(true)
-
-    window.setTimeout(() => {
-      element.currentTime = startSeconds
-      void element.play().catch((error) => {
-        console.error('Unable to continue preview loop playback:', error)
-      })
-      lastPlaybackUiUpdateRef.current = startSeconds
-      setCurrentPlaybackTime(startSeconds)
-      setIsVideoPaused(false)
-      setIsPreviewLoopFading(false)
-      previewLoopTransitioningRef.current = false
-    }, PREVIEW_FADE_DURATION_MS)
-  }
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07080B] text-white">
       <section
@@ -2231,32 +2229,15 @@ function ViewerPageContent() {
           <ViewerStreamingCanvas
             src={activeVideo.url}
             fallbackSrc={activeVideo.fallbackUrl}
-            loop={viewerIntent === 'select'}
+            loop={activeVideo.sourceType === 'area-default'}
             muted={isMuted}
             volume={volume}
-            isPreviewLoopFading={isPreviewLoopFading}
             videoRef={videoRef}
             onPlaybackNotice={setPlaybackNotice}
             onLoadedMetadata={(event) => {
               const element = event.currentTarget
               setVideoDuration(Number.isFinite(element.duration) ? element.duration : 0)
-              if (
-                viewerIntent === 'select' &&
-                activeVideo.sourceType === 'content' &&
-                Number.isFinite(element.duration) &&
-                element.duration > 0
-              ) {
-                const midpoint = Math.max(0, element.duration / 2)
-                const end = Math.min(element.duration, midpoint + 15)
-                element.currentTime = midpoint
-                setPreviewWindow({ start: midpoint, end })
-                setCurrentPlaybackTime(midpoint)
-                setIsPreviewLoopFading(true)
-                window.setTimeout(() => setIsPreviewLoopFading(false), PREVIEW_FADE_DURATION_MS)
-              } else {
-                setPreviewWindow(null)
-                setCurrentPlaybackTime(element.currentTime || 0)
-              }
+              setCurrentPlaybackTime(element.currentTime || 0)
               lastPlaybackUiUpdateRef.current = element.currentTime || 0
               setIsVideoPaused(element.paused)
               setVolume(element.volume)
@@ -2267,10 +2248,6 @@ function ViewerPageContent() {
             }}
             onTimeUpdate={(event) => {
               const current = event.currentTarget.currentTime || 0
-              if (viewerIntent === 'select' && previewWindow && current >= previewWindow.end) {
-                runPreviewLoopTransition(event.currentTarget, previewWindow.start)
-                return
-              }
               if (Math.abs(current - lastPlaybackUiUpdateRef.current) >= PLAYBACK_UI_UPDATE_STEP_SECONDS) {
                 lastPlaybackUiUpdateRef.current = current
                 setCurrentPlaybackTime(current)
@@ -2900,6 +2877,9 @@ function ViewerPageContent() {
                   }}
                   referenceHref={activeStory?.infoUrl || null}
                   bookHref="/viewer/book"
+                  materials={chamberViewerMaterials}
+                  activeMaterialId={activeChamberMaterial?.id ?? null}
+                  onMaterialSelect={setActiveChamberMaterialId}
                 />
               </div>
             </div>
@@ -3182,7 +3162,7 @@ function ViewerPageContent() {
                       items={selectedAreaStories}
                       getProgressPercent={getStoryProgressPercent}
                       onOpenVersion={(content) => {
-                        void handleOpenContent(content as ViewerContent, 'chamber')
+                        void handleOpenContent(content as ViewerContent, 'chamber', { startMuted: false })
                       }}
                     />
                   ) : (
@@ -3194,7 +3174,7 @@ function ViewerPageContent() {
                           <button
                             key={content.id}
                             type="button"
-                            onClick={() => handleOpenContent(content, selectedAreaId)}
+                            onClick={() => handleOpenContent(content, selectedAreaId, { startMuted: false })}
                             className="w-full cursor-pointer rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-left transition hover:border-[#D4AF37]/60"
                           >
                             <p className="mb-2 text-xs uppercase tracking-[0.14em] text-[#F5D37A]">
@@ -3210,7 +3190,7 @@ function ViewerPageContent() {
                                 type="button"
                                 onClick={(event) => {
                                   event.stopPropagation()
-                                  handleOpenContent(content, selectedAreaId)
+                                  handleOpenContent(content, selectedAreaId, { startMuted: false })
                                 }}
                                 aria-label={`Play ${content.title}`}
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#D4AF37]/55 bg-[#D4AF37]/12 text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/20"

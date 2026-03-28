@@ -20,6 +20,7 @@ import { BookOpenText, CheckCircle2, ChevronDown, ChevronUp, Copy, Plus, Refresh
 import { auth, db } from '@/lib/firebase'
 import { buildChamberWorkResearchAdminHref } from '@/lib/chamberWorks'
 import { DEFAULT_VIEWER_AREA_ROLE_TEMPLATES } from '@/lib/config/viewerRoleTemplates'
+import { getViewerMediaValidationError, getViewerPdfValidationError } from '@/lib/viewer/media'
 
 type AccessLevel = 'open' | 'subscriber' | 'regional' | 'institution'
 
@@ -54,6 +55,9 @@ type ViewerEntry = {
   institutionName?: string
   recordedAt?: string
   researchStatus?: string
+  scorePdfUrl?: string
+  violinPartPdfUrl?: string
+  pianoPartPdfUrl?: string
   participantNames?: string[]
   relatedVersionIds?: string[]
   infoUrl?: string
@@ -169,6 +173,9 @@ type FormState = {
   institutionName: string
   recordedAt: string
   researchStatus: string
+  scorePdfUrl: string
+  violinPartPdfUrl: string
+  pianoPartPdfUrl: string
   participantNames: string
   relatedVersionIds: string
   infoUrl: string
@@ -211,6 +218,9 @@ const DEFAULT_FORM: FormState = {
   institutionName: '',
   recordedAt: '',
   researchStatus: '',
+  scorePdfUrl: '',
+  violinPartPdfUrl: '',
+  pianoPartPdfUrl: '',
   participantNames: '',
   relatedVersionIds: '',
   infoUrl: '',
@@ -233,7 +243,7 @@ const PARTICIPANT_SUBMISSION_GUIDE_STEPS: SubmissionGuideStep[] = [
   {
     id: 'submission-step-2',
     title: 'Complete Core Fields',
-    description: 'Fill areaId, sectionId, title, description, and videoUrl to map the story correctly in Viewer.',
+    description: 'Fill areaId, sectionId, title, description, and a normalized MP4 videoUrl to map the story correctly in Viewer.',
     focus: 'form_core',
   },
   {
@@ -416,6 +426,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
   const [sectionOpen, setSectionOpen] = useState({
     required: true,
     media: true,
+    materials: true,
     publishing: false,
     advanced: false,
   })
@@ -572,7 +583,10 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       ? relatedEntries.find((entry) => toSlug(entry.title) === toSlug(form.title.trim())) ?? null
       : null
     const mediaSource =
-      relatedEntries.find((entry) => entry.videoUrl || entry.hlsUrl || entry.thumbnailUrl) ?? null
+      relatedEntries.find(
+        (entry) =>
+          entry.videoUrl || entry.thumbnailUrl || entry.scorePdfUrl || entry.violinPartPdfUrl || entry.pianoPartPdfUrl,
+      ) ?? null
     const placementSource =
       relatedEntries.find((entry) => entry.sectionId?.trim()) ?? relatedEntries[0] ?? null
 
@@ -827,8 +841,8 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       versionLabel: entry.versionLabel ?? '',
       submittedBy: entry.submittedBy ?? entry.submissionDisplayName ?? '',
       description: entry.description,
-      videoUrl: entry.videoUrl,
-      hlsUrl: entry.hlsUrl ?? '',
+      videoUrl: entry.videoUrl || entry.hlsUrl || '',
+      hlsUrl: '',
       thumbnailUrl: entry.thumbnailUrl ?? '',
       accessLevel: entry.accessLevel,
       isPublished: entry.isPublished,
@@ -842,6 +856,9 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       institutionName: entry.institutionName ?? '',
       recordedAt: entry.recordedAt ?? '',
       researchStatus: entry.researchStatus ?? '',
+      scorePdfUrl: entry.scorePdfUrl ?? '',
+      violinPartPdfUrl: entry.violinPartPdfUrl ?? '',
+      pianoPartPdfUrl: entry.pianoPartPdfUrl ?? '',
       participantNames: toCsv(entry.participantNames),
       relatedVersionIds: toCsv(entry.relatedVersionIds),
       infoUrl: entry.infoUrl ?? '',
@@ -890,7 +907,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       submittedBy,
       description: form.description.trim(),
       videoUrl: form.videoUrl.trim(),
-      hlsUrl: form.hlsUrl.trim(),
+      hlsUrl: '',
       thumbnailUrl: form.thumbnailUrl.trim(),
       accessLevel: participantManaged ? 'open' : form.accessLevel,
       isPublished: participantManaged ? true : form.isPublished,
@@ -906,6 +923,9 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       institutionName: form.institutionName.trim(),
       recordedAt: form.recordedAt.trim(),
       researchStatus: form.researchStatus.trim(),
+      scorePdfUrl: form.scorePdfUrl.trim(),
+      violinPartPdfUrl: form.violinPartPdfUrl.trim(),
+      pianoPartPdfUrl: form.pianoPartPdfUrl.trim(),
       participantNames: parseCsv(form.participantNames),
       relatedVersionIds: parseCsv(form.relatedVersionIds),
       infoUrl: form.infoUrl.trim(),
@@ -935,6 +955,26 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     }
     if (!auth?.currentUser && !form.submissionDisplayName.trim()) {
       setSubmitError('Name is required before account creation so your submissions can be tracked.')
+      return
+    }
+    const mediaError = getViewerMediaValidationError(form.videoUrl)
+    if (mediaError) {
+      setSubmitError(mediaError)
+      return
+    }
+    const scorePdfError = getViewerPdfValidationError(form.scorePdfUrl, 'full score PDF')
+    if (scorePdfError) {
+      setSubmitError(scorePdfError)
+      return
+    }
+    const violinPartPdfError = getViewerPdfValidationError(form.violinPartPdfUrl, 'violin part PDF')
+    if (violinPartPdfError) {
+      setSubmitError(violinPartPdfError)
+      return
+    }
+    const pianoPartPdfError = getViewerPdfValidationError(form.pianoPartPdfUrl, 'piano part PDF')
+    if (pianoPartPdfError) {
+      setSubmitError(pianoPartPdfError)
       return
     }
 
@@ -1016,7 +1056,7 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     setCloneError(null)
   }
 
-  const toggleFormSection = (section: 'required' | 'media' | 'publishing' | 'advanced') => {
+  const toggleFormSection = (section: 'required' | 'media' | 'materials' | 'publishing' | 'advanced') => {
     setSectionOpen((current) => ({ ...current, [section]: !current[section] }))
   }
 
@@ -1290,8 +1330,11 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
         submittedBy: source.submittedBy ?? source.submissionDisplayName ?? '',
         description: source.description ?? '',
         videoUrl: cloneCopyMediaUrls ? source.videoUrl ?? '' : '',
-        hlsUrl: cloneCopyMediaUrls ? source.hlsUrl ?? '' : '',
+        hlsUrl: '',
         thumbnailUrl: cloneCopyMediaUrls ? source.thumbnailUrl ?? '' : '',
+        scorePdfUrl: cloneCopyMediaUrls ? source.scorePdfUrl ?? '' : '',
+        violinPartPdfUrl: cloneCopyMediaUrls ? source.violinPartPdfUrl ?? '' : '',
+        pianoPartPdfUrl: cloneCopyMediaUrls ? source.pianoPartPdfUrl ?? '' : '',
         institutionName: source.institutionName ?? '',
         recordedAt: source.recordedAt ?? '',
         createdByUid: source.createdByUid ?? '',
@@ -1362,8 +1405,11 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
         submittedBy: String(payload.submittedBy ?? ''),
         description: String(payload.description ?? ''),
         videoUrl: String(payload.videoUrl ?? ''),
-        hlsUrl: String(payload.hlsUrl ?? ''),
+        hlsUrl: '',
         thumbnailUrl: String(payload.thumbnailUrl ?? ''),
+        scorePdfUrl: String(payload.scorePdfUrl ?? ''),
+        violinPartPdfUrl: String(payload.violinPartPdfUrl ?? ''),
+        pianoPartPdfUrl: String(payload.pianoPartPdfUrl ?? ''),
         accessLevel: (payload.accessLevel as AccessLevel) ?? 'open',
         isPublished: Boolean(payload.isPublished),
         showOnHome: Boolean(payload.showOnHome),
@@ -1420,8 +1466,11 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
     setForm((prev) => ({
       ...prev,
       videoUrl: detectedWorkContext.mediaSource?.videoUrl ?? prev.videoUrl,
-      hlsUrl: detectedWorkContext.mediaSource?.hlsUrl ?? prev.hlsUrl,
+      hlsUrl: '',
       thumbnailUrl: detectedWorkContext.mediaSource?.thumbnailUrl ?? prev.thumbnailUrl,
+      scorePdfUrl: detectedWorkContext.mediaSource?.scorePdfUrl ?? prev.scorePdfUrl,
+      violinPartPdfUrl: detectedWorkContext.mediaSource?.violinPartPdfUrl ?? prev.violinPartPdfUrl,
+      pianoPartPdfUrl: detectedWorkContext.mediaSource?.pianoPartPdfUrl ?? prev.pianoPartPdfUrl,
     }))
   }
 
@@ -1442,6 +1491,9 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
       workSlug: source.workSlug ?? '',
       researchStatus: source.researchStatus ?? '',
       infoUrl: source.infoUrl ?? '',
+      scorePdfUrl: source.scorePdfUrl ?? '',
+      violinPartPdfUrl: source.violinPartPdfUrl ?? '',
+      pianoPartPdfUrl: source.pianoPartPdfUrl ?? '',
       accessLevel: source.accessLevel ?? prev.accessLevel ?? DEFAULT_FORM.accessLevel,
       institutionName: source.institutionName ?? '',
     }))
@@ -1862,10 +1914,57 @@ function ViewerEntryManagerContent({ mode, scope = 'all' }: Props) {
               {sectionOpen.media ? (
                 <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
                   <input value={form.videoUrl} onChange={(e) => setForm((p) => ({ ...p, videoUrl: e.target.value }))} placeholder="videoUrl" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
-                  <input value={form.hlsUrl} onChange={(e) => setForm((p) => ({ ...p, hlsUrl: e.target.value }))} placeholder="hlsUrl (optional .m3u8 for adaptive playback)" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
+                  <p className="rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/8 px-3 py-2 text-xs leading-5 text-[#F5D37A] md:col-span-2">
+                    Viewer playback is normalized around direct `H.264/AAC .mp4` files. Do not use `.mov` or `.m3u8` sources here.
+                  </p>
                   <input value={form.thumbnailUrl} onChange={(e) => setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))} placeholder="thumbnailUrl" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm md:col-span-2" />
                   <input value={form.institutionName} onChange={(e) => setForm((p) => ({ ...p, institutionName: e.target.value }))} placeholder="institutionName" className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
                   <input type="date" value={form.recordedAt} onChange={(e) => setForm((p) => ({ ...p, recordedAt: e.target.value }))} className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm" />
+                </div>
+              ) : null}
+            </div>
+
+            <div className={`rounded-lg border border-white/15 bg-black/20 ${sectionHighlightClass('form_core')}`}>
+              <button
+                type="button"
+                onClick={() => toggleFormSection('materials')}
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-semibold"
+              >
+                Materials
+                {sectionOpen.materials ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {sectionOpen.materials ? (
+                <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
+                  <label className="grid gap-1 text-xs uppercase tracking-[0.12em] text-white/60 md:col-span-2">
+                    Full Score PDF
+                    <input
+                      value={form.scorePdfUrl}
+                      onChange={(e) => setForm((p) => ({ ...p, scorePdfUrl: e.target.value }))}
+                      placeholder="https://.../full-score.pdf"
+                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-white"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase tracking-[0.12em] text-white/60">
+                    Violin Part PDF
+                    <input
+                      value={form.violinPartPdfUrl}
+                      onChange={(e) => setForm((p) => ({ ...p, violinPartPdfUrl: e.target.value }))}
+                      placeholder="https://.../violin-part.pdf"
+                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-white"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase tracking-[0.12em] text-white/60">
+                    Piano Part PDF
+                    <input
+                      value={form.pianoPartPdfUrl}
+                      onChange={(e) => setForm((p) => ({ ...p, pianoPartPdfUrl: e.target.value }))}
+                      placeholder="https://.../piano-part.pdf"
+                      className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-white"
+                    />
+                  </label>
+                  <p className="rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/8 px-3 py-2 text-xs leading-5 text-[#F5D37A] md:col-span-2">
+                    Chamber viewer materials expect direct `.pdf` URLs. Add whichever score parts exist and the viewer will only show those buttons.
+                  </p>
                 </div>
               ) : null}
             </div>

@@ -1,5 +1,6 @@
 import { collection, getDocs, type Firestore } from 'firebase/firestore'
 import { DEFAULT_VIEWER_AREA_ROLE_TEMPLATES, type ViewerAreaId, type ViewerRoleTemplate } from '@/lib/config/viewerRoleTemplates'
+import { isDirectViewerMp4Url, trimViewerMediaUrl } from '@/lib/viewer/media'
 
 export type ViewerAreaRolesDoc = {
   areaId: ViewerAreaId
@@ -23,10 +24,12 @@ export function normalizeViewerAreaRolesDoc(
     }))
     .sort((a, b) => a.order - b.order)
 
+  const explainerVideoUrl = trimViewerMediaUrl(data?.explainerVideoUrl)
+
   return {
     areaId,
     roles,
-    explainerVideoUrl: (data?.explainerVideoUrl ?? '').trim(),
+    explainerVideoUrl: isDirectViewerMp4Url(explainerVideoUrl) ? explainerVideoUrl : '',
   }
 }
 

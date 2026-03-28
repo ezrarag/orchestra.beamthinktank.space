@@ -9,6 +9,7 @@ import {
   type ViewerAreaId,
   type ViewerRoleTemplate,
 } from '@/lib/config/viewerRoleTemplates'
+import { getViewerMediaValidationError } from '@/lib/viewer/media'
 
 type ViewerAreaRolesDoc = {
   areaId?: ViewerAreaId
@@ -131,6 +132,15 @@ export default function AreaRolesEditor({ areaId }: { areaId: ViewerAreaId }) {
 
   const saveAreaRoles = async () => {
     if (!db) return
+    const normalizedExplainerUrl = explainerVideoUrl.trim()
+    if (normalizedExplainerUrl) {
+      const mediaError = getViewerMediaValidationError(normalizedExplainerUrl)
+      if (mediaError) {
+        setError(`Roles explainer: ${mediaError}`)
+        return
+      }
+    }
+
     setSaving(true)
     setError(null)
 
@@ -194,6 +204,9 @@ export default function AreaRolesEditor({ areaId }: { areaId: ViewerAreaId }) {
             className="mt-1 w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm"
           />
         </label>
+        <p className="mt-2 rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/8 px-3 py-2 text-xs leading-5 text-[#F5D37A]">
+          Use a direct `H.264/AAC .mp4` file here. `.mov` and `.m3u8` role explainers are no longer supported in the viewer.
+        </p>
       </div>
 
       {loading ? <p className="text-sm text-white/70">Loading role slots...</p> : null}

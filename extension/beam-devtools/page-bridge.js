@@ -65,6 +65,7 @@
         type: 'PAGE_CONTEXT_BRIDGE',
         // TODO: If the app has not exposed __BEAM_AUTH_USER__ yet, this will be null.
         firebaseUser: window.__BEAM_AUTH_USER__ || null,
+        pageDebug: window.__BEAM_PAGE_DEBUG__ || null,
       },
       '*'
     )

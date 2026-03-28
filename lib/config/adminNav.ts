@@ -160,12 +160,21 @@ const adminNavGroups: AdminNavGroup[] = [
   },
   {
     key: 'platform',
+    title: 'CONTENT',
     items: [
       {
         key: 'public-platform',
         label: 'Public Platform',
         href: '/admin/viewer',
         icon: Globe,
+        enabled: true,
+        roles: ['beam_admin'],
+      },
+      {
+        key: 'orchestra-works',
+        label: 'Orchestra Works',
+        href: '/admin/orchestra',
+        icon: Music,
         enabled: true,
         roles: ['beam_admin'],
       },
@@ -210,6 +219,7 @@ const adminNavGroups: AdminNavGroup[] = [
   },
   {
     key: 'system',
+    title: 'SYSTEM',
     items: [
       {
         key: 'system',

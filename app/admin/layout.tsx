@@ -8,6 +8,7 @@ import {
   Menu, 
   X,
   Music,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -224,6 +225,7 @@ export default function AdminLayout({
   const partnerProjectId = usePartnerProject()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false)
+  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({})
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
   const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
@@ -277,6 +279,30 @@ export default function AdminLayout({
       router.push(`/admin/projects/${partnerProjectId}`)
     }
   }, [role, partnerProjectId, pathname, router])
+
+  useEffect(() => {
+    setOpenNavGroups((current) => {
+      const next = { ...current }
+      let changed = false
+
+      navGroups.forEach((group) => {
+        const isCollapsibleGroup = group.items.length > 1 || Boolean(group.title)
+        if (!isCollapsibleGroup) return
+        const hasActiveItem = group.items.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+        if (!(group.key in next)) {
+          next[group.key] = hasActiveItem
+          changed = true
+          return
+        }
+        if (hasActiveItem && !next[group.key]) {
+          next[group.key] = true
+          changed = true
+        }
+      })
+
+      return changed ? next : current
+    })
+  }, [navGroups, pathname])
 
   const handleSignOut = async () => {
     if (!auth) return
@@ -361,66 +387,93 @@ export default function AdminLayout({
 
           {/* Navigation */}
           <nav className={`flex-1 overflow-y-auto p-3 ${desktopSidebarCollapsed ? 'space-y-2' : 'space-y-3'}`}>
-            {navGroups.map((group) => (
-              <div key={group.key} className="space-y-1.5">
-                {group.title && !desktopSidebarCollapsed && (
-                  <p className="px-2 text-[10px] font-semibold tracking-[0.14em] text-orchestra-gold/70">
-                    {group.title}
-                  </p>
-                )}
-                {group.items.map((link) => {
-                  const Icon = link.icon
-                  const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+            {navGroups.map((group) => {
+              const isCollapsibleGroup = group.items.length > 1 || Boolean(group.title)
+              const groupHasActiveItem = group.items.some(
+                (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+              )
+              const isGroupOpen =
+                desktopSidebarCollapsed || !isCollapsibleGroup || groupHasActiveItem || openNavGroups[group.key]
+              const groupLabel = group.title ?? 'Navigation'
 
-                  if (!link.enabled) {
-                    return (
-                      <div
-                        key={link.key}
-                        className={`rounded-lg border border-orchestra-gold/10 bg-orchestra-gold/5 text-sm text-orchestra-cream/55 ${
-                          desktopSidebarCollapsed
-                            ? 'flex items-center justify-center px-2 py-2.5'
-                            : 'flex items-center justify-between px-3 py-2'
-                        }`}
-                        title={link.label}
-                      >
-                        <div className={`flex items-center ${desktopSidebarCollapsed ? '' : 'space-x-2'}`}>
+              return (
+                <div key={group.key} className="space-y-1.5">
+                  {!desktopSidebarCollapsed && isCollapsibleGroup ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenNavGroups((current) => ({
+                          ...current,
+                          [group.key]: !current[group.key],
+                        }))
+                      }
+                      className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold tracking-[0.16em] transition ${
+                        groupHasActiveItem
+                          ? 'bg-orchestra-gold/10 text-orchestra-gold'
+                          : 'text-orchestra-gold/70 hover:bg-orchestra-gold/5 hover:text-orchestra-gold'
+                      }`}
+                    >
+                      <span>{groupLabel}</span>
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isGroupOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  ) : null}
+
+                  {isGroupOpen ? (
+                    group.items.map((link) => {
+                      const Icon = link.icon
+                      const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
+
+                      if (!link.enabled) {
+                        return (
+                          <div
+                            key={link.key}
+                            className={`rounded-lg border border-orchestra-gold/10 bg-orchestra-gold/5 text-sm text-orchestra-cream/55 ${
+                              desktopSidebarCollapsed
+                                ? 'flex items-center justify-center px-2 py-2.5'
+                                : 'flex items-center justify-between px-3 py-2'
+                            }`}
+                            title={link.label}
+                          >
+                            <div className={`flex items-center ${desktopSidebarCollapsed ? '' : 'space-x-2'}`}>
+                              <Icon className="h-4 w-4 flex-shrink-0" />
+                              {!desktopSidebarCollapsed ? (
+                                <span className="font-medium truncate">{link.label}</span>
+                              ) : null}
+                            </div>
+                            {!desktopSidebarCollapsed ? (
+                              <span className="text-[10px] uppercase tracking-wide text-orchestra-gold/70">Soon</span>
+                            ) : null}
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <Link
+                          key={link.key}
+                          href={link.href}
+                          className={`rounded-lg transition-all duration-200 text-sm ${
+                            isActive
+                              ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/30'
+                              : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
+                          } ${
+                            desktopSidebarCollapsed
+                              ? 'flex items-center justify-center px-2 py-2.5'
+                              : 'flex items-center space-x-2 px-3 py-2'
+                          }`}
+                          onClick={() => setSidebarOpen(false)}
+                          title={link.label}
+                        >
                           <Icon className="h-4 w-4 flex-shrink-0" />
                           {!desktopSidebarCollapsed ? (
                             <span className="font-medium truncate">{link.label}</span>
                           ) : null}
-                        </div>
-                        {!desktopSidebarCollapsed ? (
-                          <span className="text-[10px] uppercase tracking-wide text-orchestra-gold/70">Soon</span>
-                        ) : null}
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <Link
-                      key={link.key}
-                      href={link.href}
-                      className={`rounded-lg transition-all duration-200 text-sm ${
-                        isActive
-                          ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/30'
-                          : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
-                      } ${
-                        desktopSidebarCollapsed
-                          ? 'flex items-center justify-center px-2 py-2.5'
-                          : 'flex items-center space-x-2 px-3 py-2'
-                      }`}
-                      onClick={() => setSidebarOpen(false)}
-                      title={link.label}
-                    >
-                      <Icon className="h-4 w-4 flex-shrink-0" />
-                      {!desktopSidebarCollapsed ? (
-                        <span className="font-medium truncate">{link.label}</span>
-                      ) : null}
-                    </Link>
-                  )
-                })}
-              </div>
-            ))}
+                        </Link>
+                      )
+                    })
+                  ) : null}
+                </div>
+              )
+            })}
           </nav>
 
           {/* Footer */}

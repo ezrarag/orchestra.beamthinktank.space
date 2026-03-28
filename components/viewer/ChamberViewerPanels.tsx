@@ -1,10 +1,16 @@
 import Link from 'next/link'
-import { ArrowUpRight, Calendar, Disc3, LibraryBig, Microscope, SlidersHorizontal, Users } from 'lucide-react'
+import { ArrowUpRight, Calendar, Disc3, FileText, LibraryBig, Microscope, SlidersHorizontal, Users } from 'lucide-react'
 import { getFirestoreTimestampMillis, truncateChamberResearchExcerpt } from '@/lib/chamberWorks'
 import type { ChamberResearchRef, ChamberWorkDocument } from '@/lib/types/chamber'
 
-export type ChamberViewerTab = 'performance' | 'research' | 'session' | 'critique' | 'otherVersions'
+export type ChamberViewerTab = 'performance' | 'materials' | 'research' | 'session' | 'critique' | 'otherVersions'
 export type ChamberViewerIntent = 'select' | 'subscriber' | 'student' | 'instructor' | 'partner'
+export type ChamberViewerMaterialId = 'score' | 'violinPart' | 'pianoPart'
+export type ChamberViewerMaterial = {
+  id: ChamberViewerMaterialId
+  label: string
+  url: string
+}
 
 type ChamberPlaybackStory = {
   title: string
@@ -47,10 +53,14 @@ type Props = {
   onSelectRecentWatched?: (contentId: string) => void
   referenceHref?: string | null
   bookHref?: string | null
+  materials?: ChamberViewerMaterial[]
+  activeMaterialId?: ChamberViewerMaterialId | null
+  onMaterialSelect?: (materialId: ChamberViewerMaterialId) => void
 }
 
 const TAB_OPTIONS: Array<{ id: ChamberViewerTab; label: string }> = [
   { id: 'performance', label: 'Performance' },
+  { id: 'materials', label: 'Materials' },
   { id: 'research', label: 'Research' },
   { id: 'session', label: 'Session' },
   { id: 'critique', label: 'Critique' },
@@ -89,6 +99,11 @@ function renderResearchSkeleton() {
   )
 }
 
+function buildPdfEmbedSrc(url: string): string {
+  if (!url) return ''
+  return url.includes('#') ? url : `${url}#toolbar=0&navpanes=0&statusbar=0&view=FitH`
+}
+
 export default function ChamberViewerPanels({
   activeTab,
   onTabChange,
@@ -110,10 +125,14 @@ export default function ChamberViewerPanels({
   onSelectRecentWatched,
   referenceHref,
   bookHref,
+  materials = [],
+  activeMaterialId,
+  onMaterialSelect,
 }: Props) {
   const researchRefs = [...(work?.researchRefs ?? [])].sort(
     (a, b) => getFirestoreTimestampMillis(b.addedAt) - getFirestoreTimestampMillis(a.addedAt),
   )
+  const activeMaterial = materials.find((item) => item.id === activeMaterialId) ?? materials[0] ?? null
   const composerLabel = story?.composerName || story?.composer || work?.composerName || 'Composer metadata pending'
   const workLabel = story?.workTitle || work?.workTitle || 'Work metadata pending'
   const containerClassName =
@@ -211,10 +230,27 @@ export default function ChamberViewerPanels({
                     </div>
                   </div>
                 </article>
-                {referenceHref || bookHref ? (
+                {materials.length > 0 || referenceHref || bookHref ? (
                   <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">Reference links</p>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">
+                      {materials.length > 0 ? 'Materials + links' : 'Reference links'}
+                    </p>
                     <div className="mt-4 flex flex-wrap gap-2">
+                      {materials.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (materials[0]) {
+                              onMaterialSelect?.(materials[0].id)
+                            }
+                            onTabChange('materials')
+                          }}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3.5 py-2 text-xs font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/16"
+                        >
+                          View score materials
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
                       {referenceHref ? (
                         <Link
                           href={referenceHref}
@@ -237,6 +273,99 @@ export default function ChamberViewerPanels({
                   </article>
                 ) : null}
               </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'materials' ? (
+            <div className="grid gap-4 lg:grid-cols-[320px,1fr]">
+              <article className="rounded-[24px] border border-white/10 bg-black/25 p-5">
+                <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#F5D37A]">
+                  <FileText className="h-3.5 w-3.5" />
+                  Materials
+                </p>
+                <p className="mt-3 text-sm leading-6 text-white/72">
+                  Open score PDFs in-panel while the current chamber playback continues underneath.
+                </p>
+                {materials.length > 0 ? (
+                  <div className="mt-5 grid gap-2">
+                    {materials.map((material) => (
+                      <button
+                        key={material.id}
+                        type="button"
+                        onClick={() => onMaterialSelect?.(material.id)}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                          activeMaterial?.id === material.id
+                            ? 'border-[#D4AF37]/60 bg-[#D4AF37]/14 text-[#F5D37A]'
+                            : 'border-white/12 bg-black/20 text-white/80 hover:border-white/24 hover:text-white'
+                        }`}
+                      >
+                        {material.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/72">
+                    No score PDFs have been added for this version yet.
+                  </div>
+                )}
+                {referenceHref || bookHref ? (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {referenceHref ? (
+                      <Link
+                        href={referenceHref}
+                        className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3.5 py-2 text-xs font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/16"
+                      >
+                        Reference link
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : null}
+                    {bookHref ? (
+                      <Link
+                        href={bookHref}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/20 px-3.5 py-2 text-xs font-semibold text-white/80 transition hover:border-white/24 hover:text-white"
+                      >
+                        Book Participants
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+
+              <article className="rounded-[24px] border border-white/10 bg-black/25 p-3 sm:p-4">
+                {activeMaterial ? (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-black/20 px-4 py-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Open material</p>
+                        <p className="mt-1 text-base font-semibold text-white">{activeMaterial.label}</p>
+                      </div>
+                      <a
+                        href={activeMaterial.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/35 bg-[#D4AF37]/10 px-3.5 py-2 text-xs font-semibold text-[#F5D37A] transition hover:border-[#D4AF37] hover:bg-[#D4AF37]/16"
+                      >
+                        Open in new tab
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                    <iframe
+                      key={activeMaterial.url}
+                      src={buildPdfEmbedSrc(activeMaterial.url)}
+                      title={`${activeMaterial.label} PDF`}
+                      className="mt-3 h-[70vh] w-full rounded-[20px] border border-white/10 bg-white"
+                    />
+                    <p className="mt-3 text-xs text-white/55">
+                      If this PDF does not render inside the viewer, use “Open in new tab” and keep the chamber playback running here.
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex min-h-[360px] items-center justify-center rounded-[20px] border border-dashed border-white/12 bg-black/20 px-6 py-10 text-center text-sm text-white/68">
+                    Add a full score, violin part, or piano part URL in the admin entry form to populate this panel.
+                  </div>
+                )}
+              </article>
             </div>
           ) : null}
 

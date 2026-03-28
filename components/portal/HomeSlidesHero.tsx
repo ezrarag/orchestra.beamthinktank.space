@@ -117,7 +117,14 @@ export default function HomeSlidesHero({ fallbackSlides, ngo, scopedRoutes = fal
         if (!response.ok) return
 
         if (mounted && data?.debug) {
-          setHomeSlidesDebug(data.debug as HomeSlidesDebug)
+          const debugPayload = data.debug as HomeSlidesDebug
+          setHomeSlidesDebug(debugPayload)
+          if (typeof window !== 'undefined') {
+            ;(window as Window & { __BEAM_PAGE_DEBUG__?: Record<string, unknown> }).__BEAM_PAGE_DEBUG__ = {
+              ...(window as Window & { __BEAM_PAGE_DEBUG__?: Record<string, unknown> }).__BEAM_PAGE_DEBUG__,
+              homeSlides: debugPayload,
+            }
+          }
           console.warn('Home slides debug:', data.debug)
         }
 
