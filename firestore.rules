@@ -172,6 +172,29 @@ service cloud.firestore {
       allow create, update: if isOwner(userId);
     }
 
+    function hasInstitutionAccountAccess(institutionId) {
+      let account = get(/databases/$(database)/documents/institutionAccounts/$(institutionId)).data;
+      return isAuthenticated() && (
+        (account.userIds is list && request.auth.uid in account.userIds) ||
+        (account.contactEmails is list && request.auth.token.email in account.contactEmails)
+      );
+    }
+
+    // Institution partner records for school, venue, nonprofit, and partner dashboards.
+    match /institutionAccounts/{institutionId} {
+      allow read, write: if isAdmin();
+      allow read: if isAuthenticated() && (
+        (resource.data.userIds is list && request.auth.uid in resource.data.userIds) ||
+        (resource.data.contactEmails is list && request.auth.token.email in resource.data.contactEmails)
+      );
+    }
+
+    // Institution-facing project snapshots. Writes stay admin-only; linked contacts can read.
+    match /institutionProjects/{institutionProjectId} {
+      allow read, write: if isAdmin();
+      allow read: if resource.data.institutionId is string && hasInstitutionAccountAccess(resource.data.institutionId);
+    }
+
     // Public cohort interest form for recruitment and mentorship work.
     match /cohortApplications/{applicationId} {
       allow read: if isAdmin();

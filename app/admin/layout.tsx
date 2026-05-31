@@ -93,6 +93,12 @@ const ADMIN_PAGE_META: Array<{
     description: 'Participant roster, profile readiness, and orchestral personnel management.',
   },
   {
+    prefix: '/admin/institutions',
+    title: 'Institutions',
+    eyebrow: 'People',
+    description: 'Institution accounts, project links, and partner dashboard access.',
+  },
+  {
     prefix: '/admin/projects/new',
     title: 'New Project',
     eyebrow: 'Projects',
