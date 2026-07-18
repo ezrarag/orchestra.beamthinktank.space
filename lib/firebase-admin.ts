@@ -4,6 +4,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
 import fs from 'fs'
 import path from 'path'
+import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 let app: App | null = null
 let adminDb: ReturnType<typeof getFirestore> | null = null
@@ -190,7 +191,7 @@ export async function verifyAdminRole(uid: string): Promise<boolean> {
     const user = await adminAuth.getUser(uid)
     const customClaims = user.customClaims || {}
     // Support either a string role or a boolean claim
-    return customClaims.role === 'beam_admin' || (customClaims as any).beam_admin === true
+    return customClaims.role === 'beam_admin' || (customClaims as any).beam_admin === true || isAdminEmailAllowed(user.email)
   } catch (error) {
     console.error('Error verifying admin role:', error)
     return false

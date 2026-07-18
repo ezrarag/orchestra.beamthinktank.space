@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { HOME_SLIDES_COLLECTION, sanitizeHomeSlides } from '@/lib/homeSlides'
+import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 async function authorize(request: NextRequest) {
   if (process.env.NODE_ENV !== 'production') {
@@ -20,7 +21,7 @@ async function authorize(request: NextRequest) {
     const token = authHeader.split('Bearer ')[1]
     const decoded = await adminAuth.verifyIdToken(token)
     const claims = decoded as Record<string, unknown>
-    const isAdmin = claims.role === 'beam_admin' || claims.beam_admin === true
+    const isAdmin = claims.role === 'beam_admin' || claims.beam_admin === true || isAdminEmailAllowed(claims.email)
     if (!isAdmin) return { ok: false as const, status: 403, error: 'Insufficient permissions' }
     return { ok: true as const }
   } catch {
