@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { HOME_SLIDES_COLLECTION, sanitizeHomeSlides } from '@/lib/homeSlides'
-import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
+import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 async function authorize(request: NextRequest) {
+  if (ADMIN_GATEWAYS_DISABLED) {
+    return { ok: true as const }
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     return { ok: true as const }
   }

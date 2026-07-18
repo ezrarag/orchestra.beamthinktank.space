@@ -19,6 +19,7 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { ADMIN_GATEWAYS_DISABLED } from '@/lib/config/adminAccess'
 
 const ADMIN_PAGE_META: Array<{
   prefix: string
@@ -97,6 +98,12 @@ const ADMIN_PAGE_META: Array<{
     title: 'Institutions',
     eyebrow: 'People',
     description: 'Institution accounts, project links, and partner dashboard access.',
+  },
+  {
+    prefix: '/admin/member-audit',
+    title: 'Member Audit',
+    eyebrow: 'People',
+    description: 'Current Auth users, Firestore user records, memberships, and admin access signals.',
   },
   {
     prefix: '/admin/projects/new',
@@ -235,10 +242,11 @@ export default function AdminLayout({
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
   const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
-  const hasAdminShellAccess = role === 'beam_admin' || role === 'partner_admin' || role === 'board'
+  const effectiveRole = ADMIN_GATEWAYS_DISABLED ? 'beam_admin' : role
+  const hasAdminShellAccess = ADMIN_GATEWAYS_DISABLED || role === 'beam_admin' || role === 'partner_admin' || role === 'board'
   const navGroups = useMemo(
-    () => getAdminNavGroups({ role, partnerProjectId }),
-    [partnerProjectId, role],
+    () => getAdminNavGroups({ role: effectiveRole, partnerProjectId }),
+    [effectiveRole, partnerProjectId],
   )
   const activePageMeta = useMemo(() => {
     const directMeta = [...ADMIN_PAGE_META]
@@ -270,21 +278,21 @@ export default function AdminLayout({
     }
   }, [navGroups, pathname])
   const adminHomeHref = useMemo(() => {
-    if (role === 'partner_admin' && partnerProjectId) return `/admin/projects/${partnerProjectId}`
-    if (role === 'board') return '/admin/board'
+    if (effectiveRole === 'partner_admin' && partnerProjectId) return `/admin/projects/${partnerProjectId}`
+    if (effectiveRole === 'board') return '/admin/board'
     return '/admin/dashboard'
-  }, [partnerProjectId, role])
+  }, [effectiveRole, partnerProjectId])
   const roleLabel = useMemo(() => {
-    if (!role) return 'Admin'
-    return role.replace(/_/g, ' ')
-  }, [role])
+    if (!effectiveRole) return 'Admin'
+    return effectiveRole.replace(/_/g, ' ')
+  }, [effectiveRole])
   
   // Redirect partner admins to their project page
   useEffect(() => {
-    if (role === 'partner_admin' && partnerProjectId && pathname === '/admin/dashboard') {
+    if (effectiveRole === 'partner_admin' && partnerProjectId && pathname === '/admin/dashboard') {
       router.push(`/admin/projects/${partnerProjectId}`)
     }
-  }, [role, partnerProjectId, pathname, router])
+  }, [effectiveRole, partnerProjectId, pathname, router])
 
   useEffect(() => {
     setOpenNavGroups((current) => {
@@ -331,7 +339,7 @@ export default function AdminLayout({
     )
   }
 
-  if (!user || !hasAdminShellAccess) {
+  if ((!user && !ADMIN_GATEWAYS_DISABLED) || !hasAdminShellAccess) {
     return <AccessDeniedPage />
   }
 

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, verifyAdminRole, isAdminSDKAvailable } from '@/lib/firebase-admin'
+import { ADMIN_GATEWAYS_DISABLED } from '@/lib/config/adminAccess'
 
 const adminAuthBypassEnabled =
+  ADMIN_GATEWAYS_DISABLED ||
   process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS === '1' ||
   (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS !== '0')
 

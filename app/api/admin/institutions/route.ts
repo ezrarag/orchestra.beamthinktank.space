@@ -7,9 +7,13 @@ import {
   normalizeInstitutionAccount,
   normalizeInstitutionProject,
 } from '@/lib/api/institutions'
-import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
+import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 async function authorize(request: NextRequest) {
+  if (ADMIN_GATEWAYS_DISABLED) {
+    return { ok: true as const }
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     return { ok: true as const }
   }

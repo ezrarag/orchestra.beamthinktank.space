@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
-import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
+import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 export type UserRole = 'beam_admin' | 'partner_admin' | 'admin_staff' | 'board' | 'musician' | 'subscriber' | 'audience'
 
@@ -59,25 +59,37 @@ export function useUserRole(options: UseUserRoleOptions = {}): UserWithRole {
     }
 
     // Check if auth is initialized
-    if (!auth || !db) {
+    if (!auth) {
+      if (ADMIN_GATEWAYS_DISABLED) {
+        setUser(mockAdminUser)
+        setRole('beam_admin')
+      } else {
+        console.warn('Firebase auth is not initialized. Please check your environment variables.')
+      }
+      setLoading(false)
+      return
+    }
+
+    if (!db && !ADMIN_GATEWAYS_DISABLED) {
       console.warn('Firebase auth is not initialized. Please check your environment variables.')
       setLoading(false)
       return
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
+      const effectiveUser = user || (ADMIN_GATEWAYS_DISABLED ? mockAdminUser : null)
+      setUser(effectiveUser)
       
-      if (user) {
+      if (effectiveUser) {
         try {
-          if (isAdminEmailAllowed(user.email)) {
+          if (ADMIN_GATEWAYS_DISABLED || isAdminEmailAllowed(effectiveUser.email)) {
             setRole('beam_admin')
             setLoading(false)
             return
           }
 
           // First, check custom claims (for admin roles set via Firebase Admin SDK)
-          const tokenResult = await user.getIdTokenResult()
+          const tokenResult = await effectiveUser.getIdTokenResult()
           const claims = tokenResult.claims
           
           // Check for admin claim in custom claims
@@ -109,7 +121,13 @@ export function useUserRole(options: UseUserRoleOptions = {}): UserWithRole {
           }
           
           // Fall back to Firestore user document
-          const userDoc = await getDoc(doc(db, 'users', user.uid))
+          if (!db) {
+            setRole('musician')
+            setLoading(false)
+            return
+          }
+
+          const userDoc = await getDoc(doc(db, 'users', effectiveUser.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
             // Check if user is a subscriber
@@ -143,6 +161,7 @@ export function useRequireRole(requiredRole: UserRole, options: UseUserRoleOptio
   const { user, role, loading } = useUserRole({ allowAdminBypass })
   
   const hasAccess = !loading && (
+    ADMIN_GATEWAYS_DISABLED ||
     (allowAdminBypass && adminAuthBypassEnabled) ||
     Boolean(user && role === requiredRole)
   )
@@ -165,6 +184,7 @@ export function useBoardAccess() {
   
   // Board, partner_admin, and beam_admin all have board access
   const hasAccess = !loading && (
+    ADMIN_GATEWAYS_DISABLED ||
     adminAuthBypassEnabled ||
     Boolean(
       user && (

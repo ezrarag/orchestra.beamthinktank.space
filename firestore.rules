@@ -9,7 +9,10 @@ service cloud.firestore {
     
     // Helper function to check if user has admin role
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.role == 'beam_admin';
+      return isAuthenticated() && (
+        request.auth.token.role == 'beam_admin' ||
+        request.auth.token.email == 'ezra@readyaimgo.biz'
+      );
     }
     
     // Helper function to check if user has partner admin role

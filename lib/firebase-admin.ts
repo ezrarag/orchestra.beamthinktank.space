@@ -4,7 +4,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getStorage } from 'firebase-admin/storage'
 import fs from 'fs'
 import path from 'path'
-import { isAdminEmailAllowed } from '@/lib/config/adminAccess'
+import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 let app: App | null = null
 let adminDb: ReturnType<typeof getFirestore> | null = null
@@ -183,6 +183,10 @@ export function isAdminSDKAvailable(): boolean {
 
 // Helper function to verify admin role
 export async function verifyAdminRole(uid: string): Promise<boolean> {
+  if (ADMIN_GATEWAYS_DISABLED) {
+    return true
+  }
+
   if (!adminAuth) {
     console.error('Admin SDK not initialized - cannot verify admin role')
     return false
