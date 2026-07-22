@@ -144,6 +144,9 @@ export default function AdminInstitutionsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link href="/admin/projects/new?projectType=institution_cohort" className="rounded-lg border border-orchestra-gold/30 px-3 py-2 text-sm font-semibold text-orchestra-gold">
+              New institution cohort
+            </Link>
             <button
               type="button"
               onClick={() => void load()}
@@ -251,7 +254,7 @@ export default function AdminInstitutionsPage() {
                       accountProjects.map((project) => (
                         <tr key={project.id} className="border-t border-white/10">
                           <td className="px-3 py-3 text-white">
-                            <p className="font-medium">{project.title}</p>
+                            <Link href={`/admin/projects/${project.projectId}`} className="font-medium text-orchestra-gold hover:underline">{project.title}</Link>
                             <p className="mt-1 text-xs text-orchestra-cream/50">{project.location || 'Location pending'}</p>
                           </td>
                           <td className="px-3 py-3">

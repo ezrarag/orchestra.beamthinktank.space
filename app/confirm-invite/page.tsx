@@ -7,6 +7,7 @@ import { auth, db } from '@/lib/firebase'
 import { doc, getDoc, updateDoc, setDoc, serverTimestamp, query, collection, where, getDocs } from 'firebase/firestore'
 import { motion } from 'framer-motion'
 import { CheckCircle, XCircle, Loader2, Music, Calendar, DollarSign, Coins } from 'lucide-react'
+import { upsertCanonicalParticipant } from '@/lib/participantIdentity'
 
 function ConfirmInvitePageContent() {
   const router = useRouter()
@@ -130,6 +131,23 @@ function ConfirmInvitePageContent() {
       }
 
       await setDoc(doc(db, 'projectMusicians', `${user.uid}_${projectId}`), projectMusicianData, { merge: true })
+
+      const projectSnapshot = await getDoc(doc(db, 'projects', projectId))
+      const projectData = projectSnapshot.exists() ? projectSnapshot.data() : {}
+      await upsertCanonicalParticipant({
+        authUid: user.uid,
+        name: prospect.name || user.displayName || user.email,
+        email: prospect.email || user.email,
+        phone: prospect.phone || null,
+        roles: [prospect.roleId || 'musician'],
+        instruments: prospect.instrument ? [prospect.instrument] : [],
+        sourceSite: 'orchestra',
+        projectId,
+        projectName: projectData.name || projectId,
+        organizationId: prospect.organizationId || projectData.organizationId || null,
+        organizationName: prospect.organizationName || null,
+        status: 'confirmed',
+      })
 
       // Also update users collection
       await setDoc(doc(db, 'users', user.uid), {

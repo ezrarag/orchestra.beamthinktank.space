@@ -49,6 +49,12 @@ service cloud.firestore {
       allow read: if isPartnerAdmin() && 
         request.auth.token.organizationId == orgId;
     }
+
+    // Canonical participant identity and membership layer.
+    match /participantProfiles/{docId} { allow read, write: if isAdmin(); }
+    match /organizationMemberships/{docId} { allow read, write: if isAdmin(); }
+    match /cohortMemberships/{docId} { allow read, write: if isAdmin(); }
+    match /cohorts/{docId} { allow read, write: if isAdmin(); }
     
     // Projects - Admins and organization admins can access
     match /projects/{projectId} {

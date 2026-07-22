@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { ArrowLeft, Plus } from 'lucide-react'
@@ -10,6 +10,7 @@ import Link from 'next/link'
 
 export default function NewProjectPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading, role } = useUserRole()
   const [loading, setLoading] = useState(false)
   
@@ -22,6 +23,7 @@ export default function NewProjectPage() {
     neededMusicians: 0,
     startDate: '',
     endDate: '',
+    projectType: (searchParams.get('projectType') === 'institution_cohort' ? 'institution_cohort' : 'production_ensemble') as 'lesson_package' | 'production_ensemble' | 'resident_orchestra' | 'institution_cohort',
   })
 
   // Only beam admins can create projects
@@ -82,6 +84,8 @@ export default function NewProjectPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: user.uid,
+        projectType: formData.projectType,
+        roleSlots: [],
       }
 
       if (formData.startDate) {
@@ -91,7 +95,7 @@ export default function NewProjectPage() {
         projectData.endDate = formData.endDate
       }
 
-      await addDoc(collection(db, 'projects'), projectData)
+      await setDoc(doc(db, 'projects', projectId), projectData)
       
       router.push('/admin/projects')
     } catch (error) {
@@ -174,6 +178,7 @@ export default function NewProjectPage() {
               placeholder="Project description..."
             />
           </div>
+          <div><label className="block text-sm font-medium text-orchestra-cream mb-2">Project type</label><select value={formData.projectType} onChange={(e)=>setFormData({...formData,projectType:e.target.value as typeof formData.projectType})} className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream"><option value="lesson_package">Lesson package</option><option value="production_ensemble">Production ensemble</option><option value="resident_orchestra">Resident orchestra</option><option value="institution_cohort">Institution cohort</option></select></div>
         </div>
 
         {/* Project Details */}
@@ -255,7 +260,4 @@ export default function NewProjectPage() {
     </div>
   )
 }
-
-
-
 

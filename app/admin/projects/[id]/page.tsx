@@ -29,6 +29,8 @@ import { db } from '@/lib/firebase'
 import { useRequireRole, useUserRole } from '@/lib/hooks/useUserRole'
 import { useProjectAccess } from '@/lib/hooks/useProjectAccess'
 import { Event, EventOrder } from '@/lib/types/events'
+import ProjectStaffingManager from '@/components/admin/projects/ProjectStaffingManager'
+import { upsertCanonicalParticipant } from '@/lib/participantIdentity'
 
 function MusiciansList({ musicians }: { musicians: any[] }) {
   const [showAll, setShowAll] = useState(false)
@@ -489,6 +491,7 @@ export default function ProjectDetailPage() {
       neededMusicians: project.neededMusicians || 0,
       startDate: project.startDate || '',
       endDate: project.endDate || '',
+      projectType: project.projectType || 'production_ensemble',
     })
     setShowEditProjectModal(true)
   }
@@ -505,6 +508,7 @@ export default function ProjectDetailPage() {
         description: editingProject.description || '',
         budgetUsd: editingProject.budgetUsd || 0,
         neededMusicians: editingProject.neededMusicians || 0,
+        projectType: editingProject.projectType || 'production_ensemble',
         updatedAt: serverTimestamp(),
       }
 
@@ -590,6 +594,9 @@ export default function ProjectDetailPage() {
       }
 
       await setDoc(doc(db, 'projectMusicians', docId), musicianData, { merge: true })
+      if (newMusician.email) {
+        await upsertCanonicalParticipant({ name: newMusician.name, email: newMusician.email, phone: newMusician.phone || null, roles: ['musician'], instruments: newMusician.instrument ? [newMusician.instrument] : [], sourceSite: 'orchestra', projectId, projectName: project.name, organizationId: project.organizationId || null, status: newMusician.status })
+      }
       
       // Reset form
       setNewMusician({
@@ -1008,6 +1015,8 @@ export default function ProjectDetailPage() {
         </motion.div>
       )}
 
+      <ProjectStaffingManager projectId={projectId} projectName={project.name} initialSlots={project.roleSlots || []} initialTier={project.subscriptionTier} />
+
       {/* Add Musician Modal */}
       {showAddMusicianModal && (
         <motion.div
@@ -1215,6 +1224,12 @@ export default function ProjectDetailPage() {
                   className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-orchestra-cream mb-2">Project type</label>
+                <select value={editingProject.projectType || 'production_ensemble'} onChange={(e) => setEditingProject({ ...editingProject, projectType: e.target.value })} className="w-full px-4 py-2 bg-orchestra-dark/50 border border-orchestra-gold/30 rounded-lg text-orchestra-cream">
+                  <option value="lesson_package">Lesson package</option><option value="production_ensemble">Production ensemble</option><option value="resident_orchestra">Resident orchestra</option><option value="institution_cohort">Institution cohort</option>
+                </select>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1343,4 +1358,3 @@ export default function ProjectDetailPage() {
     </div>
   )
 }
-

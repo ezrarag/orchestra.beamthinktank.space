@@ -55,5 +55,10 @@ export const DEFAULT_VIEWER_AREA_ROLE_TEMPLATES: Record<ViewerAreaId, ViewerRole
     { id: 'marketing-lead', title: 'Marketing Lead', description: 'Audience growth and communications strategy.', order: 5 },
     { id: 'operations-manager', title: 'Operations Manager', description: 'Execution workflows, staffing, and logistics.', order: 6 },
     { id: 'impact-analyst', title: 'Impact Analyst', description: 'Research metrics, reporting, and outcome tracking.', order: 7 },
+    { id: 'venue-logistics', title: 'Venue Logistics', description: 'Coordinates venue access, load-in, and event operations.', order: 8 },
+    { id: 'transportation-logistics', title: 'Transportation & Logistics', description: 'Coordinates travel, freight, and local transportation.', order: 9 },
+    { id: 'ip-contracts-legal', title: 'IP & Contracts/Legal', description: 'Handles institutional agreements, IP, and legal coordination.', order: 10 },
+    { id: 'insurance-coordinator', title: 'Insurance Coordinator', description: 'Coordinates coverage, certificates, and risk requirements.', order: 11 },
+    { id: 'grant-writer-manager', title: 'Grant Writer/Manager', description: 'Develops grant proposals and manages award compliance.', order: 12 },
   ],
 }
