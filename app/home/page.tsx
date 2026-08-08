@@ -1,13 +1,9 @@
-import HomeSlidesHero from '@/components/portal/HomeSlidesHero'
-import { DEFAULT_NGO } from '@/lib/config/ngoConfigs'
-import { getPortalContext } from '@/lib/portal/page-data'
+import HeroStage from '@/components/portal/HeroStage'
 
 export default function HomePage() {
-  const { config } = getPortalContext(DEFAULT_NGO)
-
   return (
-    <div className="min-h-screen bg-slate-950">
-      <HomeSlidesHero fallbackSlides={config.homeSlides} ngo={config.id} scopedRoutes={false} />
+    <div className="w-screen h-screen overflow-hidden bg-[#07080b]">
+      <HeroStage />
     </div>
   )
 }
