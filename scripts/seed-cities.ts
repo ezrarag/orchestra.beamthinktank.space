@@ -29,13 +29,13 @@ const cities = [
     updatedAt: new Date()
   },
   {
-    id: 'atlanta',
-    name: 'Atlanta',
-    lat: 33.7490,
-    lon: -84.3880,
-    activeProjects: [],
-    activeModules: [],
-    status: 'planned',
+    id: 'concord',
+    name: 'Concord',
+    lat: 43.2081,
+    lon: -71.5376,
+    activeProjects: ['concord-symphony'],
+    activeModules: ['chamber-masterworks-lab'],
+    status: 'active',
     createdAt: new Date(),
     updatedAt: new Date()
   },
@@ -44,28 +44,49 @@ const cities = [
     name: 'Orlando',
     lat: 28.5383,
     lon: -81.3792,
-    activeProjects: [],
-    activeModules: [],
-    status: 'planned',
+    activeProjects: ['steinway-gallery-series'],
+    activeModules: ['florida-recording-sessions-okorie-tramaine-donte'],
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    id: 'miami',
+    name: 'Miami',
+    lat: 25.7617,
+    lon: -80.1918,
+    activeProjects: ['florida-dance-collaboration'],
+    activeModules: ['coastal-chamber-lab'],
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    id: 'tampa',
+    name: 'Tampa',
+    lat: 27.9506,
+    lon: -82.4572,
+    activeProjects: ['gulf-symphonic-sessions'],
+    activeModules: ['community-outreach-lab'],
+    status: 'active',
     createdAt: new Date(),
     updatedAt: new Date()
   }
 ]
 
 async function seedCities() {
-  console.log('🌍 Seeding cities...')
+  console.log('🌍 Seeding active geographic nodes (Milwaukee, Concord, Orlando, Miami, Tampa)...')
   
   for (const city of cities) {
     try {
       await db.collection('cities').doc(city.id).set(city, { merge: true })
-      console.log(`✅ Seeded: ${city.name} (${city.status})`)
+      console.log(`✅ Seeded node: ${city.name} (${city.status})`)
     } catch (error) {
       console.error(`❌ Error seeding ${city.name}:`, error)
     }
   }
   
-  console.log('🎉 City seeding complete!')
+  console.log('🎉 City node seeding complete!')
 }
 
 seedCities().catch(console.error)
-

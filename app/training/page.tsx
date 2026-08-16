@@ -15,22 +15,22 @@ const contractProjects = [
     color: "from-purple-500 to-blue-500"
   },
   {
+    title: "Concord Symphony / Chamber Orchestra",
+    description: "Core player group contract project directed by Jamin Hoffman for specialized symphonic and chamber masterworks.",
+    status: "Active",
+    musicians: "28/40",
+    progress: 70,
+    href: "/training/contract-projects/concord-symphony",
+    color: "from-blue-500 to-teal-500"
+  },
+  {
     title: "Milwaukee Film Orchestra",
     description: "Live orchestral accompaniment for independent film screenings and special events.",
     status: "Upcoming",
     musicians: "0/40",
     progress: 0,
     href: "#",
-    color: "from-green-500 to-teal-500"
-  },
-  {
-    title: "Chamber Music Series",
-    description: "Intimate chamber ensemble performances featuring classical and contemporary works.",
-    status: "Planning",
-    musicians: "0/20",
-    progress: 0,
-    href: "#",
-    color: "from-orange-500 to-red-500"
+    color: "from-amber-500 to-red-500"
   }
 ]
 

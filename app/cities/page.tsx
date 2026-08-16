@@ -37,7 +37,7 @@ export default function CitiesPage() {
             return a.name.localeCompare(b.name)
           }))
         } else {
-          // Fallback mock data
+          // Fallback mock data with active Florida & Midwest nodes
           setCities([
             {
               id: 'milwaukee',
@@ -46,6 +46,42 @@ export default function CitiesPage() {
               lon: -87.9065,
               activeProjects: ['black-diaspora-symphony'],
               activeModules: ['symphonic-training-lab'],
+              status: 'active'
+            },
+            {
+              id: 'concord',
+              name: 'Concord',
+              lat: 43.2081,
+              lon: -71.5376,
+              activeProjects: ['concord-symphony'],
+              activeModules: ['chamber-masterworks-lab'],
+              status: 'active'
+            },
+            {
+              id: 'orlando',
+              name: 'Orlando',
+              lat: 28.5383,
+              lon: -81.3792,
+              activeProjects: ['steinway-gallery-series'],
+              activeModules: ['florida-recording-sessions-okorie-tramaine-donte'],
+              status: 'active'
+            },
+            {
+              id: 'miami',
+              name: 'Miami',
+              lat: 25.7617,
+              lon: -80.1918,
+              activeProjects: ['florida-dance-collaboration'],
+              activeModules: ['coastal-chamber-lab'],
+              status: 'active'
+            },
+            {
+              id: 'tampa',
+              name: 'Tampa',
+              lat: 27.9506,
+              lon: -82.4572,
+              activeProjects: ['gulf-symphonic-sessions'],
+              activeModules: ['community-outreach-lab'],
               status: 'active'
             }
           ])

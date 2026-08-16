@@ -181,6 +181,45 @@ export function isAdminSDKAvailable(): boolean {
   return app !== null && adminAuth !== null && adminDb !== null
 }
 
+const BEAM_HOME_ADMIN_APP_NAME = 'beam-home-admin-sdk'
+let beamHomeApp: App | null = null
+let beamHomeAuth: ReturnType<typeof getAuth> | null = null
+
+export function getBeamHomeAdminAuth(): ReturnType<typeof getAuth> | null {
+  if (beamHomeAuth) return beamHomeAuth
+
+  try {
+    const existing = getApps().find((a) => a.name === BEAM_HOME_ADMIN_APP_NAME)
+    if (existing) {
+      beamHomeApp = getApp(BEAM_HOME_ADMIN_APP_NAME)
+      beamHomeAuth = getAuth(beamHomeApp)
+      return beamHomeAuth
+    }
+
+    const projectId = process.env.BEAM_HOME_FIREBASE_PROJECT_ID
+    const clientEmail = process.env.BEAM_HOME_FIREBASE_CLIENT_EMAIL
+    const privateKey = (process.env.BEAM_HOME_FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
+
+    if (projectId && clientEmail && privateKey) {
+      beamHomeApp = initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+        projectId,
+      }, BEAM_HOME_ADMIN_APP_NAME)
+      beamHomeAuth = getAuth(beamHomeApp)
+      console.info(`Initialized dedicated Beam Home Admin SDK (${projectId})`)
+      return beamHomeAuth
+    }
+  } catch (error) {
+    console.error('Failed to initialize Beam Home Admin SDK:', error)
+  }
+
+  return null
+}
+
 // Helper function to verify admin role
 export async function verifyAdminRole(uid: string): Promise<boolean> {
   if (ADMIN_GATEWAYS_DISABLED) {
