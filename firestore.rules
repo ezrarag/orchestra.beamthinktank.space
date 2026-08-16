@@ -101,6 +101,13 @@ service cloud.firestore {
       // Allow partner admins to read musicians in their projects
       allow read: if isPartnerAdmin();
     }
+
+    // Unified Profiles (Musician, Professional, Organization)
+    match /profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (profileId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
     
     // Project Musicians - Public read for project pages, write requires admin
     match /projectMusicians/{pmId} {
