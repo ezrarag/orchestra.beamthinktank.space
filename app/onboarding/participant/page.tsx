@@ -27,15 +27,7 @@ import type { Profile, PipelineSourceTag } from '@/lib/types/profile'
 import { useRouter } from 'next/navigation'
 import AuthButtons from '@/components/AuthButtons'
 import Link from 'next/link'
-
-const ROLE_OPTIONS = [
-  { id: 'string_player', label: 'String Player', description: 'Violin, Viola, Cello, Double Bass, Harp' },
-  { id: 'woodwind_brass', label: 'Winds & Brass', description: 'Flute, Oboe, Clarinet, Bassoon, Horn, Trumpet, Trombone, Tuba' },
-  { id: 'percussion_keyboards', label: 'Percussion & Timpani', description: 'Timpani, Mallets, Auxiliary Percussion, Piano' },
-  { id: 'conductor', label: 'Conductor', description: 'Music Director, Guest Conductor, Assistant Conductor' },
-  { id: 'composer_arranger', label: 'Composer / Arranger', description: 'Orchestrator, Transcriber, Original Composition' },
-  { id: 'media_editor', label: 'Media Editor', description: 'Audio Engineer, Video Editor, Content Producer' }
-]
+import { getSystemRoles, SystemRoleDoc, DEFAULT_SYSTEM_ROLES } from '@/lib/systemRoles'
 
 const PIPELINE_SOURCES: PipelineSourceTag[] = [
   'BDSO Core',
@@ -76,9 +68,26 @@ export default function ParticipantOnboardingPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Step 1 State: Craft & Instrument
-  const [primaryRole, setPrimaryRole] = useState('String Player')
+  const [availableRoles, setAvailableRoles] = useState<SystemRoleDoc[]>(DEFAULT_SYSTEM_ROLES)
+  const [primaryRole, setPrimaryRole] = useState('Violin I')
   const [specificInstrument, setSpecificInstrument] = useState('')
   const [pipelineSource, setPipelineSource] = useState<PipelineSourceTag>('BEAM Talent Pipeline')
+
+  useEffect(() => {
+    let mounted = true
+    const fetchRoles = async () => {
+      try {
+        const roles = await getSystemRoles()
+        if (mounted && roles.length > 0) {
+          setAvailableRoles(roles.filter(r => r.active))
+        }
+      } catch (err) {
+        console.error('Error fetching system roles for onboarding:', err)
+      }
+    }
+    void fetchRoles()
+    return () => { mounted = false }
+  }, [])
 
   // Step 2 State: Logistics & Support
   const [cityState, setCityState] = useState('Milwaukee, WI')
@@ -311,23 +320,23 @@ export default function ParticipantOnboardingPage() {
               {/* Role Card Selection Grid */}
               <div className="space-y-3">
                 <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 block">Primary Role</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {ROLE_OPTIONS.map((role) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[280px] overflow-y-auto pr-1">
+                  {availableRoles.map((role) => (
                     <button
                       key={role.id}
                       type="button"
-                      onClick={() => setPrimaryRole(role.label)}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
-                        primaryRole === role.label
+                      onClick={() => setPrimaryRole(role.title)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                        primaryRole === role.title
                           ? 'bg-purple-600/30 border-purple-400 text-white shadow-lg shadow-purple-500/20'
                           : 'bg-white/5 border-white/10 text-gray-300 hover:border-white/25 hover:bg-white/10'
                       }`}
                     >
-                      <div className="font-bold text-sm text-white mb-1 flex items-center justify-between">
-                        <span>{role.label}</span>
-                        {primaryRole === role.label && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
+                      <div className="font-bold text-xs text-white mb-1 flex items-center justify-between">
+                        <span>{role.title}</span>
+                        {primaryRole === role.title && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
                       </div>
-                      <div className="text-xs text-gray-400">{role.description}</div>
+                      <div className="text-[10px] text-gray-400 line-clamp-1">{role.description || role.category.replace(/_/g, ' ')}</div>
                     </button>
                   ))}
                 </div>

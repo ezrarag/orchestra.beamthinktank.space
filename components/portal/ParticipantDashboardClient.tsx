@@ -30,6 +30,7 @@ import type { ViewerAreaId } from '@/lib/config/viewerRoleTemplates'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 
 import BeamCoinTracker from '@/components/BeamCoinTracker'
+import RoamingPresenceWidget from '@/components/participant/RoamingPresenceWidget'
 import { ENSEMBLE_CONFIGS } from '@/lib/config/ensembles'
 
 interface ParticipantDashboardClientProps {
@@ -408,6 +409,11 @@ export default function ParticipantDashboardClient({
           {/* Embedded BeamCoin Tracker */}
           <section className="lg:col-span-3">
             <BeamCoinTracker />
+          </section>
+
+          {/* Multi-City Roaming & Active Presence Widget */}
+          <section className="lg:col-span-3">
+            <RoamingPresenceWidget />
           </section>
 
           {/* Embedded Active Project Briefs */}

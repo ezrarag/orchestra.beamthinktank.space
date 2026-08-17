@@ -24,6 +24,12 @@ export interface InfrastructureNeeds {
   equipmentDetails?: string
 }
 
+export interface CurrentLiveLocation {
+  cityState: string
+  activeUntil?: string
+  updatedAt?: string
+}
+
 export interface Profile {
   id: string
   name: string
@@ -40,6 +46,12 @@ export interface Profile {
   cityState?: string
   willingness_to_travel?: boolean
   willingnessToTravel?: boolean
+
+  // Multi-City Roaming & Active Presence
+  active_roaming_cities?: string[]
+  activeRoamingCities?: string[]
+  current_live_location?: CurrentLiveLocation
+  currentLiveLocation?: CurrentLiveLocation
 
   // Infrastructure Needs (Wraparound support)
   infrastructure_needs?: InfrastructureNeeds

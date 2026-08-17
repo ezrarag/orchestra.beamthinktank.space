@@ -240,8 +240,16 @@ const adminNavGroups: AdminNavGroup[] = [
     title: 'SYSTEM',
     items: [
       {
+        key: 'system-roles',
+        label: 'Roles & Nodes',
+        href: '/admin/roles',
+        icon: Settings,
+        enabled: true,
+        roles: ['beam_admin'],
+      },
+      {
         key: 'system',
-        label: 'System',
+        label: 'System Settings',
         href: '/admin/settings',
         icon: Settings,
         enabled: true,

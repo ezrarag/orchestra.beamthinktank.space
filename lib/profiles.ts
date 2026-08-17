@@ -10,7 +10,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Profile, ProfileType } from '@/lib/types/profile'
+import type { Profile, ProfileType, CurrentLiveLocation } from '@/lib/types/profile'
 
 const PROFILES_COLLECTION = 'profiles'
 
@@ -44,6 +44,17 @@ function normalizeProfile(id: string, data: DocumentData): Profile {
   const pipelineSource = data.pipeline_source ? String(data.pipeline_source) : data.pipelineSource ? String(data.pipelineSource) : undefined
   const ensembleAffiliations = Array.isArray(rawAffiliations) ? rawAffiliations.map(String) : undefined
 
+  // Roaming & Active City Presence
+  const rawRoaming = data.active_roaming_cities || data.activeRoamingCities
+  const activeRoamingCities = Array.isArray(rawRoaming) ? rawRoaming.map(String) : undefined
+
+  const rawLiveLoc = data.current_live_location || data.currentLiveLocation
+  const currentLiveLocation: CurrentLiveLocation | undefined = rawLiveLoc && typeof rawLiveLoc === 'object' ? {
+    cityState: String(rawLiveLoc.cityState || rawLiveLoc.city_state || ''),
+    activeUntil: rawLiveLoc.activeUntil || rawLiveLoc.active_until ? String(rawLiveLoc.activeUntil || rawLiveLoc.active_until) : undefined,
+    updatedAt: rawLiveLoc.updatedAt || rawLiveLoc.updated_at ? String(rawLiveLoc.updatedAt || rawLiveLoc.updated_at) : undefined,
+  } : undefined
+
   return {
     id,
     name: String(data.name ?? ''),
@@ -60,6 +71,12 @@ function normalizeProfile(id: string, data: DocumentData): Profile {
     cityState: cityState,
     willingness_to_travel: willingnessToTravel,
     willingnessToTravel: willingnessToTravel,
+
+    // Multi-City Roaming & Presence
+    active_roaming_cities: activeRoamingCities,
+    activeRoamingCities: activeRoamingCities,
+    current_live_location: currentLiveLocation,
+    currentLiveLocation: currentLiveLocation,
 
     // Infrastructure Needs
     infrastructure_needs: infra,
@@ -146,6 +163,23 @@ export async function upsertProfile(profile: Profile): Promise<void> {
   const docRef = doc(db, PROFILES_COLLECTION, id)
   const data = {
     ...profile,
+    updatedAt: new Date().toISOString(),
+  }
+  await setDoc(docRef, data, { merge: true })
+}
+
+export async function updateParticipantRoamingPresence(
+  id: string,
+  roamingCities: string[],
+  currentLiveLoc?: CurrentLiveLocation
+): Promise<void> {
+  if (!db) return
+  const docRef = doc(db, PROFILES_COLLECTION, id)
+  const data = {
+    active_roaming_cities: roamingCities,
+    activeRoamingCities: roamingCities,
+    current_live_location: currentLiveLoc || null,
+    currentLiveLocation: currentLiveLoc || null,
     updatedAt: new Date().toISOString(),
   }
   await setDoc(docRef, data, { merge: true })
