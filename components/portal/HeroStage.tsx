@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type SyntheticEvent } from 'react'
+import { useEffect, useMemo, useState, useRef, type SyntheticEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -11,17 +11,8 @@ import {
   ArrowLeft, 
   ArrowRight, 
   ChevronDown, 
-  Play, 
-  Users, 
-  Music, 
-  Coins, 
-  MapPin, 
   Sparkles, 
-  ArrowUpRight, 
-  CheckCircle2,
-  DollarSign,
-  Award,
-  Video
+  ArrowUpRight
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -79,6 +70,8 @@ export default function HeroStage() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPortal, setSelectedPortal] = useState<PortalCategory | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Seeding/Fetching variables
   const [slides, setSlides] = useState<HeroSlide[]>([])
@@ -94,13 +87,25 @@ export default function HeroStage() {
 
   const activeCategory = CATEGORIES[activeIndex]
 
-  // Auto advance hero categories
+  // Close dropdown on outside click
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Auto advance hero categories (pauses when dropdown is open)
+  useEffect(() => {
+    if (isDropdownOpen) return
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % CATEGORIES.length)
     }, AUTO_ADVANCE_MS)
     return () => clearInterval(timer)
-  }, [])
+  }, [isDropdownOpen])
 
   // Load slides config
   useEffect(() => {
@@ -193,10 +198,10 @@ export default function HeroStage() {
   }
 
   return (
-    <div className="relative w-full min-h-screen bg-[#07080b] text-[#f0ead6]">
+    <div className="relative w-full h-screen bg-[#07080b] text-[#f0ead6] overflow-hidden">
       
-      {/* HERO STAGE SECTION (100vh) */}
-      <section className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden isolate">
+      {/* HERO STAGE SECTION (Full Viewport) */}
+      <section className="relative h-screen w-full flex flex-col justify-between overflow-hidden isolate">
         
         {/* Ambient Video Background Layer */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-black">
@@ -225,13 +230,75 @@ export default function HeroStage() {
           }}
         />
 
-        {/* TOP BRANDING BAR (Forge Style) */}
-        <div className="relative z-20 mx-auto max-w-7xl w-full px-6 pt-8 flex items-center justify-between text-xs tracking-[0.3em] uppercase text-white/60">
+        {/* TOP BRANDING BAR WITH 'ORCHESTRA' DROPDOWN */}
+        <div className="relative z-30 mx-auto max-w-7xl w-full px-6 pt-8 flex items-center justify-between text-xs tracking-[0.3em] uppercase text-white/60">
           <div className="flex items-center space-x-3">
             <span className="font-bold text-white tracking-widest">BEAM</span>
             <span className="text-white/30">·</span>
-            <span className="text-amber-400 font-semibold">Orchestra</span>
+            
+            {/* Clickable 'Orchestra' Dropdown Toggle */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center space-x-1.5 font-semibold text-amber-400 hover:text-amber-300 transition-all focus:outline-none py-1 px-2.5 rounded-lg bg-amber-400/10 border border-amber-400/20 hover:border-amber-400/40"
+                aria-expanded={isDropdownOpen}
+                aria-label="Orchestra portal selector"
+              >
+                <span>Orchestra</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 top-full mt-2 w-72 rounded-2xl bg-[#090b14]/95 backdrop-blur-xl border border-white/15 p-2 shadow-2xl z-50 text-left normal-case tracking-normal"
+                  >
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 border-b border-white/10 mb-1">
+                      Select Portal Section
+                    </div>
+
+                    {CATEGORIES.map((cat, idx) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveIndex(idx)
+                          setIsDropdownOpen(false)
+                        }}
+                        className={`w-full flex items-start space-x-3 p-3 rounded-xl transition-all ${
+                          activeIndex === idx
+                            ? 'bg-white/15 border border-white/20 text-white'
+                            : 'hover:bg-white/10 text-white/70 hover:text-white'
+                        }`}
+                      >
+                        <div
+                          className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ backgroundColor: cat.colorAccent }}
+                        />
+                        <div>
+                          <div className="text-xs font-bold flex items-center justify-between gap-2">
+                            <span>{cat.label}</span>
+                            <span className="text-[10px] font-mono text-white/40">({cat.doorNumber})</span>
+                          </div>
+                          <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                            {cat.subtitle}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
+
+          {/* Slide Index Counter */}
           <div className="flex items-center space-x-2 font-mono">
             <span className="text-white font-bold">{String(activeIndex + 1).padStart(2, '0')}</span>
             <span className="text-white/30">/</span>
@@ -291,7 +358,7 @@ export default function HeroStage() {
           </AnimatePresence>
         </div>
 
-        {/* BOTTOM CONTROLS & SCROLL INDICATOR */}
+        {/* BOTTOM CONTROLS */}
         <div className="relative z-20 mx-auto max-w-7xl w-full px-6 pb-8 flex items-end justify-between gap-6">
           {/* Category Progress Bars */}
           <div className="flex items-center gap-3">
@@ -311,12 +378,6 @@ export default function HeroStage() {
                 />
               </button>
             ))}
-          </div>
-
-          {/* Scroll Down Prompt */}
-          <div className="hidden md:flex flex-col items-center text-white/50 text-[10px] uppercase tracking-[0.3em] space-y-2 animate-pulse">
-            <span>Scroll to Explore</span>
-            <ChevronDown className="w-4 h-4" />
           </div>
 
           {/* Carousel Arrows */}
@@ -340,183 +401,6 @@ export default function HeroStage() {
           </div>
         </div>
       </section>
-
-      {/* SCROLLABLE PAGE CONTENT SECTIONS */}
-      <div className="relative z-20 space-y-24 py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-
-        {/* SECTION 1: Active Contract Ensembles */}
-        <section className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
-            <div>
-              <span className="text-xs uppercase font-bold tracking-[0.2em] text-purple-400 block mb-1">Contract Projects</span>
-              <h2 className="text-3xl sm:text-5xl font-serif font-bold text-white">Active Symphony Ensembles</h2>
-            </div>
-            <Link 
-              href="/training" 
-              className="inline-flex items-center text-sm font-semibold text-purple-300 hover:text-white transition-colors"
-            >
-              View All Ensembles <ArrowRight className="w-4 h-4 ml-1" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* BDSO Card */}
-            <div className="bg-gradient-to-br from-purple-950/40 to-slate-900/80 backdrop-blur-md rounded-3xl p-8 border border-purple-500/20 hover:border-purple-500/50 transition-all shadow-2xl flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <span className="px-3 py-1 bg-green-500/20 text-green-300 text-xs font-bold rounded-full border border-green-500/30">
-                    Active Project
-                  </span>
-                  <span className="text-xs text-purple-300 font-semibold">Milwaukee, WI</span>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Black Diaspora Symphony Orchestra</h3>
-                <p className="text-gray-300 text-sm leading-relaxed mb-6">
-                  Celebrating Black classical heritage through Margaret Bonds&apos; <em>Montgomery Variations</em> and William Grant Still&apos;s <em>Spiritual Suite</em>.
-                </p>
-                <div className="space-y-2 mb-6">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-gray-400">Roster Recruitment</span>
-                    <span className="text-purple-300">45 / 60 Confirmed (75%)</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-2">
-                    <div className="bg-purple-500 h-full rounded-full w-[75%]" />
-                  </div>
-                </div>
-              </div>
-              <Link
-                href="/training/contract-projects/black-diaspora-symphony"
-                className="inline-flex items-center justify-center w-full px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg text-sm"
-              >
-                View BDSO Project Hub
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Link>
-            </div>
-
-            {/* Concord Symphony Card */}
-            <div className="bg-gradient-to-br from-blue-950/40 to-slate-900/80 backdrop-blur-md rounded-3xl p-8 border border-blue-500/20 hover:border-blue-500/50 transition-all shadow-2xl flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs font-bold rounded-full border border-blue-500/30">
-                    Active Project
-                  </span>
-                  <span className="text-xs text-blue-300 font-semibold">Concord / Regional</span>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Concord Symphony / Chamber Orchestra</h3>
-                <p className="text-gray-300 text-sm leading-relaxed mb-6">
-                  Core player ensemble project directed by Jamin Hoffman performing Shostakovich Chamber Symphony and Prokofiev Classical Symphony.
-                </p>
-                <div className="space-y-2 mb-6">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-gray-400">Roster Recruitment</span>
-                    <span className="text-blue-300">28 / 40 Confirmed (70%)</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-2">
-                    <div className="bg-blue-500 h-full rounded-full w-[70%]" />
-                  </div>
-                </div>
-              </div>
-              <Link
-                href="/training/contract-projects/concord-symphony"
-                className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg text-sm"
-              >
-                View Concord Project Hub
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* SECTION 2: Compensation & BEAM Coin Incentives */}
-        <section className="bg-gradient-to-r from-purple-900/20 via-slate-900/60 to-amber-900/20 backdrop-blur-md rounded-3xl p-8 sm:p-12 border border-white/10 space-y-8">
-          <div className="max-w-3xl">
-            <span className="text-xs uppercase font-bold tracking-[0.2em] text-amber-400 block mb-1">Ecosystem Model</span>
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white mb-3">Direct Compensation + BEAM Coins</h2>
-            <p className="text-gray-300 text-base leading-relaxed">
-              Every participant earns competitive cash stipends for contract sessions paired with BEAM Coin credits redeemable for career infrastructure.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-              <DollarSign className="w-8 h-8 text-green-400 mb-3" />
-              <div className="text-2xl font-bold text-green-400">Up to $495 USD</div>
-              <p className="text-xs text-gray-400 mt-1">Paid directly per contract project across rehearsals & concert</p>
-            </div>
-
-            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-              <Coins className="w-8 h-8 text-amber-400 mb-3" />
-              <div className="text-2xl font-bold text-amber-400">Up to 21 Coins</div>
-              <p className="text-xs text-gray-400 mt-1">Earned for lessons, equipment rentals, masterclasses & tickets</p>
-            </div>
-
-            <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-              <Award className="w-8 h-8 text-purple-400 mb-3" />
-              <div className="text-2xl font-bold text-purple-300">Phase 1 & 2 Benefits</div>
-              <p className="text-xs text-gray-400 mt-1">Expanding toward housing credits, food access, and fleet transport</p>
-            </div>
-          </div>
-
-          <div className="pt-2 flex justify-start">
-            <Link
-              href="/participate/benefits"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-all shadow-lg text-sm"
-            >
-              Explore Full Benefits Catalog
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </section>
-
-        {/* SECTION 3: Geographic Content Nodes */}
-        <section className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
-            <div>
-              <span className="text-xs uppercase font-bold tracking-[0.2em] text-blue-400 block mb-1">Geographic Network</span>
-              <h2 className="text-3xl sm:text-5xl font-serif font-bold text-white">Multi-City Nodes</h2>
-            </div>
-            <Link 
-              href="/cities" 
-              className="inline-flex items-center text-sm font-semibold text-blue-300 hover:text-white transition-colors"
-            >
-              Explore Cities Map <ArrowRight className="w-4 h-4 ml-1" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[
-              { name: 'Milwaukee', tag: 'BDSO Hub', status: 'Active' },
-              { name: 'Concord', tag: 'Chamber Core', status: 'Active' },
-              { name: 'Orlando', tag: 'Steinway Gallery', status: 'Active Node' },
-              { name: 'Miami', tag: 'Dance Collab', status: 'Active Node' },
-              { name: 'Tampa', tag: 'Gulf Series', status: 'Active Node' }
-            ].map((node) => (
-              <div key={node.name} className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 text-center hover:border-blue-500/40 transition-all">
-                <MapPin className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-                <h4 className="font-bold text-white text-lg">{node.name}</h4>
-                <p className="text-xs text-gray-400 mt-1">{node.tag}</p>
-                <span className="inline-block mt-3 px-2.5 py-0.5 bg-green-500/20 text-green-300 text-[10px] font-bold rounded-full">
-                  {node.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* FOOTER NAV */}
-        <footer className="pt-12 border-t border-white/10 text-center space-y-6">
-          <div className="flex items-center justify-center space-x-6 text-sm font-medium text-gray-400">
-            <Link href="/studio" className="hover:text-white transition-colors">Studio Vault</Link>
-            <Link href="/training" className="hover:text-white transition-colors">Contract Projects</Link>
-            <Link href="/participate/benefits" className="hover:text-white transition-colors">Participant Benefits</Link>
-            <Link href="/tickets" className="hover:text-white transition-colors">Tickets</Link>
-            <Link href="/cities" className="hover:text-white transition-colors">Cities</Link>
-          </div>
-          <p className="text-xs text-gray-500">
-            © {new Date().getFullYear()} BEAM Orchestra Ecosystem • Building Excellence in Arts & Music
-          </p>
-        </footer>
-
-      </div>
 
       {/* Dynamic Full-Screen Modal */}
       <FullScreenModal
