@@ -29,6 +29,9 @@ import type { CommitmentSummary, OpenCallSummary, UserProfileSummary } from '@/l
 import type { ViewerAreaId } from '@/lib/config/viewerRoleTemplates'
 import { loadViewerAreaRolesMap, type ViewerAreaRolesDoc } from '@/lib/viewerAreaRoles'
 
+import BeamCoinTracker from '@/components/BeamCoinTracker'
+import { ENSEMBLE_CONFIGS } from '@/lib/config/ensembles'
+
 interface ParticipantDashboardClientProps {
   ngo: string
   scopedRoutes?: boolean
@@ -384,6 +387,9 @@ export default function ParticipantDashboardClient({
               <Link href="/studio/viewer-submissions/mine" className={PARTICIPANT_UI.buttonGhost}>
                 My Submissions
               </Link>
+              <Link href="/onboarding/participant" className={PARTICIPANT_UI.buttonGhost}>
+                Update Onboarding Profile
+              </Link>
               <Link href="/join" className={PARTICIPANT_UI.buttonGhost}>
                 Become a Participant
               </Link>
@@ -396,6 +402,51 @@ export default function ParticipantDashboardClient({
               <Link href="/viewer" className={PARTICIPANT_UI.buttonGhost}>
                 Browse Viewer
               </Link>
+            </div>
+          </section>
+
+          {/* Embedded BeamCoin Tracker */}
+          <section className="lg:col-span-3">
+            <BeamCoinTracker />
+          </section>
+
+          {/* Embedded Active Project Briefs */}
+          <section className="lg:col-span-3 rounded-2xl border border-white/15 bg-white/[0.03] p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Active Contract Project Briefs</h2>
+                <p className="text-sm text-white/70">Contract projects, rehearsals, and stipends available for your profile track.</p>
+              </div>
+              <Link 
+                href="/training" 
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition-colors"
+              >
+                View All Training Hubs
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {Object.values(ENSEMBLE_CONFIGS).map((ensemble) => (
+                <div key={ensemble.slug} className="bg-black/30 rounded-xl p-5 border border-white/10 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-purple-400 font-medium mb-1">
+                      <span>{ensemble.city} • {ensemble.status}</span>
+                      <span className="text-green-400 font-bold">${ensemble.compensation.usdTotal} USD</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white">{ensemble.name}</h3>
+                    <p className="text-xs text-gray-300 mt-1 line-clamp-2">{ensemble.subtitle}</p>
+                  </div>
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-xs text-amber-400 font-medium">+{ensemble.compensation.beamCoinsTotal} BEAM Coins</span>
+                    <Link
+                      href={`/training/contract-projects/${ensemble.slug}`}
+                      className="text-xs font-semibold text-purple-300 hover:text-white transition-colors"
+                    >
+                      Open Project Hub &rarr;
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
 
