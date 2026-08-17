@@ -103,7 +103,6 @@ async function main() {
       const email = detail.email ? cleanString(detail.email) : undefined
       const phone = (detail as any).phone ? cleanString((detail as any).phone) : undefined
 
-      // Map roles
       const isConductor = finalInstrument.toLowerCase().includes('conductor')
       const musicianRoles: MusicianRole[] = isConductor ? ['conductor'] : ['instrumentalist']
 
@@ -112,7 +111,17 @@ async function main() {
         name,
         email,
         contact: email || phone || 'N/A',
-        location: name === 'Autumn Maria Reed' ? 'Madison, WI' : 'Milwaukee, WI', // Autodetected or defaulted
+        location: name === 'Autumn Maria Reed' ? 'Madison, WI' : 'Milwaukee, WI',
+        city_state: name === 'Autumn Maria Reed' ? 'Madison, WI' : 'Milwaukee, WI',
+        willingness_to_travel: true,
+        pipeline_source: 'BDSO Core',
+        ensemble_affiliations: ['BDSO Core'],
+        infrastructure_needs: {
+          housing: true,
+          flights_transport: true,
+          meals_per_diem: true,
+          equipment_details: `${finalInstrument} professional gear`,
+        },
         types: ['musician'],
         instrument: finalInstrument,
         section: sectionInstrument,

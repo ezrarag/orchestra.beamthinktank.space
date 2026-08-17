@@ -15,6 +15,35 @@ import type { Profile, ProfileType } from '@/lib/types/profile'
 const PROFILES_COLLECTION = 'profiles'
 
 function normalizeProfile(id: string, data: DocumentData): Profile {
+  const rawCoords = data.location_coordinates || data.locationCoordinates
+  const rawInfra = data.infrastructure_needs || data.infrastructureNeeds
+  const rawAffiliations = data.ensemble_affiliations || data.ensembleAffiliations
+
+  const coords = rawCoords && typeof rawCoords === 'object' ? {
+    lat: Number(rawCoords.lat ?? 0),
+    lng: Number(rawCoords.lng ?? 0),
+  } : undefined
+
+  const infra = rawInfra && typeof rawInfra === 'object' ? {
+    housing: Boolean(rawInfra.housing),
+    flights_transport: Boolean(rawInfra.flights_transport ?? rawInfra.flightsTransport),
+    flightsTransport: Boolean(rawInfra.flightsTransport ?? rawInfra.flights_transport),
+    meals_per_diem: Boolean(rawInfra.meals_per_diem ?? rawInfra.mealsPerDiem),
+    mealsPerDiem: Boolean(rawInfra.mealsPerDiem ?? rawInfra.meals_per_diem),
+    equipment_details: rawInfra.equipment_details ? String(rawInfra.equipment_details) : rawInfra.equipmentDetails ? String(rawInfra.equipmentDetails) : undefined,
+    equipmentDetails: rawInfra.equipmentDetails ? String(rawInfra.equipmentDetails) : rawInfra.equipment_details ? String(rawInfra.equipment_details) : undefined,
+  } : undefined
+
+  const willingnessToTravel = typeof data.willingness_to_travel === 'boolean' 
+    ? data.willingness_to_travel 
+    : typeof data.willingnessToTravel === 'boolean'
+    ? data.willingnessToTravel
+    : undefined
+
+  const cityState = data.city_state ? String(data.city_state) : data.cityState ? String(data.cityState) : undefined
+  const pipelineSource = data.pipeline_source ? String(data.pipeline_source) : data.pipelineSource ? String(data.pipelineSource) : undefined
+  const ensembleAffiliations = Array.isArray(rawAffiliations) ? rawAffiliations.map(String) : undefined
+
   return {
     id,
     name: String(data.name ?? ''),
@@ -23,6 +52,24 @@ function normalizeProfile(id: string, data: DocumentData): Profile {
     contact: String(data.contact ?? ''),
     email: data.email ? String(data.email) : undefined,
     types: Array.isArray(data.types) ? (data.types as ProfileType[]) : [],
+
+    // Location & Travel fields
+    location_coordinates: coords,
+    locationCoordinates: coords,
+    city_state: cityState,
+    cityState: cityState,
+    willingness_to_travel: willingnessToTravel,
+    willingnessToTravel: willingnessToTravel,
+
+    // Infrastructure Needs
+    infrastructure_needs: infra,
+    infrastructureNeeds: infra,
+
+    // Pipeline Source & Ensemble Affiliations
+    pipeline_source: pipelineSource,
+    pipelineSource: pipelineSource,
+    ensemble_affiliations: ensembleAffiliations,
+    ensembleAffiliations: ensembleAffiliations,
 
     // Musician-specific fields
     instrument: data.instrument ? String(data.instrument) : undefined,
@@ -62,6 +109,18 @@ export async function getProfilesByType(type: ProfileType): Promise<Profile[]> {
     return querySnapshot.docs.map((doc) => normalizeProfile(doc.id, doc.data()))
   } catch (error) {
     console.error(`Error fetching profiles of type ${type}:`, error)
+    return []
+  }
+}
+
+export async function getProfilesByPipelineSource(source: string): Promise<Profile[]> {
+  if (!db) return []
+  try {
+    const q = query(collection(db, PROFILES_COLLECTION), where('pipeline_source', '==', source))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((doc) => normalizeProfile(doc.id, doc.data()))
+  } catch (error) {
+    console.error(`Error fetching profiles for pipeline source ${source}:`, error)
     return []
   }
 }
