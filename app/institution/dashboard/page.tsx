@@ -6,6 +6,7 @@ import { Building2, CalendarDays, CheckCircle2, Loader2, MapPin, Music2, Users }
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { fetchInstitutionDashboardForUser } from '@/lib/api/institutions'
 import type { InstitutionAccount, InstitutionProject } from '@/lib/types/institution'
+import TalentDiscoveryMap from '@/components/institution/TalentDiscoveryMap'
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -189,6 +190,11 @@ export default function InstitutionDashboardPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
+        {/* Talent Discovery & Support Delta Map */}
+        <div className="mb-10">
+          <TalentDiscoveryMap />
+        </div>
+
         <div className="grid gap-5 lg:grid-cols-[1.5fr_0.8fr]">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
