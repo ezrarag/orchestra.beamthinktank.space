@@ -6,7 +6,8 @@ export interface ParsedVCard {
 }
 
 /**
- * Parse RFC 6350 / vCard 2.1 / 3.0 / 4.0 format from iOS, macOS, Android, Google, Outlook
+ * Robust RFC 6350 / vCard 2.1 / 3.0 / 4.0 parser supporting multiline Base64 photos,
+ * Apple/Outlook group prefixes (item1.PHOTO), Quoted-Printable, and URI photos.
  */
 export function parseVCard(vcardText: string): ParsedVCard {
   const result: ParsedVCard = {}
@@ -15,37 +16,70 @@ export function parseVCard(vcardText: string): ParsedVCard {
     return result
   }
 
-  // 1. Unfold lines (vCard specs fold long lines with a leading space or tab)
   const rawLines = vcardText.split(/\r\n|\r|\n/)
-  const lines: string[] = []
-  for (const rawLine of rawLines) {
-    if ((rawLine.startsWith(' ') || rawLine.startsWith('\t')) && lines.length > 0) {
-      lines[lines.length - 1] += rawLine.trim()
-    } else {
-      lines.push(rawLine.trim())
+  let inPhotoBlock = false
+  let photoMime = 'jpeg'
+  let photoBuffer = ''
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i]
+    const trimmed = raw.trim()
+    if (!trimmed) continue
+
+    // Remove Apple/Outlook property prefixes like "item1.", "item2.", "group1."
+    const clean = trimmed.replace(/^[a-zA-Z0-9_-]+\./, '')
+    const upper = clean.toUpperCase()
+
+    // 1. Photo Property Detection
+    if (upper.startsWith('PHOTO:') || upper.startsWith('PHOTO;')) {
+      inPhotoBlock = true
+      photoBuffer = ''
+      
+      if (upper.includes('PNG')) photoMime = 'png'
+      else if (upper.includes('WEBP')) photoMime = 'webp'
+      else if (upper.includes('GIF')) photoMime = 'gif'
+      else photoMime = 'jpeg'
+
+      const colonIdx = clean.indexOf(':')
+      if (colonIdx !== -1) {
+        const val = clean.substring(colonIdx + 1).trim()
+        if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:')) {
+          result.photo = val
+          inPhotoBlock = false
+        } else if (val.length > 0) {
+          photoBuffer += val.replace(/\s+/g, '')
+        }
+      }
+      continue
     }
-  }
 
-  for (const originalLine of lines) {
-    if (!originalLine) continue
+    // 2. Multiline Photo Accumulation
+    if (inPhotoBlock) {
+      // If we encounter another standard vCard field tag (e.g. "REV:", "END:", "VERSION:", "TEL:", "EMAIL:", "N:"), finalize photo
+      if (upper.includes(':') && /^[A-Z0-9_-]+(;[A-Z0-9_=-]+)*:/.test(upper)) {
+        inPhotoBlock = false
+        if (photoBuffer && !result.photo) {
+          result.photo = `data:image/${photoMime};base64,${photoBuffer}`
+        }
+      } else {
+        photoBuffer += trimmed.replace(/\s+/g, '')
+        continue
+      }
+    }
 
-    // 2. Strip Apple/Outlook item group prefixes (e.g. "item1.EMAIL;...", "item2.TEL:...", "group1.FN:...")
-    const cleanLine = originalLine.replace(/^[a-zA-Z0-9_-]+\./, '')
-    const upperLine = cleanLine.toUpperCase()
-
-    // 3. Extract Full Name (FN)
-    if (upperLine.startsWith('FN:') || upperLine.startsWith('FN;')) {
-      const colonIndex = cleanLine.indexOf(':')
-      if (colonIndex !== -1) {
-        const val = cleanLine.substring(colonIndex + 1).trim()
+    // 3. Full Name (FN)
+    if (upper.startsWith('FN:') || upper.startsWith('FN;')) {
+      const colonIdx = clean.indexOf(':')
+      if (colonIdx !== -1) {
+        const val = clean.substring(colonIdx + 1).trim()
         if (val) result.name = cleanQuotedPrintable(val)
       }
     } 
-    // 4. Extract Structured Name (N) as fallback
-    else if (!result.name && (upperLine.startsWith('N:') || upperLine.startsWith('N;'))) {
-      const colonIndex = cleanLine.indexOf(':')
-      if (colonIndex !== -1) {
-        const val = cleanLine.substring(colonIndex + 1).trim()
+    // 4. Structured Name (N) Fallback
+    else if (!result.name && (upper.startsWith('N:') || upper.startsWith('N;'))) {
+      const colonIdx = clean.indexOf(':')
+      if (colonIdx !== -1) {
+        const val = clean.substring(colonIdx + 1).trim()
         const nameParts = val.split(';')
         const lastName = cleanQuotedPrintable(nameParts[0]?.trim() || '')
         const firstName = cleanQuotedPrintable(nameParts[1]?.trim() || '')
@@ -53,43 +87,26 @@ export function parseVCard(vcardText: string): ParsedVCard {
         if (constructed) result.name = constructed
       }
     } 
-    // 5. Extract Email
-    else if (upperLine.startsWith('EMAIL:') || upperLine.startsWith('EMAIL;')) {
-      const colonIndex = cleanLine.indexOf(':')
-      if (colonIndex !== -1 && !result.email) {
-        const val = cleanLine.substring(colonIndex + 1).trim()
+    // 5. Email
+    else if (upper.startsWith('EMAIL:') || upper.startsWith('EMAIL;')) {
+      const colonIdx = clean.indexOf(':')
+      if (colonIdx !== -1 && !result.email) {
+        const val = clean.substring(colonIdx + 1).trim()
         if (val) result.email = val.replace(/^mailto:/i, '').trim()
       }
     } 
-    // 6. Extract Phone
-    else if (upperLine.startsWith('TEL:') || upperLine.startsWith('TEL;')) {
-      const colonIndex = cleanLine.indexOf(':')
-      if (colonIndex !== -1 && !result.phone) {
-        const val = cleanLine.substring(colonIndex + 1).trim()
+    // 6. Phone
+    else if (upper.startsWith('TEL:') || upper.startsWith('TEL;')) {
+      const colonIdx = clean.indexOf(':')
+      if (colonIdx !== -1 && !result.phone) {
+        const val = clean.substring(colonIdx + 1).trim()
         if (val) result.phone = val.replace(/^tel:/i, '').trim()
       }
-    } 
-    // 7. Extract Photo (Base64 data or URI)
-    else if (upperLine.startsWith('PHOTO:') || upperLine.startsWith('PHOTO;')) {
-      const colonIndex = cleanLine.indexOf(':')
-      if (colonIndex !== -1 && !result.photo) {
-        const header = cleanLine.substring(0, colonIndex).toUpperCase()
-        const val = cleanLine.substring(colonIndex + 1).trim()
-
-        let mimeType = 'jpeg'
-        if (header.includes('PNG')) mimeType = 'png'
-        else if (header.includes('WEBP')) mimeType = 'webp'
-        else if (header.includes('GIF')) mimeType = 'gif'
-
-        if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:')) {
-          result.photo = val
-        } else if (val.length > 0) {
-          // Remove spaces/newlines in Base64 string
-          const cleanB64 = val.replace(/\s+/g, '')
-          result.photo = `data:image/${mimeType};base64,${cleanB64}`
-        }
-      }
     }
+  }
+
+  if (inPhotoBlock && photoBuffer && !result.photo) {
+    result.photo = `data:image/${photoMime};base64,${photoBuffer}`
   }
 
   return result
