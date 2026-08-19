@@ -16,14 +16,35 @@ export interface EventPlayed {
   status: 'Played' | 'Confirmed' | 'Completed' | 'Scheduled'
 }
 
+export interface MediaPortfolioItem {
+  id: string
+  title: string
+  url: string
+  category: 'Steinway Session' | 'Orchestral Performance' | 'Chamber Masterclass' | 'Solo Recital'
+  dateAdded?: string
+}
+
+export interface InfrastructureNeedTag {
+  id: 'housing' | 'transit' | 'meals' | 'instrument_maintenance'
+  label: string
+  needed: boolean
+  priority: 'high' | 'medium' | 'low'
+  description?: string
+}
+
 export interface ParticipantDemographics {
   fullName: string
   email: string
   primaryRole: string
   originProject: string
   primaryInstrument: string
+  disciplineTags?: string[]
   secondaryInstruments?: string[]
   homeHub: string
+  isRoamingActive?: boolean
+  roamingCity?: string
+  infrastructureNeeds?: InfrastructureNeedTag[]
+  portfolioMedia?: MediaPortfolioItem[]
   willingnessToTravel: boolean
   ethnicity: string
   pronouns: string
@@ -58,6 +79,46 @@ export interface OrchestraCrossSiteRecordPayload {
 // Pre-populated completed profile for ezra.haugabrooks@gmail.com (originated in Black Diaspora Orchestra / BDSO)
 export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   fullName: 'Ezra Haugabrooks',
+  email: 'ezra.haugabrooks@gmail.com',
+  primaryRole: 'Section Leader & Resident Cellist',
+  originProject: 'Black Diaspora Symphony Orchestra (BDSO)',
+  primaryInstrument: 'Violoncello (Cello)',
+  disciplineTags: ['Principal Cello', 'Steinway Recording Specialist', 'Media Producer'],
+  secondaryInstruments: ['Piano', 'Orchestral Composition'],
+  homeHub: 'Milwaukee, WI / Chicago, IL',
+  isRoamingActive: true,
+  roamingCity: 'Orlando, FL (Steinway Gallery Residency)',
+  infrastructureNeeds: [
+    { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/reimbursement for multi-city travel.' },
+    { id: 'housing', label: 'Residency Housing', needed: true, priority: 'medium', description: 'Overnight lodgings for Orlando Steinway recording session.' },
+    { id: 'meals', label: 'Per Diem / Meal Access', needed: true, priority: 'medium', description: 'Catering & per diem support during multi-day contract runs.' },
+    { id: 'instrument_maintenance', label: 'Instrument Maintenance / Luthier', needed: false, priority: 'low', description: 'Cello bow rehair & luthier adjustments.' }
+  ],
+  portfolioMedia: [
+    {
+      id: 'p1',
+      title: 'Schumann Adagio & Allegro — Steinway Gallery Orlando',
+      url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
+      category: 'Steinway Session',
+      dateAdded: '2025-12-05'
+    },
+    {
+      id: 'p2',
+      title: 'Margaret Bonds Ballad of the Brown King — BDSO Annual Concert',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      category: 'Orchestral Performance',
+      dateAdded: '2025-11-12'
+    }
+  ],
+  willingnessToTravel: true,
+  ethnicity: 'Black / African Diaspora',
+  pronouns: 'He / Him',
+  educationBackground: 'Master of Music (M.M.) Cellist',
+  culturalCapitalNotes: 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.',
+  uncompensatedRehearsalHours: 24,
+  beamCoinBalance: 48,
+  usdTotalEarned: 1485
+}
   email: 'ezra.haugabrooks@gmail.com',
   primaryRole: 'BEAM Participant Musician & BDSO Community Lead',
   originProject: 'Black Diaspora Orchestra (BDSO)',
@@ -171,7 +232,17 @@ export async function fetchParticipantProfile(
           primaryRole: data.primaryRole || (isEzra ? DEFAULT_EZRA_PROFILE.primaryRole : 'BEAM Participant Musician'),
           originProject: data.originProject || (isEzra ? DEFAULT_EZRA_PROFILE.originProject : 'BEAM Orchestra Network'),
           primaryInstrument: data.primaryInstrument || (isEzra ? DEFAULT_EZRA_PROFILE.primaryInstrument : 'Strings / Musician'),
+          disciplineTags: data.disciplineTags || (isEzra ? DEFAULT_EZRA_PROFILE.disciplineTags : [data.primaryInstrument || 'Strings / Musician']),
+          secondaryInstruments: data.secondaryInstruments || (isEzra ? DEFAULT_EZRA_PROFILE.secondaryInstruments : []),
           homeHub: data.homeHub || (isEzra ? DEFAULT_EZRA_PROFILE.homeHub : 'Member Hub'),
+          isRoamingActive: typeof data.isRoamingActive === 'boolean' ? data.isRoamingActive : (isEzra ? true : false),
+          roamingCity: data.roamingCity || (isEzra ? DEFAULT_EZRA_PROFILE.roamingCity : ''),
+          infrastructureNeeds: data.infrastructureNeeds || (isEzra ? DEFAULT_EZRA_PROFILE.infrastructureNeeds : [
+            { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/transit pass support.' },
+            { id: 'housing', label: 'Residency Housing', needed: false, priority: 'medium' },
+            { id: 'meals', label: 'Per Diem / Meal Access', needed: false, priority: 'medium' }
+          ]),
+          portfolioMedia: data.portfolioMedia || (isEzra ? DEFAULT_EZRA_PROFILE.portfolioMedia : []),
           willingnessToTravel: typeof data.willingnessToTravel === 'boolean' ? data.willingnessToTravel : true,
           ethnicity: data.ethnicity || (isEzra ? DEFAULT_EZRA_PROFILE.ethnicity : 'BEAM Artist'),
           pronouns: data.pronouns || (isEzra ? DEFAULT_EZRA_PROFILE.pronouns : 'They / Them'),
@@ -199,7 +270,17 @@ export async function fetchParticipantProfile(
     primaryRole: 'BEAM Participant Musician',
     originProject: 'BEAM Orchestra Network',
     primaryInstrument: 'Strings / Musician',
+    disciplineTags: ['Strings / Musician'],
+    secondaryInstruments: [],
     homeHub: 'Member Hub',
+    isRoamingActive: false,
+    roamingCity: '',
+    infrastructureNeeds: [
+      { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/transit pass support.' },
+      { id: 'housing', label: 'Residency Housing', needed: false, priority: 'medium' },
+      { id: 'meals', label: 'Per Diem / Meal Access', needed: false, priority: 'medium' }
+    ],
+    portfolioMedia: [],
     willingnessToTravel: true,
     ethnicity: 'BEAM Artist',
     pronouns: 'They / Them',

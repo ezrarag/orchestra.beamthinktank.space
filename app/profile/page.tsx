@@ -12,7 +12,9 @@ import {
   ensureParticipantProfileExists,
   DEFAULT_EZRA_EVENTS,
   type ParticipantDemographics,
-  type EventPlayed 
+  type EventPlayed,
+  type MediaPortfolioItem,
+  type InfrastructureNeedTag
 } from '@/lib/api/profile'
 import { 
   X, 
@@ -30,7 +32,23 @@ import {
   Edit3, 
   Save, 
   LogIn, 
-  User as UserIcon
+  User as UserIcon,
+  Video,
+  Plus,
+  Navigation,
+  Truck,
+  Home,
+  MapPin,
+  Sparkles,
+  Unlock,
+  Lock,
+  Building2,
+  PlayCircle,
+  ExternalLink,
+  Layers,
+  Utensils,
+  Wrench,
+  Award
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
@@ -51,7 +69,7 @@ export default function ParticipantProfilePage() {
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'events' | 'demographics' | 'interop'>('events')
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'logistics' | 'nodes' | 'triangle' | 'interop'>('portfolio')
   
   // Photo management state
   const [profilePhoto, setProfilePhoto] = useState<string>('')
@@ -66,11 +84,22 @@ export default function ParticipantProfilePage() {
   const [copied, setCopied] = useState(false)
   const [formData, setFormData] = useState<Partial<ParticipantDemographics>>({})
 
-  // Editable Contact Info fields (Part 2)
+  // Editable Contact Info fields
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [vcardImportedNotice, setVcardImportedNotice] = useState(false)
+
+  // Portfolio Media State
+  const [portfolioItems, setPortfolioItems] = useState<MediaPortfolioItem[]>([])
+  const [showAddMediaModal, setShowAddMediaModal] = useState(false)
+  const [newMediaTitle, setNewMediaTitle] = useState('')
+  const [newMediaUrl, setNewMediaUrl] = useState('')
+  const [newMediaCategory, setNewMediaCategory] = useState<MediaPortfolioItem['category']>('Steinway Session')
+
+  // Roaming Presence & Logistics State
+  const [isRoaming, setIsRoaming] = useState(false)
+  const [roamingLocation, setRoamingLocation] = useState('')
 
   useEffect(() => {
     async function loadProfile() {
@@ -93,8 +122,10 @@ export default function ParticipantProfilePage() {
         setEditEmail(targetEmail)
         setEditPhone('(414) 555-0199')
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
+        setPortfolioItems(data.portfolioMedia || [])
+        setIsRoaming(Boolean(data.isRoamingActive))
+        setRoamingLocation(data.roamingCity || 'Orlando, FL (Steinway Gallery Residency)')
 
-        // Fallback chain: Google Auth photo -> saved profile headshot -> empty string (gradient fallback)
         const photo = user?.photoURL || data.headshotUrl || ''
         setProfilePhoto(photo)
       } catch (err) {
@@ -140,7 +171,7 @@ export default function ParticipantProfilePage() {
     }
   }
 
-  // Handle .vcf Contact Card import (Supporting multiline photos & Apple vCard format)
+  // Handle .vcf Contact Card import
   const handleVCardSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -152,7 +183,6 @@ export default function ParticipantProfilePage() {
         const parsed = parseVCard(content)
         
         let hasFields = false
-        // Prefill inputs (no auto-save until user reviews & hits save)
         if (parsed.name) {
           setEditName(parsed.name)
           hasFields = true
@@ -165,8 +195,6 @@ export default function ParticipantProfilePage() {
           setEditPhone(parsed.phone)
           hasFields = true
         }
-
-        // Only overwrite avatar if photo is explicitly present in vCard
         if (parsed.photo) {
           setProfilePhoto(parsed.photo)
           hasFields = true
@@ -189,12 +217,38 @@ export default function ParticipantProfilePage() {
     e.target.value = ''
   }
 
-  const handleSyncIphoneContact = () => {
-    const syncedPhoto = user?.photoURL || ''
-    setProfilePhoto(syncedPhoto)
-    setShowPhotoModal(false)
-    if (profile && syncedPhoto) {
-      saveParticipantProfile(targetEmail, { headshotUrl: syncedPhoto }, user?.uid)
+  // Add Portfolio Media Item
+  const handleAddMediaItem = async () => {
+    if (!newMediaTitle.trim() || !newMediaUrl.trim()) return
+
+    const newItem: MediaPortfolioItem = {
+      id: `p-${Date.now()}`,
+      title: newMediaTitle.trim(),
+      url: newMediaUrl.trim(),
+      category: newMediaCategory,
+      dateAdded: new Date().toISOString().split('T')[0]
+    }
+
+    const updatedPortfolio = [newItem, ...portfolioItems]
+    setPortfolioItems(updatedPortfolio)
+    setNewMediaTitle('')
+    setNewMediaUrl('')
+    setShowAddMediaModal(false)
+
+    if (profile) {
+      await saveParticipantProfile(targetEmail, { portfolioMedia: updatedPortfolio }, user?.uid)
+    }
+  }
+
+  // Toggle Roaming Presence
+  const handleToggleRoaming = async () => {
+    const nextRoaming = !isRoaming
+    setIsRoaming(nextRoaming)
+    if (profile) {
+      await saveParticipantProfile(targetEmail, { 
+        isRoamingActive: nextRoaming,
+        roamingCity: roamingLocation
+      }, user?.uid)
     }
   }
 
@@ -206,14 +260,18 @@ export default function ParticipantProfilePage() {
         ...formData,
         fullName: editName,
         culturalCapitalNotes: bioText,
-        headshotUrl: profilePhoto
+        headshotUrl: profilePhoto,
+        isRoamingActive: isRoaming,
+        roamingCity: roamingLocation
       }, user?.uid)
       setProfile({ 
         ...profile, 
         ...formData, 
         fullName: editName, 
         culturalCapitalNotes: bioText,
-        headshotUrl: profilePhoto
+        headshotUrl: profilePhoto,
+        isRoamingActive: isRoaming,
+        roamingCity: roamingLocation
       })
       setIsEditingBio(false)
     } catch (err) {
@@ -229,6 +287,7 @@ export default function ParticipantProfilePage() {
     discipline: `${profile.primaryInstrument} Performance / Orchestra Member`,
     subdomainSource: 'orchestra',
     location: profile.homeHub,
+    roamingLocation: isRoaming ? roamingLocation : undefined,
     educationHistory: profile.educationBackground,
     culturalCapitalNotes: bioText,
     uncompensatedRehearsalHours: profile.uncompensatedRehearsalHours,
@@ -239,6 +298,7 @@ export default function ParticipantProfilePage() {
       headshotUrl: profilePhoto,
       notes: `${profile.primaryInstrument} playing with ${profile.originProject}.`
     },
+    portfolioCount: portfolioItems.length,
     eventsPlayedCount: events.length,
     totalUsdStipends: events.reduce((sum, e) => sum + e.usdStipend, 0),
     totalBeamCoins: events.reduce((sum, e) => sum + e.beamCoinsEarned, 0)
@@ -264,7 +324,7 @@ export default function ParticipantProfilePage() {
     )
   }
 
-  // PART B — Graceful Sign In with Google Gating Screen for Unauthenticated Visitors
+  // Graceful Sign In with Google Gating Screen for Unauthenticated Visitors
   if (!user && !isSandboxPreview) {
     return (
       <div className="min-h-screen bg-[#07080A] text-white flex flex-col justify-between items-center p-6 font-sans">
@@ -278,7 +338,7 @@ export default function ParticipantProfilePage() {
               BEAM Participant Portal
             </h1>
             <p className="text-xs text-white/60 leading-relaxed font-sans max-w-xs mx-auto">
-              Sign in with Google to access your BEAM Musician Profile, performance history, stipends, and BEAM Coins.
+              Sign in with Google to access your BEAM Musician Profile, portfolio, logistics, stipends, and BEAM Coins.
             </p>
           </div>
 
@@ -312,6 +372,7 @@ export default function ParticipantProfilePage() {
 
   const displayName = editName || user?.displayName || profile?.fullName || targetEmail.split('@')[0]
   const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
+  const disciplineTags = profile?.disciplineTags || [profile?.primaryInstrument || 'Cello / Musician', 'BDSO Member', 'Steinway Session Specialist']
 
   return (
     <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
@@ -401,13 +462,25 @@ export default function ParticipantProfilePage() {
           {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
-          {/* Overlaid Left-Aligned Name & Handle */}
+          {/* Overlaid Left-Aligned Name, Handle & Discipline Badges */}
           <div className="absolute bottom-4 inset-x-0 z-20">
-            <div className="max-w-6xl mx-auto w-full px-6 text-left">
+            <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
+              {/* Dynamic Role / Discipline Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                {disciplineTags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-[11px] font-mono font-semibold tracking-wide"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
               <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-md">
                 {displayName}
               </h1>
-              <p className="text-sm sm:text-base font-sans font-medium text-white/80 tracking-tight mt-0.5 drop-shadow">
+              <p className="text-sm sm:text-base font-sans font-medium text-white/80 tracking-tight drop-shadow">
                 {handleName}
               </p>
             </div>
@@ -433,22 +506,19 @@ export default function ParticipantProfilePage() {
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* STATS ROW & BIO BOX                                                        */}
-        {/* ========================================================================= */}
-
+        {/* STATS BAR & BIO DESCRIPTION */}
         <div className="relative z-10 py-4">
           <div className="max-w-6xl mx-auto w-full px-6 space-y-4">
             
             {/* Stats Bar */}
             <div className="w-full grid grid-cols-3 gap-3 text-center">
               <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-amber-400 font-serif">{profile?.beamCoinBalance || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-amber-400 font-serif">{profile?.beamCoinBalance || 48}</p>
                 <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">BEAM Coins</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 1485}</p>
                 <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">USD Stipends</p>
               </div>
 
@@ -458,11 +528,10 @@ export default function ParticipantProfilePage() {
               </div>
             </div>
 
-            {/* Bio Description Box & Edit Mode Form */}
+            {/* Bio Box & Edit Mode Form */}
             <div className="w-full p-5 sm:p-6 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
               {isEditingBio ? (
                 <div className="space-y-4">
-                  
                   {/* Contact Information & .vcf Import */}
                   <div className="space-y-3 pb-3 border-b border-white/10">
                     <div className="flex items-center justify-between">
@@ -470,7 +539,6 @@ export default function ParticipantProfilePage() {
                         Contact Information
                       </span>
 
-                      {/* Import from .vcf Contact Card Control */}
                       <button
                         type="button"
                         onClick={() => vcardFileInputRef.current?.click()}
@@ -488,7 +556,6 @@ export default function ParticipantProfilePage() {
                       </div>
                     )}
 
-                    {/* 3 Editable Inputs with Native Browser Autofill Attributes */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Full Name</label>
@@ -531,7 +598,6 @@ export default function ParticipantProfilePage() {
                     </div>
                   </div>
 
-                  {/* Bio Textarea Section */}
                   <div className="space-y-2">
                     <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Musician Bio & Cultural Notes</label>
                     <textarea
@@ -542,7 +608,6 @@ export default function ParticipantProfilePage() {
                     />
                   </div>
 
-                  {/* Save Contact Info & Bio Action Button */}
                   <button
                     onClick={handleSaveAllEdits}
                     disabled={saving}
@@ -561,70 +626,130 @@ export default function ParticipantProfilePage() {
           </div>
         </div>
 
-        {/* Minimal Scroll Content Tabs */}
+        {/* 4 DISTINCT PARTICIPANT WRAPAROUND MODULES */}
         <div className="relative z-10 py-6 pb-16">
           <div className="max-w-6xl mx-auto w-full px-6 space-y-6">
             
-            {/* Minimal Tab Switcher */}
-            <div className="flex items-center justify-center space-x-2 border-b border-white/10 pb-3">
+            {/* Module Switcher Tabs */}
+            <div className="flex items-center justify-start overflow-x-auto space-x-2 border-b border-white/10 pb-3 no-scrollbar">
               <button
-                onClick={() => setActiveTab('events')}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition ${
-                  activeTab === 'events'
-                    ? 'bg-white/20 text-white border border-white/30'
+                onClick={() => setActiveTab('portfolio')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'portfolio'
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
                     : 'text-white/50 hover:text-white'
                 }`}
               >
-                Events Played ({events.length})
+                <Video className="w-3.5 h-3.5" />
+                <span>1. Portfolio & CV</span>
               </button>
 
               <button
-                onClick={() => setActiveTab('demographics')}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition ${
-                  activeTab === 'demographics'
-                    ? 'bg-white/20 text-white border border-white/30'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                Demographics
-              </button>
-
-              <button
-                onClick={() => setActiveTab('interop')}
-                className={`px-5 py-2 rounded-full text-xs font-semibold transition ${
-                  activeTab === 'interop'
+                onClick={() => setActiveTab('logistics')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'logistics'
                     ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                     : 'text-white/50 hover:text-white'
                 }`}
               >
-                Global Vision
+                <Truck className="w-3.5 h-3.5" />
+                <span>2. Location & Logistics</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('nodes')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'nodes'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>3. Node Access & Gigs</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('triangle')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'triangle'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>4. Benefits & Unlock Tracker</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('interop')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'interop'
+                    ? 'bg-white/20 text-white border border-white/30'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Global Vision</span>
               </button>
             </div>
 
-            {/* Events Played Tab */}
-            {activeTab === 'events' && (
-              <div>
-                {events.length === 0 ? (
-                  <div className="p-8 text-center rounded-2xl bg-black/30 border border-white/10 space-y-2">
-                    <Music className="w-8 h-8 text-white/30 mx-auto" />
-                    <p className="text-xs font-semibold text-white/80">No events played recorded yet.</p>
-                    <p className="text-[11px] text-white/50">Audition for upcoming contract projects in the Training portal.</p>
+            {/* MODULE 1: IDENTITY & CRAFT (PORTFOLIO & CV) */}
+            {activeTab === 'portfolio' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-serif font-bold text-white">Media Portfolio & Recording CV</h2>
+                    <p className="text-xs text-white/60">High-caliber recording sessions (e.g. Florida Steinway Sessions) presented to institutions.</p>
+                  </div>
+
+                  <button
+                    onClick={() => setShowAddMediaModal(true)}
+                    className="px-3.5 py-2 rounded-full bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg flex items-center space-x-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Recording Link</span>
+                  </button>
+                </div>
+
+                {portfolioItems.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                    <Video className="w-8 h-8 text-white/30 mx-auto" />
+                    <p className="text-xs font-semibold text-white/80">No recording sessions added yet.</p>
+                    <p className="text-[11px] text-white/50">Click &quot;Add Recording Link&quot; above to embed YouTube or Vimeo recital links.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {events.slice(0, 4).map((event) => (
-                      <div
-                        key={event.id}
-                        className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 transition flex flex-col justify-between space-y-3"
-                      >
-                        <span className="text-[10px] font-mono uppercase text-amber-300 font-semibold truncate">
-                          {event.type}
-                        </span>
-                        <p className="text-xs font-bold text-white line-clamp-2">{event.title}</p>
-                        <div className="flex items-center justify-between text-[11px] text-white/60 pt-2 border-t border-white/10">
-                          <span className="text-emerald-400 font-semibold">${event.usdStipend} USD</span>
-                          <span>+{event.beamCoinsEarned} BEAM</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {portfolioItems.map((item) => (
+                      <div key={item.id} className="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-amber-400/40 transition space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-mono font-semibold">
+                            {item.category}
+                          </span>
+                          {item.dateAdded && (
+                            <span className="text-[10px] text-white/40 font-mono">{item.dateAdded}</span>
+                          )}
                         </div>
+
+                        <h3 className="text-sm font-serif font-bold text-white">{item.title}</h3>
+
+                        {/* Video Embed or Link Card */}
+                        {item.url.includes('firebasestorage') || item.url.endsWith('.mov') || item.url.endsWith('.mp4') ? (
+                          <video
+                            src={item.url}
+                            controls
+                            className="w-full h-40 object-cover rounded-xl border border-white/10"
+                          />
+                        ) : (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between text-xs font-mono text-amber-300 hover:text-amber-200 transition"
+                          >
+                            <span className="truncate max-w-[240px]">{item.url}</span>
+                            <ExternalLink className="w-4 h-4 shrink-0 ml-2" />
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -632,29 +757,256 @@ export default function ParticipantProfilePage() {
               </div>
             )}
 
-            {/* Demographics Tab */}
-            {activeTab === 'demographics' && (
-              <div className="p-5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 space-y-3 text-xs">
-                <div className="flex justify-between border-b border-white/10 pb-2">
-                  <span className="text-white/50">Primary Instrument</span>
-                  <span className="font-semibold text-white">{profile?.primaryInstrument}</span>
+            {/* MODULE 2: LOCATION, ROAMING & TRANSPORTATION (LOGISTICS MODULE) */}
+            {activeTab === 'logistics' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Infrastructure Needs</h2>
+                  <p className="text-xs text-white/60">Logistical realities feeding directly into the BEAM Wraparound & Support Delta Engine.</p>
                 </div>
-                <div className="flex justify-between border-b border-white/10 pb-2">
-                  <span className="text-white/50">Location Hub</span>
-                  <span className="font-semibold text-white">{profile?.homeHub}</span>
+
+                {/* Location & Roaming Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-purple-500/30 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center space-x-2">
+                      <Home className="w-5 h-5 text-amber-400 shrink-0" />
+                      <div>
+                        <p className="text-[10px] text-white/50 uppercase tracking-wider">Primary Home Node</p>
+                        <p className="text-sm font-bold text-white">{profile?.homeHub || 'Milwaukee, WI / Chicago, IL'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 bg-white/5 px-3 py-2 rounded-xl border border-white/10">
+                      <Navigation className="w-4 h-4 text-purple-400" />
+                      <div className="text-left">
+                        <span className="text-[10px] text-white/50 block">Roaming Presence Status</span>
+                        <span className="text-xs font-semibold text-purple-300">
+                          {isRoaming ? 'ACTIVE ROAMING' : 'STATIONARY AT HOME NODE'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleToggleRoaming}
+                        className={`w-10 h-6 rounded-full transition p-1 ${isRoaming ? 'bg-purple-500' : 'bg-white/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isRoaming ? 'translate-x-4' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isRoaming && (
+                    <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-200 text-xs flex items-center justify-between font-mono">
+                      <span>Currently Active In: <strong>{roamingLocation}</strong></span>
+                      <MapPin className="w-4 h-4 text-purple-400" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between border-b border-white/10 pb-2">
-                  <span className="text-white/50">Ethnicity / Diaspora</span>
-                  <span className="font-semibold text-white">{profile?.ethnicity}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-white/50">Pronouns</span>
-                  <span className="font-semibold text-white">{profile?.pronouns}</span>
+
+                {/* Infrastructure Needs Tags (Highlights Transportation) */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
+                    Wraparound Infrastructure Needs Tags
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {profile?.infrastructureNeeds?.map((need) => (
+                      <div
+                        key={need.id}
+                        className={`p-4 rounded-2xl border transition flex items-start space-x-3 ${
+                          need.id === 'transit'
+                            ? 'bg-amber-500/10 border-amber-400/50 shadow-lg'
+                            : 'bg-black/40 border-white/10'
+                        }`}
+                      >
+                        {need.id === 'transit' && <Truck className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />}
+                        {need.id === 'housing' && <Building2 className="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />}
+                        {need.id === 'meals' && <Utensils className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />}
+                        {need.id === 'instrument_maintenance' && <Wrench className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />}
+
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white">{need.label}</span>
+                            {need.id === 'transit' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-mono font-bold uppercase">
+                                Support Delta Priority
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-white/40 font-mono capitalize">{need.priority}</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-white/60 leading-tight">{need.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Global Vision Interop Tab */}
+            {/* MODULE 3: REGIONAL NODE ACCESS & OPPORTUNITIES */}
+            {activeTab === 'nodes' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-serif font-bold text-white">Regional Node Access & Contract Gigs</h2>
+                  <p className="text-xs text-white/60">Institutional partner hubs and contract opportunities mapped to your active region.</p>
+                </div>
+
+                {/* Mapped Node Access Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-blue-500/30 space-y-3">
+                  <div className="flex items-center space-x-2 text-blue-300">
+                    <Building2 className="w-5 h-5" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider font-mono">Active Mapped Node Access</h3>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs space-y-2">
+                    <p className="font-bold text-white text-sm">
+                      {isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI'}
+                    </p>
+                    <p className="text-white/70 leading-relaxed">
+                      {isRoaming
+                        ? 'Full access to Steinway & Sons Orlando recording hall, Steinway D concert grand, and Concord Symphony residency studio.'
+                        : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Regional Opportunities List */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
+                    Immediate Regional Opportunities ({events.length})
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {events.map((event) => (
+                      <div
+                        key={event.id}
+                        className="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-white/30 transition space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-amber-300 uppercase font-semibold">{event.type}</span>
+                          <span className="text-[10px] text-white/50 font-mono">{event.cityState}</span>
+                        </div>
+
+                        <p className="text-xs font-bold text-white">{event.title}</p>
+                        <p className="text-[11px] text-white/60 truncate">{event.repertoire}</p>
+
+                        <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                          <span className="text-emerald-400 font-bold">${event.usdStipend} USD</span>
+                          <span className="text-amber-400 font-bold">+{event.beamCoinsEarned} BEAM</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODULE 4: THE BEAM TRIANGLE & BENEFITS TRACKER */}
+            {activeTab === 'triangle' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-serif font-bold text-white">The BEAM Triangle & Benefits Unlock Tracker</h2>
+                  <p className="text-xs text-white/60">Dual currency redemption engine balancing USD stipends and BEAM Coin credits.</p>
+                </div>
+
+                {/* Dual Currency Balances Card */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/20 to-black/60 border border-amber-400/40 space-y-1">
+                    <Coins className="w-6 h-6 text-amber-400" />
+                    <p className="text-3xl font-serif font-bold text-amber-300">{profile?.beamCoinBalance || 48}</p>
+                    <p className="text-xs text-white/60 uppercase font-mono tracking-wider">BEAM Coins Balance</p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-black/60 border border-emerald-400/40 space-y-1">
+                    <DollarSign className="w-6 h-6 text-emerald-400" />
+                    <p className="text-3xl font-serif font-bold text-emerald-300">${profile?.usdTotalEarned || 1485}</p>
+                    <p className="text-xs text-white/60 uppercase font-mono tracking-wider">Total USD Stipends Earned</p>
+                  </div>
+                </div>
+
+                {/* Redemption Phases Unlock Tracker */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
+                    Redemption Phases Unlock Tracker
+                  </h3>
+
+                  {/* Phase 1: Unlocked */}
+                  <div className="p-5 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-emerald-400">
+                        <Unlock className="w-4 h-4" />
+                        <span className="text-xs font-bold font-mono uppercase">Phase 1 (Active / Unlocked)</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono">100% UNLOCKED</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Masterclasses & Repertoire Coaching</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Instrument Maintenance & Bow Rehair</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Private Lessons & Masterwork Sessions</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Concert Tickets & VIP Guest Access</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase 2: Locked / Earning Toward */}
+                  <div className="p-5 rounded-2xl bg-black/40 border border-amber-500/30 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-amber-300">
+                        <Lock className="w-4 h-4" />
+                        <span className="text-xs font-bold font-mono uppercase">Phase 2 (Locked / Earning Toward)</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono">EARNING PROGRESS</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-white/80">Institutional Housing Credits</span>
+                          <span className="text-amber-300 font-mono">36 / 48 BEAM (75%)</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full w-[75%]" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-white/80">Regional Food & Catering Passes</span>
+                          <span className="text-amber-300 font-mono">30 / 50 BEAM (60%)</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full w-[60%]" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-white/80">BEAM Fleet / Ground Transit Access</span>
+                          <span className="text-amber-300 font-mono">42 / 50 BEAM (85%)</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full w-[85%]" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* GLOBAL VISION INTEROP TAB */}
             {activeTab === 'interop' && (
               <div className="p-5 rounded-2xl bg-black/40 backdrop-blur-md border border-purple-500/30 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
@@ -677,6 +1029,66 @@ export default function ParticipantProfilePage() {
         </div>
 
       </div>
+
+      {/* Add Media Portfolio Item Modal */}
+      {showAddMediaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-serif font-bold text-white">Add Recording Session / Media Link</h3>
+              <button onClick={() => setShowAddMediaModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Recording Title</label>
+                <input
+                  type="text"
+                  value={newMediaTitle}
+                  onChange={(e) => setNewMediaTitle(e.target.value)}
+                  placeholder="e.g. Schumann Adagio & Allegro — Steinway Gallery"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Media Category</label>
+                <select
+                  value={newMediaCategory}
+                  onChange={(e) => setNewMediaCategory(e.target.value as MediaPortfolioItem['category'])}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                >
+                  <option value="Steinway Session">Steinway Session</option>
+                  <option value="Orchestral Performance">Orchestral Performance</option>
+                  <option value="Chamber Masterclass">Chamber Masterclass</option>
+                  <option value="Solo Recital">Solo Recital</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Video URL (YouTube / Vimeo / MP4)</label>
+                <input
+                  type="url"
+                  value={newMediaUrl}
+                  onChange={(e) => setNewMediaUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <button
+                onClick={handleAddMediaItem}
+                disabled={!newMediaTitle || !newMediaUrl}
+                className="w-full py-3 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg mt-2 disabled:opacity-50"
+              >
+                Save to Portfolio
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Photo Selection / Sync Modal */}
       {showPhotoModal && (
