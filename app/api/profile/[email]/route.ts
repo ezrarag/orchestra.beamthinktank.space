@@ -3,10 +3,11 @@ import { fetchCrossSiteRecordPayload } from '@/lib/api/profile'
 
 export async function GET(
   request: Request,
-  { params }: { params: { email: string } }
+  context: { params: Promise<{ email: string }> }
 ) {
   try {
-    const rawEmail = params.email ? decodeURIComponent(params.email) : ''
+    const { email } = await context.params
+    const rawEmail = email ? decodeURIComponent(email) : ''
     if (!rawEmail) {
       return NextResponse.json({ error: 'Email parameter is required' }, { status: 400 })
     }
