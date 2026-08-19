@@ -12,7 +12,10 @@ import {
   ArrowRight, 
   ChevronDown, 
   Sparkles, 
-  ArrowUpRight
+  ArrowUpRight,
+  Play,
+  Pause,
+  User as UserIcon
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -71,13 +74,17 @@ export default function HeroStage() {
   const [selectedPortal, setSelectedPortal] = useState<PortalCategory | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  
+  // Requirement 1 & 2: Autoplay disabled by default
+  const [isAutoplayActive, setIsAutoplayActive] = useState(false)
+  
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Seeding/Fetching variables
   const [slides, setSlides] = useState<HeroSlide[]>([])
   const [collageVideoUrls, setCollageVideoUrls] = useState<string[]>([])
   const [failedVideoUrls, setFailedVideoUrls] = useState<string[]>([])
-  const { role } = useUserRole()
+  const { user, role } = useUserRole()
 
   const isParticipantAdmin =
     role === 'musician' ||
@@ -98,14 +105,21 @@ export default function HeroStage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Auto advance hero categories (pauses when dropdown is open)
+  // Autoplay effect (only runs if explicitly enabled by user, pauses on manual interaction)
   useEffect(() => {
-    if (isDropdownOpen) return
+    if (!isAutoplayActive || isDropdownOpen) return
     const timer = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % CATEGORIES.length)
     }, AUTO_ADVANCE_MS)
     return () => clearInterval(timer)
-  }, [isDropdownOpen])
+  }, [isAutoplayActive, isDropdownOpen])
+
+  // Pause autoplay permanently on first manual interaction
+  const handleManualInteraction = () => {
+    if (isAutoplayActive) {
+      setIsAutoplayActive(false)
+    }
+  }
 
   // Load slides config
   useEffect(() => {
@@ -185,10 +199,12 @@ export default function HeroStage() {
   }
 
   function showPrevious() {
+    handleManualInteraction()
     setActiveIndex((prev) => (prev - 1 + CATEGORIES.length) % CATEGORIES.length)
   }
 
   function showNext() {
+    handleManualInteraction()
     setActiveIndex((prev) => (prev + 1) % CATEGORIES.length)
   }
 
@@ -240,7 +256,10 @@ export default function HeroStage() {
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onClick={() => {
+                  handleManualInteraction()
+                  setIsDropdownOpen(!isDropdownOpen)
+                }}
                 className="flex items-center space-x-1.5 font-semibold text-amber-400 hover:text-amber-300 transition-all focus:outline-none py-1 px-2.5 rounded-lg bg-amber-400/10 border border-amber-400/20 hover:border-amber-400/40"
                 aria-expanded={isDropdownOpen}
                 aria-label="Orchestra portal selector"
@@ -268,6 +287,7 @@ export default function HeroStage() {
                         key={cat.id}
                         type="button"
                         onClick={() => {
+                          handleManualInteraction()
                           setActiveIndex(idx)
                           setIsDropdownOpen(false)
                         }}
@@ -292,6 +312,27 @@ export default function HeroStage() {
                         </div>
                       </button>
                     ))}
+
+                    {/* Requirement 3: 4th Entry "My Profile" in Dropdown Menu */}
+                    <Link
+                      href="/profile"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-3 rounded-xl transition-all hover:bg-white/10 text-white/70 hover:text-white border-t border-white/10 mt-1"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-emerald-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-white">My Profile</span>
+                          <span className="text-[10px] font-mono text-emerald-400 font-semibold">(04)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          View & Manage Musician Profile
+                        </div>
+                      </div>
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -306,15 +347,15 @@ export default function HeroStage() {
           </div>
         </div>
 
-        {/* MAIN HERO CONTENT (Forge Style Typography) */}
+        {/* MAIN HERO CONTENT (Requirement 4: Tightened Transition Timing) */}
         <div className="relative z-20 mx-auto max-w-7xl w-full px-6 py-12 my-auto flex flex-col justify-center">
-          <AnimatePresence mode="wait" initial={false}>
+          <AnimatePresence mode="sync">
             <motion.div
               key={activeCategory.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               className="max-w-4xl space-y-6"
             >
               <div 
@@ -366,12 +407,15 @@ export default function HeroStage() {
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => setActiveIndex(index)}
+                onClick={() => {
+                  handleManualInteraction()
+                  setActiveIndex(index)
+                }}
                 aria-label={`Show ${cat.label}`}
                 className="flex h-8 items-center"
               >
                 <span
-                  className={`block h-1 rounded-full transition-all duration-500 ${
+                  className={`block h-1 rounded-full transition-all duration-300 ${
                     index === activeIndex ? 'w-10' : 'w-3 bg-white/30 hover:bg-white/60'
                   }`}
                   style={index === activeIndex ? { backgroundColor: cat.colorAccent } : undefined}
@@ -380,8 +424,19 @@ export default function HeroStage() {
             ))}
           </div>
 
-          {/* Carousel Arrows */}
+          {/* Carousel Controls (Arrows + Autoplay Pause/Play Toggle) */}
           <div className="flex gap-3">
+            {/* Requirement 2: Play/Pause Autoplay Control */}
+            <button
+              type="button"
+              onClick={() => setIsAutoplayActive(!isAutoplayActive)}
+              aria-label={isAutoplayActive ? "Pause autoplay" : "Start autoplay"}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white hover:bg-white/20 transition-all backdrop-blur-md"
+              title={isAutoplayActive ? "Pause Autoplay" : "Start Autoplay"}
+            >
+              {isAutoplayActive ? <Pause className="h-4 w-4 text-amber-400" /> : <Play className="h-4 w-4 text-white/70" />}
+            </button>
+
             <button
               type="button"
               onClick={showPrevious}
