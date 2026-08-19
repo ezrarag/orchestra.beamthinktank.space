@@ -148,21 +148,39 @@ export default function ParticipantProfilePage() {
       if (content) {
         const parsed = parseVCard(content)
         
+        let hasFields = false
         // Prefill inputs (no auto-save until user reviews & hits save)
-        if (parsed.name) setEditName(parsed.name)
-        if (parsed.email) setEditEmail(parsed.email)
-        if (parsed.phone) setEditPhone(parsed.phone)
+        if (parsed.name) {
+          setEditName(parsed.name)
+          hasFields = true
+        }
+        if (parsed.email) {
+          setEditEmail(parsed.email)
+          hasFields = true
+        }
+        if (parsed.phone) {
+          setEditPhone(parsed.phone)
+          hasFields = true
+        }
 
         // Only overwrite avatar if photo is explicitly present in vCard
         if (parsed.photo) {
           setProfilePhoto(parsed.photo)
+          hasFields = true
         }
 
-        setVcardImportedNotice(true)
-        setTimeout(() => setVcardImportedNotice(false), 5000)
+        if (hasFields) {
+          setIsEditingBio(true)
+          setShowPhotoModal(false)
+          setVcardImportedNotice(true)
+          setTimeout(() => setVcardImportedNotice(false), 5000)
+        } else {
+          alert('Could not find Name, Email, Phone, or Photo in the selected .vcf file.')
+        }
       }
     }
     reader.readAsText(file)
+    e.target.value = ''
   }
 
   const handleSyncIphoneContact = () => {
