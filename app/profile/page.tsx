@@ -111,7 +111,10 @@ export default function ParticipantProfilePage() {
     if (!auth) return
     try {
       const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
+      const res = await signInWithPopup(auth, provider)
+      if (res.user) {
+        await ensureParticipantProfileExists(res.user)
+      }
     } catch (err) {
       console.error('Google Sign-In Error:', err)
     }

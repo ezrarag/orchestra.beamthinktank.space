@@ -236,6 +236,44 @@ export async function saveParticipantProfile(
   }
 }
 
+export async function ensureParticipantProfileExists(user: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null }): Promise<void> {
+  if (!db || !user.email) return
+
+  const normEmail = normalizeEmail(user.email)
+  const primaryId = `participant_role_${user.uid}`
+  const altId = `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
+
+  try {
+    const snap = await getDoc(doc(db, 'participantProfiles', primaryId))
+    if (!snap.exists()) {
+      const altSnap = await getDoc(doc(db, 'participantProfiles', altId))
+      if (!altSnap.exists()) {
+        const isEzra = normEmail === 'ezra.haugabrooks@gmail.com'
+        const initialProfile: Partial<ParticipantDemographics> = isEzra ? DEFAULT_EZRA_PROFILE : {
+          fullName: user.displayName || normEmail.split('@')[0],
+          email: normEmail,
+          primaryRole: 'BEAM Participant Musician',
+          originProject: 'BEAM Orchestra Network',
+          primaryInstrument: 'Strings / Musician',
+          homeHub: 'Member Hub',
+          willingnessToTravel: true,
+          ethnicity: 'BEAM Artist',
+          pronouns: 'They / Them',
+          educationBackground: 'BEAM Musician Participant',
+          culturalCapitalNotes: 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.',
+          uncompensatedRehearsalHours: 0,
+          beamCoinBalance: 0,
+          usdTotalEarned: 0,
+          headshotUrl: user.photoURL || ''
+        }
+        await saveParticipantProfile(normEmail, initialProfile, user.uid)
+      }
+    }
+  } catch (err) {
+    console.warn('Error ensuring participant profile exists:', err)
+  }
+}
+
 export async function fetchCrossSiteRecordPayload(email: string): Promise<OrchestraCrossSiteRecordPayload> {
   const profile = await fetchParticipantProfile(email)
   const isEzra = normalizeEmail(email) === 'ezra.haugabrooks@gmail.com'

@@ -6,6 +6,8 @@ import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
+import { ensureParticipantProfileExists } from '@/lib/api/profile'
+
 export type UserRole = 'beam_admin' | 'partner_admin' | 'admin_staff' | 'board' | 'musician' | 'subscriber' | 'audience'
 
 const adminAuthBypassEnabled =
@@ -67,9 +69,13 @@ export function useUserRole(options: UseUserRoleOptions = {}): UserWithRole {
       const effectiveUser = realUser || (bypassEnabled || ADMIN_GATEWAYS_DISABLED ? mockAdminUser : null)
       setUser(effectiveUser)
       
+      if (realUser) {
+        void ensureParticipantProfileExists(realUser)
+      }
+
       if (effectiveUser) {
         try {
-          if (ADMIN_GATEWAYS_DISABLED || isAdminEmailAllowed(effectiveUser.email)) {
+          if (isAdminEmailAllowed(effectiveUser.email)) {
             setRole('beam_admin')
             setLoading(false)
             return
