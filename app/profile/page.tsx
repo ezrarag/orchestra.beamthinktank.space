@@ -6,6 +6,7 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { parseVCard } from '@/lib/vcard'
+import { parseCVText } from '@/lib/cvParser'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -48,7 +49,8 @@ import {
   Layers,
   Utensils,
   Wrench,
-  Award
+  Award,
+  FileText
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
@@ -71,11 +73,12 @@ export default function ParticipantProfilePage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'portfolio' | 'logistics' | 'nodes' | 'triangle' | 'interop'>('portfolio')
   
-  // Photo management state
+  // Photo management & CV File input refs
   const [profilePhoto, setProfilePhoto] = useState<string>('')
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const avatarFileInputRef = useRef<HTMLInputElement>(null)
   const vcardFileInputRef = useRef<HTMLInputElement>(null)
+  const cvFileInputRef = useRef<HTMLInputElement>(null)
 
   // Edit mode state
   const [isEditingBio, setIsEditingBio] = useState(false)
@@ -84,11 +87,14 @@ export default function ParticipantProfilePage() {
   const [copied, setCopied] = useState(false)
   const [formData, setFormData] = useState<Partial<ParticipantDemographics>>({})
 
-  // Editable Contact Info fields
+  // Editable Contact Info & Discipline Tag Pills state
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [disciplinePills, setDisciplinePills] = useState<string[]>([])
+  const [newTagInput, setNewTagInput] = useState('')
   const [vcardImportedNotice, setVcardImportedNotice] = useState(false)
+  const [cvImportedNotice, setCvImportedNotice] = useState(false)
 
   // Portfolio Media State
   const [portfolioItems, setPortfolioItems] = useState<MediaPortfolioItem[]>([])
@@ -121,6 +127,7 @@ export default function ParticipantProfilePage() {
         setEditName(user?.displayName || data.fullName || targetEmail.split('@')[0])
         setEditEmail(targetEmail)
         setEditPhone('(414) 555-0199')
+        setDisciplinePills(data.disciplineTags || ['Resident Cellist', 'Steinway Recording Specialist', 'Media Producer'])
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
         setPortfolioItems(data.portfolioMedia || [])
         setIsRoaming(Boolean(data.isRoamingActive))
@@ -217,6 +224,62 @@ export default function ParticipantProfilePage() {
     e.target.value = ''
   }
 
+  // Handle CV / Resume File Upload & Parsing
+  const handleCVFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string
+      if (content) {
+        const parsed = parseCVText(content)
+        let hasUpdates = false
+
+        if (parsed.fullName) {
+          setEditName(parsed.fullName)
+          hasUpdates = true
+        }
+        if (parsed.email) {
+          setEditEmail(parsed.email)
+          hasUpdates = true
+        }
+        if (parsed.phone) {
+          setEditPhone(parsed.phone)
+          hasUpdates = true
+        }
+        if (parsed.disciplineTags && parsed.disciplineTags.length > 0) {
+          setDisciplinePills(prev => Array.from(new Set([...prev, ...parsed.disciplineTags!])))
+          hasUpdates = true
+        }
+        if (parsed.bio) {
+          setBioText(parsed.bio)
+          hasUpdates = true
+        }
+
+        setIsEditingBio(true)
+        setShowPhotoModal(false)
+        setCvImportedNotice(true)
+        setTimeout(() => setCvImportedNotice(false), 6000)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  // Add / Remove Role Discipline Pills
+  const handleAddPill = (tagToAdd: string) => {
+    const trimmed = tagToAdd.trim()
+    if (trimmed && !disciplinePills.includes(trimmed)) {
+      setDisciplinePills([...disciplinePills, trimmed])
+      setNewTagInput('')
+    }
+  }
+
+  const handleRemovePill = (tagToRemove: string) => {
+    setDisciplinePills(disciplinePills.filter(t => t !== tagToRemove))
+  }
+
   // Add Portfolio Media Item
   const handleAddMediaItem = async () => {
     if (!newMediaTitle.trim() || !newMediaUrl.trim()) return
@@ -261,6 +324,7 @@ export default function ParticipantProfilePage() {
         fullName: editName,
         culturalCapitalNotes: bioText,
         headshotUrl: profilePhoto,
+        disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
         roamingCity: roamingLocation
       }, user?.uid)
@@ -270,6 +334,7 @@ export default function ParticipantProfilePage() {
         fullName: editName, 
         culturalCapitalNotes: bioText,
         headshotUrl: profilePhoto,
+        disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
         roamingCity: roamingLocation
       })
@@ -285,6 +350,7 @@ export default function ParticipantProfilePage() {
     name: editName || profile.fullName,
     email: editEmail || profile.email,
     discipline: `${profile.primaryInstrument} Performance / Orchestra Member`,
+    disciplineTags: disciplinePills,
     subdomainSource: 'orchestra',
     location: profile.homeHub,
     roamingLocation: isRoaming ? roamingLocation : undefined,
@@ -372,7 +438,6 @@ export default function ParticipantProfilePage() {
 
   const displayName = editName || user?.displayName || profile?.fullName || targetEmail.split('@')[0]
   const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
-  const disciplineTags = profile?.disciplineTags || [profile?.primaryInstrument || 'Cello / Musician', 'BDSO Member', 'Steinway Session Specialist']
 
   return (
     <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
@@ -390,6 +455,13 @@ export default function ParticipantProfilePage() {
         ref={vcardFileInputRef}
         onChange={handleVCardSelect}
         accept=".vcf,text/vcard,text/x-vcard"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={cvFileInputRef}
+        onChange={handleCVFileUpload}
+        accept=".txt,.md,.pdf,.docx"
         className="hidden"
       />
 
@@ -462,15 +534,15 @@ export default function ParticipantProfilePage() {
           {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
-          {/* Overlaid Left-Aligned Name, Handle & Discipline Badges */}
+          {/* Overlaid Left-Aligned Name, Handle & Dynamic Role Pills */}
           <div className="absolute bottom-4 inset-x-0 z-20">
             <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
-              {/* Dynamic Role / Discipline Badges */}
+              {/* Live CV Role & Discipline Tags / Pills */}
               <div className="flex flex-wrap items-center gap-2">
-                {disciplineTags.map((tag, idx) => (
+                {disciplinePills.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-[11px] font-mono font-semibold tracking-wide"
+                    className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-xs font-mono font-semibold tracking-wide"
                   >
                     {tag}
                   </span>
@@ -487,14 +559,14 @@ export default function ParticipantProfilePage() {
           </div>
         </div>
 
-        {/* Action Row Below Photo: Wide White Pill on Left + Secondary Icon Button on Right */}
+        {/* Action Row Below Photo */}
         <div className="relative z-20 bg-[#0F1015] py-4">
           <div className="max-w-6xl mx-auto w-full px-6 flex items-center space-x-4">
             <button
               onClick={() => setIsEditingBio(!isEditingBio)}
               className="flex-1 py-3.5 px-6 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl text-center"
             >
-              {isEditingBio ? 'Done Editing' : 'Edit Profile'}
+              {isEditingBio ? 'Done Editing' : 'Edit Profile & CV'}
             </button>
 
             <button
@@ -528,31 +600,52 @@ export default function ParticipantProfilePage() {
               </div>
             </div>
 
-            {/* Bio Box & Edit Mode Form */}
+            {/* Bio Box & Live CV Edit Mode Form */}
             <div className="w-full p-5 sm:p-6 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
               {isEditingBio ? (
-                <div className="space-y-4">
-                  {/* Contact Information & .vcf Import */}
+                <div className="space-y-5">
+                  
+                  {/* CV & Contact Card Upload Header */}
                   <div className="space-y-3 pb-3 border-b border-white/10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
-                        Contact Information
+                        Contact Information & CV Parser
                       </span>
 
-                      <button
-                        type="button"
-                        onClick={() => vcardFileInputRef.current?.click()}
-                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/15 flex items-center space-x-1.5 transition"
-                      >
-                        <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Import .vcf Card</span>
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {/* Upload & Parse CV Button */}
+                        <button
+                          type="button"
+                          onClick={() => cvFileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-medium border border-amber-400/40 flex items-center space-x-1.5 transition"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Upload & Parse CV</span>
+                        </button>
+
+                        {/* Import .vcf Button */}
+                        <button
+                          type="button"
+                          onClick={() => vcardFileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/15 flex items-center space-x-1.5 transition"
+                        >
+                          <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Import .vcf</span>
+                        </button>
+                      </div>
                     </div>
 
                     {vcardImportedNotice && (
                       <div className="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center space-x-1.5">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span>Parsed .vcf card! Review inputs below before saving.</span>
+                      </div>
+                    )}
+
+                    {cvImportedNotice && (
+                      <div className="p-2.5 rounded-lg bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-medium flex items-center space-x-1.5">
+                        <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                        <span>CV Parsed Successfully! Review extracted role pills & fields below before saving.</span>
                       </div>
                     )}
 
@@ -598,6 +691,61 @@ export default function ParticipantProfilePage() {
                     </div>
                   </div>
 
+                  {/* EDITABLE DISCIPLINE & ROLE PILLS MODULE */}
+                  <div className="space-y-2.5 pb-3 border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
+                        Artistic Role & Discipline Pills (CV Header)
+                      </span>
+                      <span className="text-[10px] text-white/40 font-mono">Click (✕) to remove any incorrect role tag</span>
+                    </div>
+
+                    {/* Interactive Pills List */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {disciplinePills.map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-white text-xs font-mono font-semibold"
+                        >
+                          <span>{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePill(tag)}
+                            className="w-4 h-4 rounded-full bg-white/20 hover:bg-red-500/80 text-white flex items-center justify-center text-[10px] transition ml-1"
+                            title={`Remove ${tag}`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Add Custom Role Tag Input */}
+                    <div className="flex items-center space-x-2 pt-1">
+                      <input
+                        type="text"
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAddPill(newTagInput)
+                          }
+                        }}
+                        placeholder="Add custom role tag (e.g. Resident Cellist, Media Producer)"
+                        className="flex-1 px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-amber-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddPill(newTagInput)}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition"
+                      >
+                        + Add Pill
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bio Textarea Section */}
                   <div className="space-y-2">
                     <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Musician Bio & Cultural Notes</label>
                     <textarea
@@ -608,12 +756,13 @@ export default function ParticipantProfilePage() {
                     />
                   </div>
 
+                  {/* Save All Edits Button */}
                   <button
                     onClick={handleSaveAllEdits}
                     disabled={saving}
                     className="w-full py-3 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition shadow-lg"
                   >
-                    {saving ? 'Saving Profile...' : 'Save Contact Info & Bio'}
+                    {saving ? 'Saving Live CV & Profile...' : 'Save Live CV & Profile'}
                   </button>
                 </div>
               ) : (
@@ -801,7 +950,7 @@ export default function ParticipantProfilePage() {
                   )}
                 </div>
 
-                {/* Infrastructure Needs Tags (Highlights Transportation) */}
+                {/* Infrastructure Needs Tags */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
                     Wraparound Infrastructure Needs Tags
@@ -850,7 +999,6 @@ export default function ParticipantProfilePage() {
                   <p className="text-xs text-white/60">Institutional partner hubs and contract opportunities mapped to your active region.</p>
                 </div>
 
-                {/* Mapped Node Access Card */}
                 <div className="p-5 rounded-2xl bg-black/40 border border-blue-500/30 space-y-3">
                   <div className="flex items-center space-x-2 text-blue-300">
                     <Building2 className="w-5 h-5" />
@@ -869,7 +1017,6 @@ export default function ParticipantProfilePage() {
                   </div>
                 </div>
 
-                {/* Regional Opportunities List */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
                     Immediate Regional Opportunities ({events.length})
@@ -908,7 +1055,6 @@ export default function ParticipantProfilePage() {
                   <p className="text-xs text-white/60">Dual currency redemption engine balancing USD stipends and BEAM Coin credits.</p>
                 </div>
 
-                {/* Dual Currency Balances Card */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/20 to-black/60 border border-amber-400/40 space-y-1">
                     <Coins className="w-6 h-6 text-amber-400" />
@@ -923,13 +1069,11 @@ export default function ParticipantProfilePage() {
                   </div>
                 </div>
 
-                {/* Redemption Phases Unlock Tracker */}
                 <div className="space-y-4">
                   <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
                     Redemption Phases Unlock Tracker
                   </h3>
 
-                  {/* Phase 1: Unlocked */}
                   <div className="p-5 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-emerald-400">
@@ -959,7 +1103,6 @@ export default function ParticipantProfilePage() {
                     </div>
                   </div>
 
-                  {/* Phase 2: Locked / Earning Toward */}
                   <div className="p-5 rounded-2xl bg-black/40 border border-amber-500/30 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 text-amber-300">
@@ -1090,14 +1233,22 @@ export default function ParticipantProfilePage() {
         </div>
       )}
 
-      {/* Photo Selection / Sync Modal */}
+      {/* Photo / File Selection Modal */}
       {showPhotoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="w-full max-w-sm p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 text-center shadow-2xl">
-            <h3 className="text-lg font-serif font-bold text-white">Profile Photo Options</h3>
-            <p className="text-xs text-white/60">Choose how you want to load or update your profile picture.</p>
+            <h3 className="text-lg font-serif font-bold text-white">Import & Photo Options</h3>
+            <p className="text-xs text-white/60">Choose how you want to update your profile, photo, or live CV.</p>
 
             <div className="space-y-2 pt-2">
+              <button
+                onClick={() => cvFileInputRef.current?.click()}
+                className="w-full py-3 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-medium text-xs flex items-center justify-center space-x-2 border border-amber-400/30"
+              >
+                <FileText className="w-4 h-4 text-amber-400" />
+                <span>Upload & Parse CV / Resume</span>
+              </button>
+
               <button
                 onClick={() => avatarFileInputRef.current?.click()}
                 className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
