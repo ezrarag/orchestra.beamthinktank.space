@@ -71,8 +71,7 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   culturalCapitalNotes: 'Cellist & Sectional Leader for BDSO annual concert series, rehearsal intensives, and community youth mentorship.',
   uncompensatedRehearsalHours: 24,
   beamCoinBalance: 48,
-  usdTotalEarned: 1485,
-  headshotUrl: 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg'
+  usdTotalEarned: 1485
 }
 
 export const DEFAULT_EZRA_EVENTS: EventPlayed[] = [

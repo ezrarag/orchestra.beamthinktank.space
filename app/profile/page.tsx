@@ -30,13 +30,8 @@ import {
   Edit3, 
   Save, 
   LogIn, 
-  User as UserIcon, 
-  Phone as PhoneIcon, 
-  Mail as MailIcon, 
-  FileText 
+  User as UserIcon
 } from 'lucide-react'
-
-const DEFAULT_COVER_IMAGE = 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg'
 
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
@@ -82,8 +77,8 @@ export default function ParticipantProfilePage() {
         setEditPhone('(414) 555-0199')
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
 
-        // Prefer Google Login photo URL if available, else saved profile headshot, else default cover
-        const photo = user?.photoURL || data.headshotUrl || DEFAULT_COVER_IMAGE
+        // Fallback chain: Google Auth photo -> saved profile headshot -> empty string (gradient fallback)
+        const photo = user?.photoURL || data.headshotUrl || ''
         setProfilePhoto(photo)
       } catch (err) {
         console.error('Error loading profile:', err)
@@ -152,10 +147,10 @@ export default function ParticipantProfilePage() {
   }
 
   const handleSyncIphoneContact = () => {
-    const syncedPhoto = user?.photoURL || DEFAULT_COVER_IMAGE
+    const syncedPhoto = user?.photoURL || ''
     setProfilePhoto(syncedPhoto)
     setShowPhotoModal(false)
-    if (profile) {
+    if (profile && syncedPhoto) {
       saveParticipantProfile(targetEmail, { headshotUrl: syncedPhoto })
     }
   }
@@ -252,19 +247,23 @@ export default function ParticipantProfilePage() {
       <div className="relative min-h-screen max-w-lg mx-auto flex flex-col justify-between overflow-hidden shadow-2xl bg-[#0F1015]">
         
         {/* ========================================================================= */}
-        {/* PART 1 — HERO SECTION REFACTOR                                           */}
+        {/* PART A — HERO SECTION VIEWPORT SIZING & FALLBACK FIX                      */}
         {/* ========================================================================= */}
         
-        <div className="relative w-full h-[420px] sm:h-[460px] overflow-hidden bg-[#0A0B0E]">
-          {/* Full-bleed Cover/Profile Photo filling top ~65-70% of viewport */}
+        {/* Dynamic Viewport Height (68dvh) for iOS Safari / Chrome address bar handling */}
+        <div className="relative w-full h-[68dvh] min-h-[360px] max-h-[640px] overflow-hidden bg-[#0A0B0E]">
+          {/* Full-bleed Cover/Profile Photo or Dark Gradient Fallback */}
           {profilePhoto ? (
             <img
               src={profilePhoto}
               alt={displayName}
+              onError={() => setProfilePhoto('')}
               className="w-full h-full object-cover object-center"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#241F38] via-[#151724] to-[#0A0B0E]" />
+            <div className="w-full h-full bg-gradient-to-br from-[#241F38] via-[#151724] to-[#0A0B0E] flex items-center justify-center relative">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(212,175,55,0.12),_transparent_65%)]" />
+            </div>
           )}
 
           {/* Top Floating Header Control Bar */}
@@ -361,10 +360,7 @@ export default function ParticipantProfilePage() {
             {isEditingBio ? (
               <div className="space-y-4">
                 
-                {/* ========================================================================= */}
-                {/* PART 2 — EDIT MODE CONTACT CARD QUICK-FILL                                */}
-                {/* ========================================================================= */}
-                
+                {/* Contact Information & .vcf Import */}
                 <div className="space-y-3 pb-3 border-b border-white/10">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
