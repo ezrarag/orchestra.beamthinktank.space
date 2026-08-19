@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { parseVCard } from '@/lib/vcard'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -18,23 +19,21 @@ import {
   Camera, 
   Upload, 
   Smartphone, 
-  Sparkles, 
   Coins, 
   DollarSign, 
   Calendar, 
   Music, 
-  MapPin, 
   Globe, 
   CheckCircle2, 
   Copy, 
   Check, 
-  ExternalLink,
-  Edit3,
-  Save,
-  LogIn,
-  User as UserIcon,
-  ShieldCheck,
-  ChevronDown
+  Edit3, 
+  Save, 
+  LogIn, 
+  User as UserIcon, 
+  Phone as PhoneIcon, 
+  Mail as MailIcon, 
+  FileText 
 } from 'lucide-react'
 
 const DEFAULT_COVER_IMAGE = 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg'
@@ -54,14 +53,21 @@ export default function ParticipantProfilePage() {
   // Photo management state
   const [profilePhoto, setProfilePhoto] = useState<string>('')
   const [showPhotoModal, setShowPhotoModal] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const avatarFileInputRef = useRef<HTMLInputElement>(null)
+  const vcardFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Editing state
+  // Edit mode state
   const [isEditingBio, setIsEditingBio] = useState(false)
   const [bioText, setBioText] = useState('')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [formData, setFormData] = useState<Partial<ParticipantDemographics>>({})
+
+  // Editable Contact Info fields (Part 2)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [vcardImportedNotice, setVcardImportedNotice] = useState(false)
 
   useEffect(() => {
     async function loadProfile() {
@@ -71,9 +77,12 @@ export default function ParticipantProfilePage() {
         setProfile(data)
         setFormData(data)
         setBioText(data.culturalCapitalNotes || 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.')
+        setEditName(user?.displayName || data.fullName || 'Ezra Haugabrooks')
+        setEditEmail(targetEmail)
+        setEditPhone('(414) 555-0199')
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
 
-        // Prefer Google Login photo URL if available, else saved profile headshot, else default
+        // Prefer Google Login photo URL if available, else saved profile headshot, else default cover
         const photo = user?.photoURL || data.headshotUrl || DEFAULT_COVER_IMAGE
         setProfilePhoto(photo)
       } catch (err) {
@@ -83,7 +92,7 @@ export default function ParticipantProfilePage() {
       }
     }
     loadProfile()
-  }, [targetEmail, user?.photoURL, isBdsoEzra])
+  }, [targetEmail, user?.photoURL, user?.displayName, isBdsoEzra])
 
   const handleGoogleSignIn = async () => {
     if (!auth) return
@@ -95,6 +104,7 @@ export default function ParticipantProfilePage() {
     }
   }
 
+  // Handle image upload from device
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -113,8 +123,35 @@ export default function ParticipantProfilePage() {
     }
   }
 
+  // Handle .vcf Contact Card import (Part 2)
+  const handleVCardSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string
+      if (content) {
+        const parsed = parseVCard(content)
+        
+        // Prefill inputs (no auto-save until user reviews & hits save)
+        if (parsed.name) setEditName(parsed.name)
+        if (parsed.email) setEditEmail(parsed.email)
+        if (parsed.phone) setEditPhone(parsed.phone)
+
+        // Only overwrite avatar if photo is explicitly present in vCard
+        if (parsed.photo) {
+          setProfilePhoto(parsed.photo)
+        }
+
+        setVcardImportedNotice(true)
+        setTimeout(() => setVcardImportedNotice(false), 5000)
+      }
+    }
+    reader.readAsText(file)
+  }
+
   const handleSyncIphoneContact = () => {
-    // Simulates iOS Contact / Photo picker sync
     const syncedPhoto = user?.photoURL || DEFAULT_COVER_IMAGE
     setProfilePhoto(syncedPhoto)
     setShowPhotoModal(false)
@@ -123,15 +160,23 @@ export default function ParticipantProfilePage() {
     }
   }
 
-  const handleSaveBio = async () => {
+  const handleSaveAllEdits = async () => {
     if (!profile) return
     setSaving(true)
     try {
       await saveParticipantProfile(targetEmail, { 
         ...formData,
-        culturalCapitalNotes: bioText 
+        fullName: editName,
+        culturalCapitalNotes: bioText,
+        headshotUrl: profilePhoto
       })
-      setProfile({ ...profile, ...formData, culturalCapitalNotes: bioText })
+      setProfile({ 
+        ...profile, 
+        ...formData, 
+        fullName: editName, 
+        culturalCapitalNotes: bioText,
+        headshotUrl: profilePhoto
+      })
       setIsEditingBio(false)
     } catch (err) {
       console.error('Error saving profile:', err)
@@ -141,13 +186,13 @@ export default function ParticipantProfilePage() {
   }
 
   const crossSitePayload = profile ? {
-    name: profile.fullName,
-    email: profile.email,
+    name: editName || profile.fullName,
+    email: editEmail || profile.email,
     discipline: `${profile.primaryInstrument} Performance / Orchestra Member`,
     subdomainSource: 'orchestra',
     location: profile.homeHub,
     educationHistory: profile.educationBackground,
-    culturalCapitalNotes: profile.culturalCapitalNotes,
+    culturalCapitalNotes: bioText,
     uncompensatedRehearsalHours: profile.uncompensatedRehearsalHours,
     orchestraRecord: {
       project: events[0]?.title || 'Black Diaspora Symphony Orchestra - 2025 Annual Concert',
@@ -181,109 +226,120 @@ export default function ParticipantProfilePage() {
     )
   }
 
-  const displayName = user?.displayName || profile?.fullName || 'Ezra Haugabrooks'
-  const handleName = `@${targetEmail.split('@')[0]}`
+  const displayName = editName || user?.displayName || profile?.fullName || 'Ezra Haugabrooks'
+  const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
 
   return (
     <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
       
-      {/* Hidden File Input for Image Upload */}
+      {/* Hidden File Inputs */}
       <input
         type="file"
-        ref={fileInputRef}
+        ref={avatarFileInputRef}
         onChange={handleFileUpload}
         accept="image/*"
         className="hidden"
       />
+      <input
+        type="file"
+        ref={vcardFileInputRef}
+        onChange={handleVCardSelect}
+        accept=".vcf,text/vcard,text/x-vcard"
+        className="hidden"
+      />
 
-      {/* Main Full Viewport Container (Minimal Ambient Scroll) */}
+      {/* Main Container */}
       <div className="relative min-h-screen max-w-lg mx-auto flex flex-col justify-between overflow-hidden shadow-2xl bg-[#0F1015]">
         
-        {/* Full Background Blur Hero Image (Matching Image 2 Reference) */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src={profilePhoto || DEFAULT_COVER_IMAGE}
-            alt={displayName}
-            className="w-full h-full object-cover object-center filter brightness-[0.55] contrast-[1.1] scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-[#0F1015] backdrop-blur-[2px]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent" />
-        </div>
+        {/* ========================================================================= */}
+        {/* PART 1 — HERO SECTION REFACTOR                                           */}
+        {/* ========================================================================= */}
+        
+        <div className="relative w-full h-[420px] sm:h-[460px] overflow-hidden bg-[#0A0B0E]">
+          {/* Full-bleed Cover/Profile Photo filling top ~65-70% of viewport */}
+          {profilePhoto ? (
+            <img
+              src={profilePhoto}
+              alt={displayName}
+              className="w-full h-full object-cover object-center"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#241F38] via-[#151724] to-[#0A0B0E]" />
+          )}
 
-        {/* Top Floating Control Bar (No Header/Footer) */}
-        <div className="relative z-20 flex items-center justify-between px-6 pt-6 pb-4">
-          <Link
-            href="/"
-            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
-          >
-            <X className="w-5 h-5" />
-          </Link>
-
-          <div className="flex items-center space-x-3">
-            {!user ? (
-              <button
-                onClick={handleGoogleSignIn}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold hover:bg-white/30 transition shadow-lg"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Google Login</span>
-              </button>
-            ) : (
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-[11px] font-mono font-semibold flex items-center space-x-1">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Signed In</span>
-              </span>
-            )}
-
-            <button
-              onClick={() => setShowPhotoModal(true)}
+          {/* Top Floating Header Control Bar */}
+          <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-6 pt-6 pb-4">
+            <Link
+              href="/"
               className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
             >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+              <X className="w-5 h-5" />
+            </Link>
 
-        {/* Hero Section: Avatar, Name, Handle, Action Pill (Exact Match to Image 2) */}
-        <div className="relative z-10 px-6 pt-16 pb-6 flex flex-col items-center text-center space-y-4">
-          
-          {/* Avatar Photo with Change Photo Badge */}
-          <div className="relative group cursor-pointer" onClick={() => setShowPhotoModal(true)}>
-            <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/40 shadow-2xl transition group-hover:scale-105 group-hover:border-white">
-              <img
-                src={profilePhoto || DEFAULT_COVER_IMAGE}
-                alt={displayName}
-                className="w-full h-full object-cover"
-              />
+            <div className="flex items-center space-x-3">
+              {!user ? (
+                <button
+                  onClick={handleGoogleSignIn}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold hover:bg-white/30 transition shadow-lg"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Google Login</span>
+                </button>
+              ) : (
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-[11px] font-mono font-semibold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Signed In</span>
+                </span>
+              )}
+
+              <button
+                onClick={() => setShowPhotoModal(true)}
+                className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
             </div>
-            <button className="absolute bottom-1 right-1 p-2 rounded-full bg-black/70 text-white border border-white/30 shadow-lg group-hover:bg-white group-hover:text-black transition">
-              <Camera className="w-4 h-4" />
-            </button>
           </div>
 
-          {/* Name & Handle */}
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-wide">
+          {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
+          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
+
+          {/* Overlaid Left-Aligned Name & Handle */}
+          <div className="absolute bottom-4 left-6 right-6 z-20 text-left">
+            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-wide drop-shadow-md">
               {displayName}
             </h1>
-            <p className="text-sm font-sans font-medium text-white/70 mt-0.5 tracking-tight">
+            <p className="text-sm font-sans font-medium text-white/80 tracking-tight mt-0.5 drop-shadow">
               {handleName}
             </p>
           </div>
+        </div>
 
-          {/* Primary Action Button (White Pill like Image 2) */}
-          <div className="w-full max-w-xs pt-1">
-            <button
-              onClick={() => setIsEditingBio(!isEditingBio)}
-              className="w-full py-3.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl flex items-center justify-center space-x-2"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>{isEditingBio ? 'Done Editing' : 'Edit Profile'}</span>
-            </button>
-          </div>
+        {/* Action Row Below Photo: Wide White Pill on Left + Secondary Icon Button on Right */}
+        <div className="relative z-20 px-6 pt-4 pb-3 flex items-center space-x-3 bg-[#0F1015]">
+          <button
+            onClick={() => setIsEditingBio(!isEditingBio)}
+            className="flex-1 py-3.5 px-6 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl text-center"
+          >
+            {isEditingBio ? 'Done Editing' : 'Edit Profile'}
+          </button>
 
-          {/* Stats Bar (Exact 3 Metric Grid from Image 2) */}
-          <div className="w-full max-w-sm pt-4 grid grid-cols-3 gap-2 text-center">
+          <button
+            onClick={() => setShowPhotoModal(true)}
+            className="w-12 h-12 rounded-full border border-white/20 bg-black/40 text-white flex items-center justify-center hover:bg-white/10 transition shadow-xl shrink-0"
+          >
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* STATS ROW & BIO BOX (UNTOUCHED FROM BEFORE)                                */}
+        {/* ========================================================================= */}
+
+        <div className="relative z-10 px-6 space-y-4">
+          
+          {/* Stats Bar */}
+          <div className="w-full grid grid-cols-3 gap-2 text-center">
             <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
               <p className="text-xl font-bold text-amber-400 font-serif">48</p>
               <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">BEAM Coins</p>
@@ -300,22 +356,100 @@ export default function ParticipantProfilePage() {
             </div>
           </div>
 
-          {/* Bio Description Box (Translucent Dark Box like Image 2) */}
-          <div className="w-full max-w-sm p-4 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
+          {/* Bio Description Box & Edit Mode Form */}
+          <div className="w-full p-4 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
             {isEditingBio ? (
-              <div className="space-y-3">
-                <textarea
-                  rows={3}
-                  value={bioText}
-                  onChange={(e) => setBioText(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
-                />
+              <div className="space-y-4">
+                
+                {/* ========================================================================= */}
+                {/* PART 2 — EDIT MODE CONTACT CARD QUICK-FILL                                */}
+                {/* ========================================================================= */}
+                
+                <div className="space-y-3 pb-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
+                      Contact Information
+                    </span>
+
+                    {/* Import from .vcf Contact Card Control */}
+                    <button
+                      type="button"
+                      onClick={() => vcardFileInputRef.current?.click()}
+                      className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium border border-white/15 flex items-center space-x-1.5 transition"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Import .vcf Card</span>
+                    </button>
+                  </div>
+
+                  {vcardImportedNotice && (
+                    <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-medium flex items-center space-x-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Parsed .vcf card! Review inputs below before saving.</span>
+                    </div>
+                  )}
+
+                  {/* 3 Editable Inputs with Native Browser Autofill Attributes */}
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Full Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        autoComplete="name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Full Name"
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Email Address</label>
+                      <input
+                        type="email"
+                        name="email"
+                        autoComplete="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        placeholder="email@domain.com"
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Phone Number</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        autoComplete="tel"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        placeholder="(555) 000-0000"
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bio Textarea Section */}
+                <div className="space-y-2">
+                  <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Musician Bio & Cultural Notes</label>
+                  <textarea
+                    rows={3}
+                    value={bioText}
+                    onChange={(e) => setBioText(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                  />
+                </div>
+
+                {/* Save Contact Info & Bio Action Button */}
                 <button
-                  onClick={handleSaveBio}
+                  onClick={handleSaveAllEdits}
                   disabled={saving}
-                  className="w-full py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition"
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition shadow-lg"
                 >
-                  {saving ? 'Saving...' : 'Save Bio to Profile'}
+                  {saving ? 'Saving Profile...' : 'Save Contact Info & Bio'}
                 </button>
               </div>
             ) : (
@@ -327,8 +461,8 @@ export default function ParticipantProfilePage() {
 
         </div>
 
-        {/* Minimal Scroll Content Area */}
-        <div className="relative z-10 px-6 pb-12 space-y-6">
+        {/* Minimal Scroll Content Tabs */}
+        <div className="relative z-10 px-6 pt-4 pb-12 space-y-6">
           
           {/* Minimal Tab Switcher */}
           <div className="flex items-center justify-center space-x-2 border-b border-white/10 pb-3">
@@ -441,7 +575,7 @@ export default function ParticipantProfilePage() {
 
             <div className="space-y-2 pt-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => avatarFileInputRef.current?.click()}
                 className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
               >
                 <Upload className="w-4 h-4 text-purple-400" />
@@ -449,11 +583,11 @@ export default function ParticipantProfilePage() {
               </button>
 
               <button
-                onClick={handleSyncIphoneContact}
+                onClick={() => vcardFileInputRef.current?.click()}
                 className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
               >
                 <Smartphone className="w-4 h-4 text-amber-400" />
-                <span>Sync Contact Photo from iPhone / Google</span>
+                <span>Import from .vcf Contact Card</span>
               </button>
 
               {user?.photoURL && (
