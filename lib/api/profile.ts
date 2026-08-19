@@ -119,21 +119,6 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   beamCoinBalance: 48,
   usdTotalEarned: 1485
 }
-  email: 'ezra.haugabrooks@gmail.com',
-  primaryRole: 'BEAM Participant Musician & BDSO Community Lead',
-  originProject: 'Black Diaspora Orchestra (BDSO)',
-  primaryInstrument: 'Cello',
-  secondaryInstruments: ['Violoncello', 'Chamber Ensemble Leadership'],
-  homeHub: 'Milwaukee, WI / Chicago, IL',
-  willingnessToTravel: true,
-  ethnicity: 'Black Diaspora / African-American Artist',
-  pronouns: 'He / Him',
-  educationBackground: 'Black Diaspora Symphony Orchestra Core Roster & Repertoire Specialist (Bonds, Still, Price)',
-  culturalCapitalNotes: 'Cellist & Sectional Leader for BDSO annual concert series, rehearsal intensives, and community youth mentorship.',
-  uncompensatedRehearsalHours: 24,
-  beamCoinBalance: 48,
-  usdTotalEarned: 1485
-}
 
 export const DEFAULT_EZRA_EVENTS: EventPlayed[] = [
   {
