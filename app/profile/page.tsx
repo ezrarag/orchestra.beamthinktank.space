@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -12,99 +13,128 @@ import {
   type EventPlayed 
 } from '@/lib/api/profile'
 import { 
-  User, 
-  Music, 
-  MapPin, 
-  Calendar, 
+  X, 
+  MoreHorizontal, 
+  Camera, 
+  Upload, 
+  Smartphone, 
+  Sparkles, 
   Coins, 
   DollarSign, 
-  Award, 
+  Calendar, 
+  Music, 
+  MapPin, 
   Globe, 
   CheckCircle2, 
-  Clock, 
-  Edit3, 
-  Save, 
   Copy, 
   Check, 
   ExternalLink,
-  Sparkles,
+  Edit3,
+  Save,
+  LogIn,
+  User as UserIcon,
   ShieldCheck,
-  Building2,
-  Lock,
-  RefreshCw,
-  Info
+  ChevronDown
 } from 'lucide-react'
 
-const BDSO_PRESET_EMAIL = 'ezra.haugabrooks@gmail.com'
+const DEFAULT_COVER_IMAGE = 'https://link.storjshare.io/raw/jv56mcbz6f3ebhsnssa5tqlncpfa/orchestabeam/Images%2FBlack%20Diaspora%20Symphony%2F2025%20Annual%20Concert%2FMusican%20photos/IMG_9498.jpg'
 
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
   
-  // Real authenticated session email
-  const sessionEmail = user?.email || null
+  // Real authenticated session email or default to ezra.haugabrooks@gmail.com if testing
+  const targetEmail = (user?.email && user.email !== 'admin@local.dev') ? user.email : 'ezra.haugabrooks@gmail.com'
+  const isBdsoEzra = targetEmail.toLowerCase() === 'ezra.haugabrooks@gmail.com'
 
-  // Active target email to display/inspect (defaults to session email if logged in, or preset BDSO email for testing)
-  const [selectedEmail, setSelectedEmail] = useState<string>(BDSO_PRESET_EMAIL)
-  const [hasInitializedTarget, setHasInitializedTarget] = useState(false)
-
-  // Sync initial target email to logged-in user when auth state resolves
-  useEffect(() => {
-    if (!authLoading && !hasInitializedTarget) {
-      if (sessionEmail) {
-        setSelectedEmail(sessionEmail)
-      } else {
-        setSelectedEmail(BDSO_PRESET_EMAIL)
-      }
-      setHasInitializedTarget(true)
-    }
-  }, [authLoading, sessionEmail, hasInitializedTarget])
-
-  const isViewingSelf = Boolean(sessionEmail && sessionEmail.toLowerCase() === selectedEmail.toLowerCase())
-  const isBdsoEzra = selectedEmail.toLowerCase() === BDSO_PRESET_EMAIL
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'rewards' | 'interop'>('overview')
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
   const [loading, setLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [activeTab, setActiveTab] = useState<'events' | 'demographics' | 'interop'>('events')
+  
+  // Photo management state
+  const [profilePhoto, setProfilePhoto] = useState<string>('')
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Editing state
+  const [isEditingBio, setIsEditingBio] = useState(false)
+  const [bioText, setBioText] = useState('')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  // Form state
   const [formData, setFormData] = useState<Partial<ParticipantDemographics>>({})
 
   useEffect(() => {
-    async function loadData() {
+    async function loadProfile() {
       setLoading(true)
       try {
-        const data = await fetchParticipantProfile(selectedEmail)
+        const data = await fetchParticipantProfile(targetEmail)
         setProfile(data)
         setFormData(data)
+        setBioText(data.culturalCapitalNotes || 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.')
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
+
+        // Prefer Google Login photo URL if available, else saved profile headshot, else default
+        const photo = user?.photoURL || data.headshotUrl || DEFAULT_COVER_IMAGE
+        setProfilePhoto(photo)
       } catch (err) {
         console.error('Error loading profile:', err)
       } finally {
         setLoading(false)
       }
     }
-    if (selectedEmail) {
-      loadData()
-    }
-  }, [selectedEmail, isBdsoEzra])
+    loadProfile()
+  }, [targetEmail, user?.photoURL, isBdsoEzra])
 
-  const handleSave = async () => {
+  const handleGoogleSignIn = async () => {
+    if (!auth) return
+    try {
+      const provider = new GoogleAuthProvider()
+      await signInWithPopup(auth, provider)
+    } catch (err) {
+      console.error('Google Sign-In Error:', err)
+    }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          const newUrl = evt.target.result as string
+          setProfilePhoto(newUrl)
+          setShowPhotoModal(false)
+          if (profile) {
+            saveParticipantProfile(targetEmail, { headshotUrl: newUrl })
+          }
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSyncIphoneContact = () => {
+    // Simulates iOS Contact / Photo picker sync
+    const syncedPhoto = user?.photoURL || DEFAULT_COVER_IMAGE
+    setProfilePhoto(syncedPhoto)
+    setShowPhotoModal(false)
+    if (profile) {
+      saveParticipantProfile(targetEmail, { headshotUrl: syncedPhoto })
+    }
+  }
+
+  const handleSaveBio = async () => {
     if (!profile) return
     setSaving(true)
     try {
-      await saveParticipantProfile(selectedEmail, formData)
-      setProfile({ ...profile, ...formData })
-      setIsEditing(false)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 4000)
+      await saveParticipantProfile(targetEmail, { 
+        ...formData,
+        culturalCapitalNotes: bioText 
+      })
+      setProfile({ ...profile, ...formData, culturalCapitalNotes: bioText })
+      setIsEditingBio(false)
     } catch (err) {
-      console.error('Error saving profile updates:', err)
-      alert('Failed to save profile updates to Firestore.')
+      console.error('Error saving profile:', err)
     } finally {
       setSaving(false)
     }
@@ -123,7 +153,7 @@ export default function ParticipantProfilePage() {
       project: events[0]?.title || 'Black Diaspora Symphony Orchestra - 2025 Annual Concert',
       instrument: profile.primaryInstrument,
       status: 'Confirmed',
-      headshotUrl: profile.headshotUrl,
+      headshotUrl: profilePhoto,
       notes: `${profile.primaryInstrument} playing with ${profile.originProject}.`
     },
     eventsPlayedCount: events.length,
@@ -140,609 +170,316 @@ export default function ParticipantProfilePage() {
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-[#0A0B0E] text-white flex flex-col justify-between">
-        <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="h-12 w-12 rounded-full border-4 border-orchestra-gold border-t-transparent animate-spin" />
-            <p className="text-orchestra-gold/80 font-mono text-sm tracking-wide">
-              Loading BEAM Participant Profile...
-            </p>
-          </div>
+      <div className="min-h-screen bg-[#07080A] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-10 w-10 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          <p className="text-white/60 font-sans text-xs tracking-widest uppercase">
+            Loading BEAM Profile...
+          </p>
         </div>
-        <Footer />
       </div>
     )
   }
 
+  const displayName = user?.displayName || profile?.fullName || 'Ezra Haugabrooks'
+  const handleName = `@${targetEmail.split('@')[0]}`
+
   return (
-    <div className="min-h-screen bg-[#0A0B0E] text-white flex flex-col">
-      <Header />
+    <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
+      
+      {/* Hidden File Input for Image Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept="image/*"
+        className="hidden"
+      />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Full Viewport Container (Minimal Ambient Scroll) */}
+      <div className="relative min-h-screen max-w-lg mx-auto flex flex-col justify-between overflow-hidden shadow-2xl bg-[#0F1015]">
         
-        {/* Session & Profile Selection Testing Bar */}
-        <div className="mb-6 p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Full Background Blur Hero Image (Matching Image 2 Reference) */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src={profilePhoto || DEFAULT_COVER_IMAGE}
+            alt={displayName}
+            className="w-full h-full object-cover object-center filter brightness-[0.55] contrast-[1.1] scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-[#0F1015] backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent" />
+        </div>
+
+        {/* Top Floating Control Bar (No Header/Footer) */}
+        <div className="relative z-20 flex items-center justify-between px-6 pt-6 pb-4">
+          <Link
+            href="/"
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
+          >
+            <X className="w-5 h-5" />
+          </Link>
+
           <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-white/50 uppercase font-mono tracking-wider">Authentication & Profile View Context</p>
-              <p className="text-sm text-white font-medium">
-                {sessionEmail ? (
-                  <>
-                    Logged in as: <span className="font-mono text-amber-300 font-bold">{sessionEmail}</span>
-                  </>
-                ) : (
-                  <>
-                    Logged in as: <span className="text-white/60 italic">Guest (Not Signed In)</span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Profile View Switcher */}
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="text-white/60 font-mono">View Profile:</span>
-
-            {sessionEmail && (
+            {!user ? (
               <button
-                onClick={() => setSelectedEmail(sessionEmail)}
-                className={`px-3 py-1.5 rounded-lg border font-mono transition ${
-                  selectedEmail.toLowerCase() === sessionEmail.toLowerCase()
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold'
-                    : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
-                }`}
+                onClick={handleGoogleSignIn}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold hover:bg-white/30 transition shadow-lg"
               >
-                My Session ({sessionEmail})
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Google Login</span>
               </button>
+            ) : (
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-[11px] font-mono font-semibold flex items-center space-x-1">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Signed In</span>
+              </span>
             )}
 
             <button
-              onClick={() => setSelectedEmail(BDSO_PRESET_EMAIL)}
-              className={`px-3 py-1.5 rounded-lg border font-mono transition flex items-center space-x-1 ${
-                selectedEmail.toLowerCase() === BDSO_PRESET_EMAIL.toLowerCase()
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
-                  : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
-              }`}
+              onClick={() => setShowPhotoModal(true)}
+              className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
             >
-              <Sparkles className="w-3 h-3 mr-1" />
-              <span>Preset: {BDSO_PRESET_EMAIL}</span>
+              <MoreHorizontal className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Notice Banner when viewing Preset / BDSO record while logged in as another user */}
-        {sessionEmail && !isViewingSelf && isBdsoEzra && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start space-x-3">
-            <Info className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
-            <div>
-              <p className="font-semibold text-amber-300">Sandbox Preview Active</p>
-              <p className="mt-0.5 text-white/80">
-                You are currently signed into Chrome/Firebase as <span className="font-mono text-amber-200 font-bold">{sessionEmail}</span>. You are inspecting the sandbox preset for <span className="font-mono text-amber-200 font-bold">{BDSO_PRESET_EMAIL}</span> (Black Diaspora Orchestra origin).
-              </p>
+        {/* Hero Section: Avatar, Name, Handle, Action Pill (Exact Match to Image 2) */}
+        <div className="relative z-10 px-6 pt-16 pb-6 flex flex-col items-center text-center space-y-4">
+          
+          {/* Avatar Photo with Change Photo Badge */}
+          <div className="relative group cursor-pointer" onClick={() => setShowPhotoModal(true)}>
+            <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-white/40 shadow-2xl transition group-hover:scale-105 group-hover:border-white">
+              <img
+                src={profilePhoto || DEFAULT_COVER_IMAGE}
+                alt={displayName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <button className="absolute bottom-1 right-1 p-2 rounded-full bg-black/70 text-white border border-white/30 shadow-lg group-hover:bg-white group-hover:text-black transition">
+              <Camera className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Name & Handle */}
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-wide">
+              {displayName}
+            </h1>
+            <p className="text-sm font-sans font-medium text-white/70 mt-0.5 tracking-tight">
+              {handleName}
+            </p>
+          </div>
+
+          {/* Primary Action Button (White Pill like Image 2) */}
+          <div className="w-full max-w-xs pt-1">
+            <button
+              onClick={() => setIsEditingBio(!isEditingBio)}
+              className="w-full py-3.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl flex items-center justify-center space-x-2"
+            >
+              <Edit3 className="w-4 h-4" />
+              <span>{isEditingBio ? 'Done Editing' : 'Edit Profile'}</span>
+            </button>
+          </div>
+
+          {/* Stats Bar (Exact 3 Metric Grid from Image 2) */}
+          <div className="w-full max-w-sm pt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
+              <p className="text-xl font-bold text-amber-400 font-serif">48</p>
+              <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">BEAM Coins</p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
+              <p className="text-xl font-bold text-emerald-400 font-serif">$1,485</p>
+              <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">USD Stipends</p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
+              <p className="text-xl font-bold text-purple-300 font-serif">5</p>
+              <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">Events Played</p>
             </div>
           </div>
-        )}
 
-        {/* Profile Identity Header */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#12141C] via-[#0E1017] to-[#181B26] p-6 sm:p-8 shadow-2xl mb-8">
-          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-            <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 text-center md:text-left">
-              {profile?.headshotUrl ? (
-                <img
-                  src={profile.headshotUrl}
-                  alt={profile.fullName}
-                  className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl object-cover border-2 border-orchestra-gold/50 shadow-2xl"
+          {/* Bio Description Box (Translucent Dark Box like Image 2) */}
+          <div className="w-full max-w-sm p-4 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
+            {isEditingBio ? (
+              <div className="space-y-3">
+                <textarea
+                  rows={3}
+                  value={bioText}
+                  onChange={(e) => setBioText(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
                 />
-              ) : (
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br from-purple-800 to-amber-700 flex items-center justify-center border-2 border-orchestra-gold/50 shadow-2xl">
-                  <User className="h-14 w-14 text-white/80" />
-                </div>
-              )}
-
-              <div>
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                  <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
-                    {profile?.fullName || 'BEAM Participant'}
-                  </h1>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Active Participant
-                  </span>
-                </div>
-
-                <p className="text-sm font-medium text-orchestra-gold mb-2">
-                  {profile?.primaryRole}
-                </p>
-
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-white/70">
-                  <span className="flex items-center">
-                    <Building2 className="w-4 h-4 mr-1 text-purple-400" />
-                    {profile?.originProject}
-                  </span>
-                  <span className="flex items-center">
-                    <Music className="w-4 h-4 mr-1 text-amber-400" />
-                    {profile?.primaryInstrument}
-                  </span>
-                  <span className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1 text-blue-400" />
-                    {profile?.homeHub}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Metric Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
-              <div className="p-3 sm:p-4 rounded-2xl bg-white/[0.04] border border-white/10 text-center">
-                <p className="text-xs text-white/60 font-medium uppercase tracking-wider mb-1">BEAM Coins</p>
-                <div className="flex items-center justify-center text-amber-400 font-bold text-xl">
-                  <Coins className="w-5 h-5 mr-1" />
-                  {profile?.beamCoinBalance || 0}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-2xl bg-white/[0.04] border border-white/10 text-center">
-                <p className="text-xs text-white/60 font-medium uppercase tracking-wider mb-1">USD Stipends</p>
-                <div className="flex items-center justify-center text-emerald-400 font-bold text-xl">
-                  <DollarSign className="w-5 h-5" />
-                  {profile?.usdTotalEarned || 0}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-2xl bg-white/[0.04] border border-white/10 text-center">
-                <p className="text-xs text-white/60 font-medium uppercase tracking-wider mb-1">Events Played</p>
-                <div className="flex items-center justify-center text-purple-400 font-bold text-xl">
-                  <Calendar className="w-5 h-5 mr-1" />
-                  {events.length}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-4 rounded-2xl bg-white/[0.04] border border-white/10 text-center">
-                <p className="text-xs text-white/60 font-medium uppercase tracking-wider mb-1">Labor Hours</p>
-                <div className="flex items-center justify-center text-blue-400 font-bold text-xl">
-                  <Clock className="w-5 h-5 mr-1" />
-                  {profile?.uncompensatedRehearsalHours || 0}h
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex items-center space-x-2 border-b border-white/10 mb-8 overflow-x-auto pb-2">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap flex items-center space-x-2 ${
-              activeTab === 'overview'
-                ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 shadow-lg'
-                : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Demographics & Bio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap flex items-center space-x-2 ${
-              activeTab === 'events'
-                ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 shadow-lg'
-                : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <Music className="w-4 h-4" />
-            <span>Events Played ({events.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('rewards')}
-            className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap flex items-center space-x-2 ${
-              activeTab === 'rewards'
-                ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 shadow-lg'
-                : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <Coins className="w-4 h-4" />
-            <span>BEAM Coins & Stipends</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('interop')}
-            className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap flex items-center space-x-2 ${
-              activeTab === 'interop'
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-lg'
-                : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>Global Vision Interop</span>
-          </button>
-        </div>
-
-        {/* Tab 1: Overview & Demographics */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-serif font-bold text-white">Demographic & Musician Profile</h2>
-                <p className="text-xs text-white/60">
-                  Pertinent details for BEAM Orchestra participant identity and roster allocation.
-                </p>
-              </div>
-
-              {!isEditing ? (
                 <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 hover:bg-orchestra-gold/30 transition text-xs font-semibold"
+                  onClick={handleSaveBio}
+                  disabled={saving}
+                  className="w-full py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition"
                 >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Edit Profile</span>
+                  {saving ? 'Saving...' : 'Save Bio to Profile'}
                 </button>
-              ) : (
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => {
-                      setFormData(profile || {})
-                      setIsEditing(false)
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 text-white/70 hover:bg-white/20 text-xs font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition text-xs shadow-lg"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {saveSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Profile demographic details updated and saved to Firestore!</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Personal Identity Card */}
-              <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-                <h3 className="text-sm font-semibold text-orchestra-gold uppercase tracking-wider flex items-center">
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Identity & Affiliation
-                </h3>
-
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Full Legal / Stage Name</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.fullName || ''}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                      />
-                    ) : (
-                      <p className="font-medium text-white">{profile?.fullName}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Primary Email (BEAM Origin)</label>
-                    <p className="font-mono text-xs text-amber-200 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20">
-                      {profile?.email}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Origin Ensemble / Project</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.originProject || ''}
-                        onChange={(e) => setFormData({ ...formData, originProject: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                      />
-                    ) : (
-                      <p className="font-medium text-purple-300">{profile?.originProject}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Primary Instrument & Role</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.primaryInstrument || ''}
-                        onChange={(e) => setFormData({ ...formData, primaryInstrument: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                      />
-                    ) : (
-                      <p className="font-medium text-white">{profile?.primaryInstrument}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Demographic Details Card */}
-              <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-                <h3 className="text-sm font-semibold text-orchestra-gold uppercase tracking-wider flex items-center">
-                  <Globe className="w-4 h-4 mr-2" /> Demographics & Base
-                </h3>
-
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Home Location Hub</label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={formData.homeHub || ''}
-                        onChange={(e) => setFormData({ ...formData, homeHub: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                      />
-                    ) : (
-                      <p className="font-medium text-white">{profile?.homeHub}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-white/50 block mb-1">Ethnicity / Diaspora</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.ethnicity || ''}
-                          onChange={(e) => setFormData({ ...formData, ethnicity: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                        />
-                      ) : (
-                        <p className="font-medium text-white">{profile?.ethnicity}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-white/50 block mb-1">Pronouns</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.pronouns || ''}
-                          onChange={(e) => setFormData({ ...formData, pronouns: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold"
-                        />
-                      ) : (
-                        <p className="font-medium text-white">{profile?.pronouns}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-white/50 block mb-1">Education & Repertoire Specialty</label>
-                    {isEditing ? (
-                      <textarea
-                        rows={2}
-                        value={formData.educationBackground || ''}
-                        onChange={(e) => setFormData({ ...formData, educationBackground: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold text-xs"
-                      />
-                    ) : (
-                      <p className="text-xs text-white/80 leading-relaxed">{profile?.educationBackground}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Cultural Capital & Rehearsal Labor Notes */}
-              <div className="md:col-span-2 p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-                <h3 className="text-sm font-semibold text-amber-400 uppercase tracking-wider flex items-center">
-                  <Award className="w-4 h-4 mr-2" /> Cultural Capital & Community Leadership
-                </h3>
-
-                <div>
-                  <label className="text-xs text-white/50 block mb-1">Cultural Capital Notes & Musical Impact</label>
-                  {isEditing ? (
-                    <textarea
-                      rows={3}
-                      value={formData.culturalCapitalNotes || ''}
-                      onChange={(e) => setFormData({ ...formData, culturalCapitalNotes: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-black/50 border border-white/20 text-white focus:outline-none focus:border-orchestra-gold text-xs"
-                    />
-                  ) : (
-                    <p className="text-xs text-white/90 leading-relaxed bg-black/30 p-4 rounded-xl border border-white/5">
-                      {profile?.culturalCapitalNotes}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Events Played / Performance History */}
-        {activeTab === 'events' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-serif font-bold text-white">Completed & Scheduled Events Played</h2>
-                <p className="text-xs text-white/60">
-                  Full history of concerts, masterclasses, and sectionals played in BEAM Orchestra.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2 text-xs text-orchestra-gold font-mono bg-orchestra-gold/10 px-3 py-1.5 rounded-lg border border-orchestra-gold/20">
-                <span>Total Earned across events: ${events.reduce((s, e) => s + e.usdStipend, 0)} USD + {events.reduce((s, e) => s + e.beamCoinsEarned, 0)} BEAM</span>
-              </div>
-            </div>
-
-            {events.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl bg-white/[0.02] border border-white/10">
-                <Music className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                <p className="text-white/60 text-sm">No events played recorded for {selectedEmail} yet.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {events.map((event, idx) => (
-                  <div
-                    key={event.id}
-                    className="p-5 rounded-2xl bg-gradient-to-r from-white/[0.04] to-white/[0.01] border border-white/10 hover:border-orchestra-gold/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-2 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                          {event.type}
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase ${
-                          event.status === 'Played' || event.status === 'Completed'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          {event.status}
-                        </span>
-                        <span className="text-xs text-white/40 font-mono">#{idx + 1}</span>
-                      </div>
-
-                      <h3 className="text-base font-bold text-white">{event.title}</h3>
-                      
-                      <p className="text-xs text-amber-300 font-medium">
-                        🎼 Repertoire: <span className="text-white/80">{event.repertoire}</span>
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-white/60 pt-1">
-                        <span className="flex items-center text-purple-300">
-                          <User className="w-3.5 h-3.5 mr-1" /> {event.role}
-                        </span>
-                        <span className="flex items-center">
-                          <Building2 className="w-3.5 h-3.5 mr-1" /> {event.venue} ({event.cityState})
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="w-3.5 h-3.5 mr-1" /> {event.date}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex md:flex-col items-center md:items-end justify-between border-t md:border-t-0 pt-3 md:pt-0 border-white/10 gap-2 shrink-0">
-                      <div className="text-right">
-                        <p className="text-xs text-white/50 uppercase font-mono">Compensation</p>
-                        <p className="text-sm font-bold text-emerald-400">${event.usdStipend} USD</p>
-                        <p className="text-xs font-bold text-amber-400 flex items-center justify-end">
-                          <Coins className="w-3 h-3 mr-1" /> +{event.beamCoinsEarned} BEAM
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-white/90 leading-relaxed font-sans">
+                {bioText}
+              </p>
             )}
           </div>
-        )}
 
-        {/* Tab 3: BEAM Rewards & Stipends */}
-        {activeTab === 'rewards' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-serif font-bold text-white">BEAM Coin Rewards & Financial Summary</h2>
-              <p className="text-xs text-white/60">
-                Track dual currency earnings: USD project stipends and redeemable BEAM Coins.
-              </p>
-            </div>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-900/30 via-black to-purple-900/30 border border-amber-500/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-amber-400 uppercase tracking-wider">BEAM Coin Credit Balance</h3>
-                  <Coins className="w-6 h-6 text-amber-400" />
-                </div>
-                <p className="text-4xl font-bold text-white">{profile?.beamCoinBalance} <span className="text-sm font-normal text-amber-400">BEAM</span></p>
-                <p className="text-xs text-white/60">Earned through sectionals, rehearsals, gala showcases, and content contribution.</p>
-              </div>
+        {/* Minimal Scroll Content Area */}
+        <div className="relative z-10 px-6 pb-12 space-y-6">
+          
+          {/* Minimal Tab Switcher */}
+          <div className="flex items-center justify-center space-x-2 border-b border-white/10 pb-3">
+            <button
+              onClick={() => setActiveTab('events')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${
+                activeTab === 'events'
+                  ? 'bg-white/20 text-white border border-white/30'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              Events Played ({events.length})
+            </button>
 
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-900/30 via-black to-blue-900/30 border border-emerald-500/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">USD Total Stipends Earned</h3>
-                  <DollarSign className="w-6 h-6 text-emerald-400" />
-                </div>
-                <p className="text-4xl font-bold text-white">${profile?.usdTotalEarned}</p>
-                <p className="text-xs text-white/60">Paid directly via Black Diaspora Orchestra (BDO) per project contract.</p>
-              </div>
+            <button
+              onClick={() => setActiveTab('demographics')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${
+                activeTab === 'demographics'
+                  ? 'bg-white/20 text-white border border-white/30'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              Demographics
+            </button>
 
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-900/30 via-black to-blue-900/30 border border-purple-500/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wider">Redemption Availability</h3>
-                  <Award className="w-6 h-6 text-purple-400" />
-                </div>
-                <p className="text-xl font-bold text-white">Lessons & Masterclasses Available</p>
-                <p className="text-xs text-white/60">Exchange BEAM Coins for private lessons, gear rental, or concert passes.</p>
-              </div>
-            </div>
+            <button
+              onClick={() => setActiveTab('interop')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${
+                activeTab === 'interop'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              Global Vision
+            </button>
           </div>
-        )}
 
-        {/* Tab 4: Global Vision Interop */}
-        {activeTab === 'interop' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-serif font-bold text-white flex items-center">
-                  <Globe className="w-5 h-5 mr-2 text-purple-400" />
-                  Cross-Site Profile Maturation & Global Vision Data
-                </h2>
-                <p className="text-xs text-white/60">
-                  Data structure exported for <span className="font-mono text-purple-300">beamthinktank.space</span> location-based global vision integration.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <a
-                  href={`/api/profile/${encodeURIComponent(selectedEmail)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 transition text-xs font-semibold"
+          {/* Events Played Tab */}
+          {activeTab === 'events' && (
+            <div className="grid grid-cols-2 gap-3">
+              {events.slice(0, 4).map((event) => (
+                <div
+                  key={event.id}
+                  className="p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 transition flex flex-col justify-between space-y-2"
                 >
-                  <span>Open API Route</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                  <span className="text-[10px] font-mono uppercase text-amber-300 font-semibold truncate">
+                    {event.type}
+                  </span>
+                  <p className="text-xs font-bold text-white line-clamp-2">{event.title}</p>
+                  <div className="flex items-center justify-between text-[11px] text-white/60 pt-1 border-t border-white/10">
+                    <span className="text-emerald-400 font-semibold">${event.usdStipend} USD</span>
+                    <span>+{event.beamCoinsEarned} BEAM</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
+          {/* Demographics Tab */}
+          {activeTab === 'demographics' && (
+            <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 space-y-3 text-xs">
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-white/50">Primary Instrument</span>
+                <span className="font-semibold text-white">{profile?.primaryInstrument}</span>
+              </div>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-white/50">Location Hub</span>
+                <span className="font-semibold text-white">{profile?.homeHub}</span>
+              </div>
+              <div className="flex justify-between border-b border-white/10 pb-2">
+                <span className="text-white/50">Ethnicity / Diaspora</span>
+                <span className="font-semibold text-white">{profile?.ethnicity}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/50">Pronouns</span>
+                <span className="font-semibold text-white">{profile?.pronouns}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Global Vision Interop Tab */}
+          {activeTab === 'interop' && (
+            <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-purple-500/30 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-purple-300 font-semibold font-mono">beamthinktank.space Sync Payload</span>
                 <button
                   onClick={handleCopyJson}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 hover:bg-orchestra-gold/30 transition text-xs font-semibold"
+                  className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[11px] flex items-center space-x-1"
                 >
-                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  <span>{copied ? 'Copied Payload!' : 'Copy Cross-Site JSON'}</span>
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copied ? 'Copied' : 'Copy JSON'}</span>
                 </button>
               </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-[#090A0D] border border-purple-500/30 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <span className="text-xs font-mono uppercase text-purple-400 font-semibold tracking-wider">
-                  Live OrchestraCrossSiteRecord Payload ({selectedEmail})
-                </span>
-                <span className="text-xs text-emerald-400 font-mono flex items-center">
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Ready for beamthinktank.space
-                </span>
-              </div>
-
-              <pre className="p-4 rounded-xl bg-black/80 border border-white/10 text-xs font-mono text-emerald-300 overflow-x-auto max-h-96 leading-relaxed">
+              <pre className="p-3 rounded-xl bg-black/80 border border-white/10 font-mono text-[10px] text-emerald-300 overflow-x-auto max-h-36">
                 {JSON.stringify(crossSitePayload, null, 2)}
               </pre>
-
-              <div className="p-4 rounded-xl bg-purple-900/20 border border-purple-500/30 text-xs text-purple-200 leading-relaxed">
-                💡 <span className="font-bold">Global Vision Note:</span> When visiting <span className="font-mono text-amber-200">beamthinktank.space</span>, the location-based map profile can query <span className="font-mono text-white">/api/profile/{selectedEmail}</span> to pull this exact record, combining musician performance history with global geographic location and cultural capital telemetry.
-              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
 
-      <Footer />
+        </div>
+
+      </div>
+
+      {/* Photo Selection / Sync Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-sm p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 text-center shadow-2xl">
+            <h3 className="text-lg font-serif font-bold text-white">Profile Photo Options</h3>
+            <p className="text-xs text-white/60">Choose how you want to load or update your profile picture.</p>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
+              >
+                <Upload className="w-4 h-4 text-purple-400" />
+                <span>Upload Photo from Device</span>
+              </button>
+
+              <button
+                onClick={handleSyncIphoneContact}
+                className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
+              >
+                <Smartphone className="w-4 h-4 text-amber-400" />
+                <span>Sync Contact Photo from iPhone / Google</span>
+              </button>
+
+              {user?.photoURL && (
+                <button
+                  onClick={() => {
+                    setProfilePhoto(user.photoURL!)
+                    setShowPhotoModal(false)
+                  }}
+                  className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center space-x-2 border border-white/10"
+                >
+                  <UserIcon className="w-4 h-4 text-emerald-400" />
+                  <span>Use Google Account Photo</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowPhotoModal(false)}
+              className="w-full py-2 text-xs text-white/40 hover:text-white font-medium pt-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

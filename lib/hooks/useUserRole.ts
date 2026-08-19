@@ -51,16 +51,9 @@ export function useUserRole(options: UseUserRoleOptions = {}): UserWithRole {
   const bypassEnabled = allowAdminBypass && adminAuthBypassEnabled
 
   useEffect(() => {
-    if (bypassEnabled) {
-      setUser(mockAdminUser)
-      setRole('beam_admin')
-      setLoading(false)
-      return
-    }
-
     // Check if auth is initialized
     if (!auth) {
-      if (ADMIN_GATEWAYS_DISABLED) {
+      if (bypassEnabled || ADMIN_GATEWAYS_DISABLED) {
         setUser(mockAdminUser)
         setRole('beam_admin')
       } else {
@@ -70,14 +63,8 @@ export function useUserRole(options: UseUserRoleOptions = {}): UserWithRole {
       return
     }
 
-    if (!db && !ADMIN_GATEWAYS_DISABLED) {
-      console.warn('Firebase auth is not initialized. Please check your environment variables.')
-      setLoading(false)
-      return
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      const effectiveUser = user || (ADMIN_GATEWAYS_DISABLED ? mockAdminUser : null)
+    const unsubscribe = onAuthStateChanged(auth, async (realUser) => {
+      const effectiveUser = realUser || (bypassEnabled || ADMIN_GATEWAYS_DISABLED ? mockAdminUser : null)
       setUser(effectiveUser)
       
       if (effectiveUser) {
