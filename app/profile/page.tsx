@@ -9,6 +9,7 @@ import { parseVCard } from '@/lib/vcard'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
+  ensureParticipantProfileExists,
   DEFAULT_EZRA_EVENTS,
   type ParticipantDemographics,
   type EventPlayed 
