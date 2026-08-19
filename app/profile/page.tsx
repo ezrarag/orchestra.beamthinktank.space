@@ -7,6 +7,7 @@ import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { parseVCard } from '@/lib/vcard'
 import { parseCVText } from '@/lib/cvParser'
+import { getBrowserCoordinates } from '@/lib/geolocation'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -15,7 +16,8 @@ import {
   type ParticipantDemographics,
   type EventPlayed,
   type MediaPortfolioItem,
-  type InfrastructureNeedTag
+  type InfrastructureNeedTag,
+  type LiveLocationBeacon
 } from '@/lib/api/profile'
 import { 
   X, 
@@ -50,7 +52,8 @@ import {
   Utensils,
   Wrench,
   Award,
-  FileText
+  FileText,
+  Radio
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
@@ -96,6 +99,15 @@ export default function ParticipantProfilePage() {
   const [vcardImportedNotice, setVcardImportedNotice] = useState(false)
   const [cvImportedNotice, setCvImportedNotice] = useState(false)
 
+  // Live Location Beacon State (Life360 Cross-Domain Sync)
+  const [isBroadcastingLocation, setIsBroadcastingLocation] = useState(false)
+  const [liveBeaconCity, setLiveBeaconCity] = useState('Atlanta, GA')
+  const [liveLat, setLiveLat] = useState(33.749)
+  const [liveLng, setLiveLng] = useState(-84.388)
+  const [liveAccuracy, setLiveAccuracy] = useState(12)
+  const [isGeoLoading, setIsGeoLoading] = useState(false)
+  const [geoError, setGeoError] = useState('')
+
   // Portfolio Media State
   const [portfolioItems, setPortfolioItems] = useState<MediaPortfolioItem[]>([])
   const [showAddMediaModal, setShowAddMediaModal] = useState(false)
@@ -133,6 +145,14 @@ export default function ParticipantProfilePage() {
         setIsRoaming(Boolean(data.isRoamingActive))
         setRoamingLocation(data.roamingCity || 'Orlando, FL (Steinway Gallery Residency)')
 
+        if (data.current_live_location) {
+          setIsBroadcastingLocation(Boolean(data.current_live_location.isBroadcasting))
+          if (data.current_live_location.cityState) setLiveBeaconCity(data.current_live_location.cityState)
+          if (data.current_live_location.latitude) setLiveLat(data.current_live_location.latitude)
+          if (data.current_live_location.longitude) setLiveLng(data.current_live_location.longitude)
+          if (data.current_live_location.accuracy) setLiveAccuracy(data.current_live_location.accuracy)
+        }
+
         const photo = user?.photoURL || data.headshotUrl || ''
         setProfilePhoto(photo)
       } catch (err) {
@@ -156,6 +176,54 @@ export default function ParticipantProfilePage() {
       }
     } catch (err) {
       console.error('Google Sign-In Error:', err)
+    }
+  }
+
+  // Handle Live Location Beacon Toggle & Browser Geolocation
+  const handleToggleLiveLocation = async () => {
+    if (isBroadcastingLocation) {
+      setIsBroadcastingLocation(false)
+      const disabledBeacon: LiveLocationBeacon = {
+        isBroadcasting: false,
+        cityState: liveBeaconCity,
+        lastBeaconTime: new Date().toISOString()
+      }
+      if (profile) {
+        await saveParticipantProfile(targetEmail, { current_live_location: disabledBeacon }, user?.uid)
+      }
+      return
+    }
+
+    setIsGeoLoading(true)
+    setGeoError('')
+    const geo = await getBrowserCoordinates()
+    setIsGeoLoading(false)
+
+    if (geo.error) {
+      setGeoError(geo.error)
+    }
+
+    const newLat = geo.latitude || (liveLat !== 0 ? liveLat : 33.749)
+    const newLng = geo.longitude || (liveLng !== 0 ? liveLng : -84.388)
+    const newCity = geo.cityState || liveBeaconCity || 'Atlanta, GA'
+
+    setLiveLat(newLat)
+    setLiveLng(newLng)
+    setLiveAccuracy(geo.accuracy || 12)
+    setLiveBeaconCity(newCity)
+    setIsBroadcastingLocation(true)
+
+    const beaconData: LiveLocationBeacon = {
+      isBroadcasting: true,
+      latitude: newLat,
+      longitude: newLng,
+      accuracy: geo.accuracy || 12,
+      cityState: newCity,
+      lastBeaconTime: new Date().toISOString()
+    }
+
+    if (profile) {
+      await saveParticipantProfile(targetEmail, { current_live_location: beaconData }, user?.uid)
     }
   }
 
@@ -319,6 +387,15 @@ export default function ParticipantProfilePage() {
     if (!profile) return
     setSaving(true)
     try {
+      const beaconPayload: LiveLocationBeacon = {
+        isBroadcasting: isBroadcastingLocation,
+        latitude: liveLat,
+        longitude: liveLng,
+        accuracy: liveAccuracy,
+        cityState: liveBeaconCity,
+        lastBeaconTime: new Date().toISOString()
+      }
+
       await saveParticipantProfile(targetEmail, { 
         ...formData,
         fullName: editName,
@@ -326,7 +403,8 @@ export default function ParticipantProfilePage() {
         headshotUrl: profilePhoto,
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
-        roamingCity: roamingLocation
+        roamingCity: roamingLocation,
+        current_live_location: beaconPayload
       }, user?.uid)
       setProfile({ 
         ...profile, 
@@ -336,7 +414,8 @@ export default function ParticipantProfilePage() {
         headshotUrl: profilePhoto,
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
-        roamingCity: roamingLocation
+        roamingCity: roamingLocation,
+        current_live_location: beaconPayload
       })
       setIsEditingBio(false)
     } catch (err) {
@@ -354,6 +433,13 @@ export default function ParticipantProfilePage() {
     subdomainSource: 'orchestra',
     location: profile.homeHub,
     roamingLocation: isRoaming ? roamingLocation : undefined,
+    current_live_location: {
+      isBroadcasting: isBroadcastingLocation,
+      latitude: liveLat,
+      longitude: liveLng,
+      accuracy: liveAccuracy,
+      cityState: liveBeaconCity
+    },
     educationHistory: profile.educationBackground,
     culturalCapitalNotes: bioText,
     uncompensatedRehearsalHours: profile.uncompensatedRehearsalHours,
@@ -534,11 +620,29 @@ export default function ParticipantProfilePage() {
           {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
-          {/* Overlaid Left-Aligned Name, Handle & Dynamic Role Pills */}
+          {/* Overlaid Left-Aligned Name, Handle, Role Pills & Live Presence Header Badge */}
           <div className="absolute bottom-4 inset-x-0 z-20">
             <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
-              {/* Live CV Role & Discipline Tags / Pills */}
+              
+              {/* Feature 1: Live Presence Header Badge + Dynamic Role Pills */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Live Status Indicator Badge */}
+                {isBroadcastingLocation ? (
+                  <span className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/25 backdrop-blur-md border border-emerald-500/50 text-emerald-300 text-xs font-mono font-bold shadow-lg">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                    </span>
+                    <span>🟢 LIVE: {liveBeaconCity}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800/80 backdrop-blur-md border border-slate-700/60 text-slate-300 text-xs font-mono">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span>📍 Home: {profile?.homeHub || 'Milwaukee, WI'}</span>
+                  </span>
+                )}
+
+                {/* Role & Discipline Tags / Pills */}
                 {disciplinePills.map((tag, idx) => (
                   <span
                     key={idx}
@@ -700,7 +804,6 @@ export default function ParticipantProfilePage() {
                       <span className="text-[10px] text-white/40 font-mono">Click (✕) to remove any incorrect role tag</span>
                     </div>
 
-                    {/* Interactive Pills List */}
                     <div className="flex flex-wrap items-center gap-2">
                       {disciplinePills.map((tag, idx) => (
                         <span
@@ -720,7 +823,6 @@ export default function ParticipantProfilePage() {
                       ))}
                     </div>
 
-                    {/* Add Custom Role Tag Input */}
                     <div className="flex items-center space-x-2 pt-1">
                       <input
                         type="text"
@@ -910,8 +1012,71 @@ export default function ParticipantProfilePage() {
             {activeTab === 'logistics' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Infrastructure Needs</h2>
-                  <p className="text-xs text-white/60">Logistical realities feeding directly into the BEAM Wraparound & Support Delta Engine.</p>
+                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Live Beacon Logistics</h2>
+                  <p className="text-xs text-white/60">Logistical realities feeding directly into grounds.beamthinktank.space ride dispatch & housing engines.</p>
+                </div>
+
+                {/* Feature 2: Life360 Cross-Domain Live Location Beacon Card */}
+                <div className="p-5 rounded-2xl bg-black/50 border border-emerald-500/40 space-y-4 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold">
+                        <Radio className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                          <span>Broadcast My Live Location (Life360 Beacon)</span>
+                          {isBroadcastingLocation && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/40 uppercase font-bold">
+                              Broadcasting Live
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-xs text-white/60">
+                          Syncs real-time coordinates to <code>grounds.beamthinktank.space</code> & <code>hood.beamthinktank.space</code> for instant ride dispatch & housing.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Geolocation Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={handleToggleLiveLocation}
+                      disabled={isGeoLoading}
+                      className={`px-4 py-2.5 rounded-full text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
+                        isBroadcastingLocation
+                          ? 'bg-emerald-500 text-black shadow-lg hover:bg-emerald-400'
+                          : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${isBroadcastingLocation ? 'bg-black animate-ping' : 'bg-white/40'}`} />
+                      <span>{isGeoLoading ? 'Locating...' : (isBroadcastingLocation ? 'Broadcast ON' : 'Broadcast OFF')}</span>
+                    </button>
+                  </div>
+
+                  {/* Geolocation Status Info & Coordinates */}
+                  {isBroadcastingLocation && (
+                    <div className="space-y-3 pt-1">
+                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-mono space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white/80">Active Live Beacon City:</span>
+                          <span className="text-emerald-300 font-bold">{liveBeaconCity}</span>
+                        </div>
+                        {liveLat !== 0 && (
+                          <div className="flex items-center justify-between text-[11px] text-emerald-300/80 pt-1 border-t border-emerald-500/20">
+                            <span>Coordinates: Lat {liveLat.toFixed(4)}, Lng {liveLng.toFixed(4)}</span>
+                            <span>Accuracy: ±{liveAccuracy}m</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {geoError && (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between">
+                          <span>{geoError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Location & Roaming Card */}
@@ -1007,12 +1172,14 @@ export default function ParticipantProfilePage() {
 
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs space-y-2">
                     <p className="font-bold text-white text-sm">
-                      {isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI'}
+                      {isBroadcastingLocation ? `Live Beacon Hub — ${liveBeaconCity}` : (isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI')}
                     </p>
                     <p className="text-white/70 leading-relaxed">
-                      {isRoaming
-                        ? 'Full access to Steinway & Sons Orlando recording hall, Steinway D concert grand, and Concord Symphony residency studio.'
-                        : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.'}
+                      {isBroadcastingLocation
+                        ? `Live location beacon active in ${liveBeaconCity}. Connected to grounds.beamthinktank.space dispatch engine.`
+                        : (isRoaming
+                          ? 'Full access to Steinway & Sons Orlando recording hall, Steinway D concert grand, and Concord Symphony residency studio.'
+                          : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.')}
                     </p>
                   </div>
                 </div>

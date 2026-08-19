@@ -32,6 +32,15 @@ export interface InfrastructureNeedTag {
   description?: string
 }
 
+export interface LiveLocationBeacon {
+  isBroadcasting: boolean
+  latitude?: number
+  longitude?: number
+  accuracy?: number
+  cityState?: string
+  lastBeaconTime?: string
+}
+
 export interface ParticipantDemographics {
   fullName: string
   email: string
@@ -43,6 +52,7 @@ export interface ParticipantDemographics {
   homeHub: string
   isRoamingActive?: boolean
   roamingCity?: string
+  current_live_location?: LiveLocationBeacon
   infrastructureNeeds?: InfrastructureNeedTag[]
   portfolioMedia?: MediaPortfolioItem[]
   willingnessToTravel: boolean
@@ -222,6 +232,7 @@ export async function fetchParticipantProfile(
           homeHub: data.homeHub || (isEzra ? DEFAULT_EZRA_PROFILE.homeHub : 'Member Hub'),
           isRoamingActive: typeof data.isRoamingActive === 'boolean' ? data.isRoamingActive : (isEzra ? true : false),
           roamingCity: data.roamingCity || (isEzra ? DEFAULT_EZRA_PROFILE.roamingCity : ''),
+          current_live_location: data.current_live_location || (isEzra ? DEFAULT_EZRA_PROFILE.current_live_location : { isBroadcasting: false }),
           infrastructureNeeds: data.infrastructureNeeds || (isEzra ? DEFAULT_EZRA_PROFILE.infrastructureNeeds : [
             { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/transit pass support.' },
             { id: 'housing', label: 'Residency Housing', needed: false, priority: 'medium' },
