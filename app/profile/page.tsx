@@ -16,7 +16,6 @@ import {
 import { 
   X, 
   MoreHorizontal, 
-  Camera, 
   Upload, 
   Smartphone, 
   Coins, 
@@ -30,15 +29,24 @@ import {
   Edit3, 
   Save, 
   LogIn, 
-  User as UserIcon
+  User as UserIcon,
+  Sparkles
 } from 'lucide-react'
+
+const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
 
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
   
-  // Real authenticated session email or default to ezra.haugabrooks@gmail.com if testing
-  const targetEmail = (user?.email && user.email !== 'admin@local.dev') ? user.email : 'ezra.haugabrooks@gmail.com'
-  const isBdsoEzra = targetEmail.toLowerCase() === 'ezra.haugabrooks@gmail.com'
+  // Explicit Sandbox Preview toggle for testing BDSO core profile
+  const [isSandboxPreview, setIsSandboxPreview] = useState(false)
+
+  // Real authenticated session email or sandbox preview email
+  const targetEmail = (user?.email && user.email !== 'admin@local.dev')
+    ? user.email 
+    : (isSandboxPreview ? BDSO_SANDBOX_EMAIL : '')
+
+  const isBdsoEzra = targetEmail.toLowerCase() === BDSO_SANDBOX_EMAIL
 
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
@@ -66,13 +74,22 @@ export default function ParticipantProfilePage() {
 
   useEffect(() => {
     async function loadProfile() {
+      if (!targetEmail) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
-        const data = await fetchParticipantProfile(targetEmail)
+        const data = await fetchParticipantProfile(
+          targetEmail, 
+          user?.uid, 
+          user?.displayName, 
+          user?.photoURL
+        )
         setProfile(data)
         setFormData(data)
-        setBioText(data.culturalCapitalNotes || 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.')
-        setEditName(user?.displayName || data.fullName || 'Ezra Haugabrooks')
+        setBioText(data.culturalCapitalNotes || 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.')
+        setEditName(user?.displayName || data.fullName || targetEmail.split('@')[0])
         setEditEmail(targetEmail)
         setEditPhone('(414) 555-0199')
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
@@ -86,8 +103,10 @@ export default function ParticipantProfilePage() {
         setLoading(false)
       }
     }
-    loadProfile()
-  }, [targetEmail, user?.photoURL, user?.displayName, isBdsoEzra])
+    if (targetEmail || !authLoading) {
+      loadProfile()
+    }
+  }, [targetEmail, user?.uid, user?.photoURL, user?.displayName, isBdsoEzra, authLoading])
 
   const handleGoogleSignIn = async () => {
     if (!auth) return
@@ -110,7 +129,7 @@ export default function ParticipantProfilePage() {
           setProfilePhoto(newUrl)
           setShowPhotoModal(false)
           if (profile) {
-            saveParticipantProfile(targetEmail, { headshotUrl: newUrl })
+            saveParticipantProfile(targetEmail, { headshotUrl: newUrl }, user?.uid)
           }
         }
       }
@@ -151,7 +170,7 @@ export default function ParticipantProfilePage() {
     setProfilePhoto(syncedPhoto)
     setShowPhotoModal(false)
     if (profile && syncedPhoto) {
-      saveParticipantProfile(targetEmail, { headshotUrl: syncedPhoto })
+      saveParticipantProfile(targetEmail, { headshotUrl: syncedPhoto }, user?.uid)
     }
   }
 
@@ -164,7 +183,7 @@ export default function ParticipantProfilePage() {
         fullName: editName,
         culturalCapitalNotes: bioText,
         headshotUrl: profilePhoto
-      })
+      }, user?.uid)
       setProfile({ 
         ...profile, 
         ...formData, 
@@ -208,7 +227,7 @@ export default function ParticipantProfilePage() {
     setTimeout(() => setCopied(false), 2500)
   }
 
-  if (loading || authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-[#07080A] text-white flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -221,7 +240,53 @@ export default function ParticipantProfilePage() {
     )
   }
 
-  const displayName = editName || user?.displayName || profile?.fullName || 'Ezra Haugabrooks'
+  // PART B — Requirement 1: Graceful Sign In with Google Gating Screen for Unauthenticated Visitors
+  if (!user && !isSandboxPreview) {
+    return (
+      <div className="min-h-screen bg-[#07080A] text-white flex flex-col justify-between items-center p-6 font-sans">
+        <div className="w-full max-w-md my-auto text-center space-y-6 bg-[#0F1015] p-8 rounded-3xl border border-white/10 shadow-2xl">
+          <div className="w-16 h-16 rounded-full bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/40 flex items-center justify-center mx-auto shadow-lg">
+            <Music className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
+              BEAM Participant Portal
+            </h1>
+            <p className="text-xs text-white/60 leading-relaxed font-sans max-w-xs mx-auto">
+              Sign in with Google to access your BEAM Musician Profile, performance history, stipends, and BEAM Coins.
+            </p>
+          </div>
+
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full py-3.5 px-6 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl flex items-center justify-center space-x-2"
+          >
+            <LogIn className="w-4 h-4 text-black" />
+            <span>Sign In with Google</span>
+          </button>
+
+          <div className="pt-4 border-t border-white/10 flex flex-col space-y-3">
+            <Link
+              href="/"
+              className="text-xs text-white/60 hover:text-white transition font-medium"
+            >
+              ← Return to Orchestra Homepage
+            </Link>
+
+            <button
+              onClick={() => setIsSandboxPreview(true)}
+              className="text-[11px] font-mono text-orchestra-gold/80 hover:text-orchestra-gold transition"
+            >
+              ⚡ Preview BDSO Core Sandbox Profile (ezra.haugabrooks@gmail.com)
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const displayName = editName || user?.displayName || profile?.fullName || targetEmail.split('@')[0]
   const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
 
   return (
@@ -246,6 +311,19 @@ export default function ParticipantProfilePage() {
       {/* Main Container */}
       <div className="relative min-h-screen max-w-lg mx-auto flex flex-col justify-between overflow-hidden shadow-2xl bg-[#0F1015]">
         
+        {/* Sandbox Preview Banner */}
+        {isSandboxPreview && !user && (
+          <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-xs font-mono text-amber-200">
+            <span>⚡ SANDBOX PREVIEW (BDSO CORE)</span>
+            <button
+              onClick={() => setIsSandboxPreview(false)}
+              className="underline text-amber-300 hover:text-white"
+            >
+              Exit Preview
+            </button>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* PART A — HERO SECTION VIEWPORT SIZING & FALLBACK FIX                      */}
         {/* ========================================================================= */}
@@ -340,17 +418,17 @@ export default function ParticipantProfilePage() {
           {/* Stats Bar */}
           <div className="w-full grid grid-cols-3 gap-2 text-center">
             <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-              <p className="text-xl font-bold text-amber-400 font-serif">48</p>
+              <p className="text-xl font-bold text-amber-400 font-serif">{profile?.beamCoinBalance || 0}</p>
               <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">BEAM Coins</p>
             </div>
 
             <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-              <p className="text-xl font-bold text-emerald-400 font-serif">$1,485</p>
+              <p className="text-xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 0}</p>
               <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">USD Stipends</p>
             </div>
 
             <div className="p-3 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-              <p className="text-xl font-bold text-purple-300 font-serif">5</p>
+              <p className="text-xl font-bold text-purple-300 font-serif">{events.length}</p>
               <p className="text-[11px] text-white/60 uppercase font-sans tracking-wider mt-0.5">Events Played</p>
             </div>
           </div>
@@ -498,22 +576,32 @@ export default function ParticipantProfilePage() {
 
           {/* Events Played Tab */}
           {activeTab === 'events' && (
-            <div className="grid grid-cols-2 gap-3">
-              {events.slice(0, 4).map((event) => (
-                <div
-                  key={event.id}
-                  className="p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 transition flex flex-col justify-between space-y-2"
-                >
-                  <span className="text-[10px] font-mono uppercase text-amber-300 font-semibold truncate">
-                    {event.type}
-                  </span>
-                  <p className="text-xs font-bold text-white line-clamp-2">{event.title}</p>
-                  <div className="flex items-center justify-between text-[11px] text-white/60 pt-1 border-t border-white/10">
-                    <span className="text-emerald-400 font-semibold">${event.usdStipend} USD</span>
-                    <span>+{event.beamCoinsEarned} BEAM</span>
-                  </div>
+            <div>
+              {events.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-black/30 border border-white/10 space-y-2">
+                  <Music className="w-8 h-8 text-white/30 mx-auto" />
+                  <p className="text-xs font-semibold text-white/80">No events played recorded yet.</p>
+                  <p className="text-[11px] text-white/50">Audition for upcoming contract projects in the Training portal.</p>
                 </div>
-              ))}
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {events.slice(0, 4).map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 hover:border-white/30 transition flex flex-col justify-between space-y-2"
+                    >
+                      <span className="text-[10px] font-mono uppercase text-amber-300 font-semibold truncate">
+                        {event.type}
+                      </span>
+                      <p className="text-xs font-bold text-white line-clamp-2">{event.title}</p>
+                      <div className="flex items-center justify-between text-[11px] text-white/60 pt-1 border-t border-white/10">
+                        <span className="text-emerald-400 font-semibold">${event.usdStipend} USD</span>
+                        <span>+{event.beamCoinsEarned} BEAM</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

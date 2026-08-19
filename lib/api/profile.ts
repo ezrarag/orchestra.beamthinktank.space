@@ -142,67 +142,98 @@ export const DEFAULT_EZRA_EVENTS: EventPlayed[] = [
   }
 ]
 
-export async function fetchParticipantProfile(email: string): Promise<ParticipantDemographics> {
+export async function fetchParticipantProfile(
+  email: string,
+  userUid?: string,
+  googleName?: string | null,
+  googlePhoto?: string | null
+): Promise<ParticipantDemographics> {
   const normEmail = normalizeEmail(email)
-  if (normEmail === 'ezra.haugabrooks@gmail.com') {
-    if (db) {
-      try {
-        const participantId = `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
-        const snap = await getDoc(doc(db, 'participantProfiles', participantId))
-        if (snap.exists()) {
-          const data = snap.data()
-          return {
-            ...DEFAULT_EZRA_PROFILE,
-            fullName: data.fullName || DEFAULT_EZRA_PROFILE.fullName,
-            primaryInstrument: data.primaryInstrument || data.instruments?.[0] || DEFAULT_EZRA_PROFILE.primaryInstrument,
-            homeHub: data.homeHub || DEFAULT_EZRA_PROFILE.homeHub,
-            ethnicity: data.ethnicity || DEFAULT_EZRA_PROFILE.ethnicity,
-            pronouns: data.pronouns || DEFAULT_EZRA_PROFILE.pronouns,
-            culturalCapitalNotes: data.culturalCapitalNotes || DEFAULT_EZRA_PROFILE.culturalCapitalNotes,
-            educationBackground: data.educationBackground || DEFAULT_EZRA_PROFILE.educationBackground,
-            uncompensatedRehearsalHours: typeof data.uncompensatedRehearsalHours === 'number' ? data.uncompensatedRehearsalHours : DEFAULT_EZRA_PROFILE.uncompensatedRehearsalHours
-          }
-        }
-      } catch (err) {
-        console.warn('Could not read Firestore participant profile, using default:', err)
+  const participantId = userUid ? `participant_role_${userUid}` : `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
+
+  if (db) {
+    try {
+      // First try by UID-based doc id, then fallback to email-based doc id
+      let snap = await getDoc(doc(db, 'participantProfiles', participantId))
+      if (!snap.exists()) {
+        const altId = `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
+        snap = await getDoc(doc(db, 'participantProfiles', altId))
       }
+
+      if (snap.exists()) {
+        const data = snap.data()
+        const isEzra = normEmail === 'ezra.haugabrooks@gmail.com'
+        const defaultBase = isEzra ? DEFAULT_EZRA_PROFILE : {}
+
+        return {
+          fullName: data.fullName || googleName || data.name || (isEzra ? DEFAULT_EZRA_PROFILE.fullName : normEmail.split('@')[0]),
+          email: normEmail,
+          primaryRole: data.primaryRole || (isEzra ? DEFAULT_EZRA_PROFILE.primaryRole : 'BEAM Participant Musician'),
+          originProject: data.originProject || (isEzra ? DEFAULT_EZRA_PROFILE.originProject : 'BEAM Orchestra Network'),
+          primaryInstrument: data.primaryInstrument || (isEzra ? DEFAULT_EZRA_PROFILE.primaryInstrument : 'Strings / Musician'),
+          homeHub: data.homeHub || (isEzra ? DEFAULT_EZRA_PROFILE.homeHub : 'Member Hub'),
+          willingnessToTravel: typeof data.willingnessToTravel === 'boolean' ? data.willingnessToTravel : true,
+          ethnicity: data.ethnicity || (isEzra ? DEFAULT_EZRA_PROFILE.ethnicity : 'BEAM Artist'),
+          pronouns: data.pronouns || (isEzra ? DEFAULT_EZRA_PROFILE.pronouns : 'They / Them'),
+          educationBackground: data.educationBackground || (isEzra ? DEFAULT_EZRA_PROFILE.educationBackground : 'BEAM Musician Participant'),
+          culturalCapitalNotes: data.culturalCapitalNotes || (isEzra ? DEFAULT_EZRA_PROFILE.culturalCapitalNotes : 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.'),
+          uncompensatedRehearsalHours: typeof data.uncompensatedRehearsalHours === 'number' ? data.uncompensatedRehearsalHours : (isEzra ? 24 : 0),
+          beamCoinBalance: typeof data.beamCoinBalance === 'number' ? data.beamCoinBalance : (isEzra ? 48 : 0),
+          usdTotalEarned: typeof data.usdTotalEarned === 'number' ? data.usdTotalEarned : (isEzra ? 1485 : 0),
+          headshotUrl: data.headshotUrl || googlePhoto || (isEzra ? DEFAULT_EZRA_PROFILE.headshotUrl : '')
+        }
+      }
+    } catch (err) {
+      console.warn('Could not read Firestore participant profile, creating default:', err)
     }
+  }
+
+  if (normEmail === 'ezra.haugabrooks@gmail.com') {
     return DEFAULT_EZRA_PROFILE
   }
 
-  // Fallback profile for other users
+  // Clean brand-new user profile (0 stats, clean empty state)
   return {
-    fullName: email.split('@')[0],
+    fullName: googleName || normEmail.split('@')[0],
     email: normEmail,
     primaryRole: 'BEAM Participant Musician',
     originProject: 'BEAM Orchestra Network',
-    primaryInstrument: 'Strings',
-    homeHub: 'Global Hub',
+    primaryInstrument: 'Strings / Musician',
+    homeHub: 'Member Hub',
     willingnessToTravel: true,
     ethnicity: 'BEAM Artist',
     pronouns: 'They / Them',
     educationBackground: 'BEAM Musician Participant',
-    culturalCapitalNotes: 'Registered BEAM participant.',
+    culturalCapitalNotes: 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.',
     uncompensatedRehearsalHours: 0,
-    beamCoinBalance: 10,
-    usdTotalEarned: 0
+    beamCoinBalance: 0,
+    usdTotalEarned: 0,
+    headshotUrl: googlePhoto || ''
   }
 }
 
-export async function saveParticipantProfile(email: string, updates: Partial<ParticipantDemographics>): Promise<void> {
+export async function saveParticipantProfile(
+  email: string,
+  updates: Partial<ParticipantDemographics>,
+  userUid?: string
+): Promise<void> {
   const normEmail = normalizeEmail(email)
   if (!db) return
 
-  const participantId = `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
-  await setDoc(
-    doc(db, 'participantProfiles', participantId),
-    {
-      ...updates,
-      primaryEmail: normEmail,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  )
+  const primaryId = userUid ? `participant_role_${userUid}` : `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
+  const altId = `participant-${normEmail.replace(/[^a-z0-9]+/g, '-')}`
+
+  const payload = {
+    ...updates,
+    primaryEmail: normEmail,
+    authUid: userUid || null,
+    updatedAt: serverTimestamp()
+  }
+
+  await setDoc(doc(db, 'participantProfiles', primaryId), payload, { merge: true })
+  if (userUid && primaryId !== altId) {
+    await setDoc(doc(db, 'participantProfiles', altId), payload, { merge: true })
+  }
 }
 
 export async function fetchCrossSiteRecordPayload(email: string): Promise<OrchestraCrossSiteRecordPayload> {

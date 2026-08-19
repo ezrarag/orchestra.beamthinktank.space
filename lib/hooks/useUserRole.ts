@@ -9,8 +9,8 @@ import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/admin
 export type UserRole = 'beam_admin' | 'partner_admin' | 'admin_staff' | 'board' | 'musician' | 'subscriber' | 'audience'
 
 const adminAuthBypassEnabled =
-  process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS === '1' ||
-  (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS !== '0')
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_ADMIN_AUTH_BYPASS === '1'
 
 interface UserWithRole {
   user: User | null
