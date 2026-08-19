@@ -52,7 +52,7 @@ const CATEGORIES: CategoryItem[] = [
     description: 'Audition for professional contract orchestra projects, earn USD stipends up to $495 per project, and collect BEAM Coin credits.',
     colorAccent: '#A855F7', // BEAM Purple
     ctaText: 'Join Participant Network',
-    ctaHref: '/participate/benefits'
+    ctaHref: '/profile'
   },
   {
     id: 'cohorts',

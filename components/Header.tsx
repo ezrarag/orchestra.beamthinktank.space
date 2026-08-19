@@ -22,6 +22,9 @@ export default function Header() {
 
           {/* Desktop Navigation - All links in header */}
           <nav className="hidden md:flex items-center space-x-8">
+            <Link href="/profile" className="text-orchestra-gold hover:text-white font-medium transition-colors border border-orchestra-gold/30 px-3 py-1 rounded-lg bg-orchestra-gold/10">
+              My Profile
+            </Link>
             <Link href="/tickets" className="text-orchestra-cream hover:text-orchestra-gold transition-colors">
               Tickets
             </Link>

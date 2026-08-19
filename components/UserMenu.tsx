@@ -149,7 +149,7 @@ export default function UserMenu() {
                   <div className="p-2 space-y-1">
                     {/* Profile/Account Link */}
                     <Link
-                      href="/members"
+                      href="/profile"
                       onClick={() => setIsOpen(false)}
                       className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
                     >
