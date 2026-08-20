@@ -8,7 +8,6 @@ import { auth } from '@/lib/firebase'
 import { parseVCard } from '@/lib/vcard'
 import { parseCVText } from '@/lib/cvParser'
 import { getBrowserCoordinates } from '@/lib/geolocation'
-import InstitutionalCohortProfile from '@/components/InstitutionalCohortProfile'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -54,26 +53,17 @@ import {
   Wrench,
   Award,
   FileText,
-  Radio
+  Radio,
+  Tv
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
 
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
-  
-  // Profile View Mode Toggle: Participant View vs Institutional Cohort View
-  const [viewMode, setViewMode] = useState<'participant' | 'institution'>('participant')
 
   // Explicit Sandbox Preview toggle for testing BDSO core profile
   const [isSandboxPreview, setIsSandboxPreview] = useState(false)
-
-  // Auto-detect institutional email
-  useEffect(() => {
-    if (user?.email && /ballet|dance|institution|partner|bdo/i.test(user.email)) {
-      setViewMode('institution')
-    }
-  }, [user?.email])
 
   // Real authenticated session email or sandbox preview email
   const targetEmail = (user?.email && user.email !== 'admin@local.dev')
@@ -210,7 +200,6 @@ export default function ParticipantProfilePage() {
       if (coords.cityState) setLiveBeaconCity(coords.cityState)
       setIsBroadcastingLocation(true)
 
-      // Save live location to Firestore for cross-domain dispatching
       if (profile) {
         await saveParticipantProfile(targetEmail, {
           current_live_location: {
@@ -512,7 +501,7 @@ export default function ParticipantProfilePage() {
 
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
-              BEAM Participant Portal
+              BEAM Musician Participant Portal
             </h1>
             <p className="text-xs text-white/60 leading-relaxed font-sans max-w-xs mx-auto">
               Sign in with Google to access your BEAM Musician Profile, portfolio, logistics, stipends, and BEAM Coins.
@@ -535,56 +524,16 @@ export default function ParticipantProfilePage() {
               ← Return to Orchestra Homepage
             </Link>
 
-            <button
-              onClick={() => setIsSandboxPreview(true)}
-              className="text-[11px] font-mono text-orchestra-gold/80 hover:text-orchestra-gold transition"
-            >
-              ⚡ Preview BDSO Core Sandbox Profile (ezra.haugabrooks@gmail.com)
-            </button>
+            <div className="flex justify-center space-x-4 pt-1">
+              <Link href="/institution/profile" className="text-[11px] font-mono text-purple-300 hover:underline">
+                🏛️ Institutional Profile
+              </Link>
+              <Link href="/audience/profile" className="text-[11px] font-mono text-amber-300 hover:underline">
+                📺 Studio Vault Audience
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
-    )
-  }
-
-  // IF INSTITUTIONAL VIEW MODE IS ACTIVE:
-  if ((viewMode as string) === 'institution') {
-    return (
-      <div className="min-h-screen bg-[#07080A] text-white">
-        {/* Top Demo Mode Switcher Bar */}
-        <div className="bg-[#0B0C10] border-b border-white/10 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 z-30 relative">
-          <div className="flex items-center space-x-2 text-xs font-mono text-white/60">
-            <span>LIVE MEETING DEMO SWITCHER:</span>
-          </div>
-
-          <div className="flex items-center space-x-2 bg-black/60 p-1 rounded-full border border-white/15">
-            <button
-              onClick={() => setViewMode('participant')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
-                (viewMode as string) === 'participant'
-                  ? 'bg-amber-400 text-black shadow-md'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              <UserIcon className="w-3.5 h-3.5" />
-              <span>Participant View</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode('institution')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
-                (viewMode as string) === 'institution'
-                  ? 'bg-purple-500 text-white shadow-md'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Institutional Cohort (Ballet & Dance Orchestra)</span>
-            </button>
-          </div>
-        </div>
-
-        <InstitutionalCohortProfile />
       </div>
     )
   }
@@ -595,39 +544,6 @@ export default function ParticipantProfilePage() {
   return (
     <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
       
-      {/* Top Demo Mode Switcher Bar for Live Meetings */}
-      <div className="bg-[#0B0C10] border-b border-white/10 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 z-30 relative">
-        <div className="flex items-center space-x-2 text-xs font-mono text-white/60">
-          <span>LIVE MEETING DEMO SWITCHER:</span>
-        </div>
-
-        <div className="flex items-center space-x-2 bg-black/60 p-1 rounded-full border border-white/15">
-          <button
-            onClick={() => setViewMode('participant')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
-              (viewMode as string) === 'participant'
-                ? 'bg-amber-400 text-black shadow-md'
-                : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <UserIcon className="w-3.5 h-3.5" />
-            <span>Participant View</span>
-          </button>
-
-          <button
-            onClick={() => setViewMode('institution')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
-              (viewMode as string) === 'institution'
-                ? 'bg-purple-500 text-white shadow-md'
-                : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Institutional Cohort (Ballet & Dance Orchestra)</span>
-          </button>
-        </div>
-      </div>
-
       {/* Hidden File Inputs */}
       <input
         type="file"
@@ -724,7 +640,7 @@ export default function ParticipantProfilePage() {
           <div className="absolute bottom-4 inset-x-0 z-20">
             <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
               
-              {/* Feature 1: Live Presence Header Badge */}
+              {/* Live Presence Header Badge */}
               <div className="flex flex-wrap items-center gap-2">
                 {isBroadcastingLocation ? (
                   <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold shadow-lg">
@@ -1117,7 +1033,7 @@ export default function ParticipantProfilePage() {
                   <p className="text-xs text-white/60">Cross-domain Life360 location beacon broadcasting live coordinates for grounds.beamthinktank.space transport & housing dispatch.</p>
                 </div>
 
-                {/* FEATURE 2 & 3: Live Location Beacon Broadcasting Card */}
+                {/* Live Location Beacon Broadcasting Card */}
                 <div className="p-5 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-4 shadow-xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
                     <div className="flex items-center space-x-3">
@@ -1501,12 +1417,12 @@ export default function ParticipantProfilePage() {
         </div>
       )}
 
-      {/* Photo / File Selection Modal */}
+      {/* Photo / File & Profile Switching Options Modal */}
       {showPhotoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
           <div className="w-full max-w-sm p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 text-center shadow-2xl">
-            <h3 className="text-lg font-serif font-bold text-white">Import & Photo Options</h3>
-            <p className="text-xs text-white/60">Choose how you want to update your profile, photo, or live CV.</p>
+            <h3 className="text-lg font-serif font-bold text-white">Profile & Photo Options</h3>
+            <p className="text-xs text-white/60">Choose how you want to update your profile, photo, or switch profile views.</p>
 
             <div className="space-y-2 pt-2">
               <button
@@ -1545,6 +1461,27 @@ export default function ParticipantProfilePage() {
                   <span>Use Google Account Photo</span>
                 </button>
               )}
+            </div>
+
+            {/* Direct Profile View Route Switchers */}
+            <div className="pt-3 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider">Switch Dedicated Profile View</p>
+              
+              <Link
+                href="/institution/profile"
+                className="w-full py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center justify-center space-x-2 transition"
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Institutional Cohort Profile →</span>
+              </Link>
+
+              <Link
+                href="/audience/profile"
+                className="w-full py-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-semibold flex items-center justify-center space-x-2 transition"
+              >
+                <Tv className="w-4 h-4" />
+                <span>Studio Vault Audience Profile →</span>
+              </Link>
             </div>
 
             <button
