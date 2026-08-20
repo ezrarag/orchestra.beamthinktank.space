@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase'
 import { parseVCard } from '@/lib/vcard'
 import { parseCVText } from '@/lib/cvParser'
 import { getBrowserCoordinates } from '@/lib/geolocation'
+import InstitutionalCohortProfile from '@/components/InstitutionalCohortProfile'
 import { 
   fetchParticipantProfile, 
   saveParticipantProfile, 
@@ -61,8 +62,18 @@ const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
   
+  // Profile View Mode Toggle: Participant View vs Institutional Cohort View
+  const [viewMode, setViewMode] = useState<'participant' | 'institution'>('participant')
+
   // Explicit Sandbox Preview toggle for testing BDSO core profile
   const [isSandboxPreview, setIsSandboxPreview] = useState(false)
+
+  // Auto-detect institutional email
+  useEffect(() => {
+    if (user?.email && /ballet|dance|institution|partner|bdo/i.test(user.email)) {
+      setViewMode('institution')
+    }
+  }, [user?.email])
 
   // Real authenticated session email or sandbox preview email
   const targetEmail = (user?.email && user.email !== 'admin@local.dev')
@@ -100,7 +111,7 @@ export default function ParticipantProfilePage() {
   const [cvImportedNotice, setCvImportedNotice] = useState(false)
 
   // Live Location Beacon State (Life360 Cross-Domain Sync)
-  const [isBroadcastingLocation, setIsBroadcastingLocation] = useState(false)
+  const [isBroadcastingLocation, setIsBroadcastingLocation] = useState(true)
   const [liveBeaconCity, setLiveBeaconCity] = useState('Atlanta, GA')
   const [liveLat, setLiveLat] = useState(33.749)
   const [liveLng, setLiveLng] = useState(-84.388)
@@ -179,51 +190,60 @@ export default function ParticipantProfilePage() {
     }
   }
 
-  // Handle Live Location Beacon Toggle & Browser Geolocation
-  const handleToggleLiveLocation = async () => {
-    if (isBroadcastingLocation) {
-      setIsBroadcastingLocation(false)
-      const disabledBeacon: LiveLocationBeacon = {
-        isBroadcasting: false,
-        cityState: liveBeaconCity,
-        lastBeaconTime: new Date().toISOString()
-      }
-      if (profile) {
-        await saveParticipantProfile(targetEmail, { current_live_location: disabledBeacon }, user?.uid)
-      }
+  // Trigger Browser Geolocation API Capture
+  const handleCaptureLiveLocation = async () => {
+    setIsGeoLoading(true)
+    setGeoError('')
+
+    const coords = await getBrowserCoordinates()
+
+    if (coords.error) {
+      setGeoError(coords.error)
+      setIsGeoLoading(false)
       return
     }
 
-    setIsGeoLoading(true)
-    setGeoError('')
-    const geo = await getBrowserCoordinates()
+    if (coords.latitude && coords.longitude) {
+      setLiveLat(coords.latitude)
+      setLiveLng(coords.longitude)
+      if (coords.accuracy) setLiveAccuracy(coords.accuracy)
+      if (coords.cityState) setLiveBeaconCity(coords.cityState)
+      setIsBroadcastingLocation(true)
+
+      // Save live location to Firestore for cross-domain dispatching
+      if (profile) {
+        await saveParticipantProfile(targetEmail, {
+          current_live_location: {
+            isBroadcasting: true,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            cityState: coords.cityState,
+            lastBeaconTime: new Date().toISOString()
+          }
+        }, user?.uid)
+      }
+    }
     setIsGeoLoading(false)
+  }
 
-    if (geo.error) {
-      setGeoError(geo.error)
-    }
+  // Toggle Live Location Broadcasting ON/OFF
+  const handleToggleBroadcasting = async () => {
+    const nextBroadcasting = !isBroadcastingLocation
+    setIsBroadcastingLocation(nextBroadcasting)
 
-    const newLat = geo.latitude || (liveLat !== 0 ? liveLat : 33.749)
-    const newLng = geo.longitude || (liveLng !== 0 ? liveLng : -84.388)
-    const newCity = geo.cityState || liveBeaconCity || 'Atlanta, GA'
-
-    setLiveLat(newLat)
-    setLiveLng(newLng)
-    setLiveAccuracy(geo.accuracy || 12)
-    setLiveBeaconCity(newCity)
-    setIsBroadcastingLocation(true)
-
-    const beaconData: LiveLocationBeacon = {
-      isBroadcasting: true,
-      latitude: newLat,
-      longitude: newLng,
-      accuracy: geo.accuracy || 12,
-      cityState: newCity,
-      lastBeaconTime: new Date().toISOString()
-    }
-
-    if (profile) {
-      await saveParticipantProfile(targetEmail, { current_live_location: beaconData }, user?.uid)
+    if (nextBroadcasting) {
+      await handleCaptureLiveLocation()
+    } else {
+      if (profile) {
+        await saveParticipantProfile(targetEmail, {
+          current_live_location: {
+            isBroadcasting: false,
+            cityState: liveBeaconCity,
+            lastBeaconTime: new Date().toISOString()
+          }
+        }, user?.uid)
+      }
     }
   }
 
@@ -387,15 +407,6 @@ export default function ParticipantProfilePage() {
     if (!profile) return
     setSaving(true)
     try {
-      const beaconPayload: LiveLocationBeacon = {
-        isBroadcasting: isBroadcastingLocation,
-        latitude: liveLat,
-        longitude: liveLng,
-        accuracy: liveAccuracy,
-        cityState: liveBeaconCity,
-        lastBeaconTime: new Date().toISOString()
-      }
-
       await saveParticipantProfile(targetEmail, { 
         ...formData,
         fullName: editName,
@@ -404,7 +415,14 @@ export default function ParticipantProfilePage() {
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
         roamingCity: roamingLocation,
-        current_live_location: beaconPayload
+        current_live_location: {
+          isBroadcasting: isBroadcastingLocation,
+          latitude: liveLat,
+          longitude: liveLng,
+          accuracy: liveAccuracy,
+          cityState: liveBeaconCity,
+          lastBeaconTime: new Date().toISOString()
+        }
       }, user?.uid)
       setProfile({ 
         ...profile, 
@@ -415,7 +433,14 @@ export default function ParticipantProfilePage() {
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
         roamingCity: roamingLocation,
-        current_live_location: beaconPayload
+        current_live_location: {
+          isBroadcasting: isBroadcastingLocation,
+          latitude: liveLat,
+          longitude: liveLng,
+          accuracy: liveAccuracy,
+          cityState: liveBeaconCity,
+          lastBeaconTime: new Date().toISOString()
+        }
       })
       setIsEditingBio(false)
     } catch (err) {
@@ -433,12 +458,12 @@ export default function ParticipantProfilePage() {
     subdomainSource: 'orchestra',
     location: profile.homeHub,
     roamingLocation: isRoaming ? roamingLocation : undefined,
-    current_live_location: {
+    currentLiveLocation: {
       isBroadcasting: isBroadcastingLocation,
+      cityState: liveBeaconCity,
       latitude: liveLat,
       longitude: liveLng,
-      accuracy: liveAccuracy,
-      cityState: liveBeaconCity
+      accuracy: liveAccuracy
     },
     educationHistory: profile.educationBackground,
     culturalCapitalNotes: bioText,
@@ -522,12 +547,87 @@ export default function ParticipantProfilePage() {
     )
   }
 
+  // IF INSTITUTIONAL VIEW MODE IS ACTIVE:
+  if ((viewMode as string) === 'institution') {
+    return (
+      <div className="min-h-screen bg-[#07080A] text-white">
+        {/* Top Demo Mode Switcher Bar */}
+        <div className="bg-[#0B0C10] border-b border-white/10 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 z-30 relative">
+          <div className="flex items-center space-x-2 text-xs font-mono text-white/60">
+            <span>LIVE MEETING DEMO SWITCHER:</span>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-black/60 p-1 rounded-full border border-white/15">
+            <button
+              onClick={() => setViewMode('participant')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                (viewMode as string) === 'participant'
+                  ? 'bg-amber-400 text-black shadow-md'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              <span>Participant View</span>
+            </button>
+
+            <button
+              onClick={() => setViewMode('institution')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                (viewMode as string) === 'institution'
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Institutional Cohort (Ballet & Dance Orchestra)</span>
+            </button>
+          </div>
+        </div>
+
+        <InstitutionalCohortProfile />
+      </div>
+    )
+  }
+
   const displayName = editName || user?.displayName || profile?.fullName || targetEmail.split('@')[0]
   const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
 
   return (
     <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
       
+      {/* Top Demo Mode Switcher Bar for Live Meetings */}
+      <div className="bg-[#0B0C10] border-b border-white/10 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 z-30 relative">
+        <div className="flex items-center space-x-2 text-xs font-mono text-white/60">
+          <span>LIVE MEETING DEMO SWITCHER:</span>
+        </div>
+
+        <div className="flex items-center space-x-2 bg-black/60 p-1 rounded-full border border-white/15">
+          <button
+            onClick={() => setViewMode('participant')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+              (viewMode as string) === 'participant'
+                ? 'bg-amber-400 text-black shadow-md'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span>Participant View</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('institution')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+              (viewMode as string) === 'institution'
+                ? 'bg-purple-500 text-white shadow-md'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Institutional Cohort (Ballet & Dance Orchestra)</span>
+          </button>
+        </div>
+      </div>
+
       {/* Hidden File Inputs */}
       <input
         type="file"
@@ -620,29 +720,28 @@ export default function ParticipantProfilePage() {
           {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
-          {/* Overlaid Left-Aligned Name, Handle, Role Pills & Live Presence Header Badge */}
+          {/* Overlaid Left-Aligned Name, Handle, Live Status Badge & Dynamic Role Pills */}
           <div className="absolute bottom-4 inset-x-0 z-20">
             <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
               
-              {/* Feature 1: Live Presence Header Badge + Dynamic Role Pills */}
+              {/* Feature 1: Live Presence Header Badge */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Live Status Indicator Badge */}
                 {isBroadcastingLocation ? (
-                  <span className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/25 backdrop-blur-md border border-emerald-500/50 text-emerald-300 text-xs font-mono font-bold shadow-lg">
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold shadow-lg">
                     <span className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                     </span>
-                    <span>🟢 LIVE: {liveBeaconCity}</span>
-                  </span>
+                    <span>🟢 LIVE BEACON: {liveBeaconCity}</span>
+                  </div>
                 ) : (
-                  <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800/80 backdrop-blur-md border border-slate-700/60 text-slate-300 text-xs font-mono">
+                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800/80 backdrop-blur-md border border-slate-700/60 text-slate-300 text-xs font-mono">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
                     <span>📍 Home: {profile?.homeHub || 'Milwaukee, WI'}</span>
-                  </span>
+                  </div>
                 )}
 
-                {/* Role & Discipline Tags / Pills */}
+                {/* Dynamic Role / Discipline Pills */}
                 {disciplinePills.map((tag, idx) => (
                   <span
                     key={idx}
@@ -804,6 +903,7 @@ export default function ParticipantProfilePage() {
                       <span className="text-[10px] text-white/40 font-mono">Click (✕) to remove any incorrect role tag</span>
                     </div>
 
+                    {/* Interactive Pills List */}
                     <div className="flex flex-wrap items-center gap-2">
                       {disciplinePills.map((tag, idx) => (
                         <span
@@ -823,6 +923,7 @@ export default function ParticipantProfilePage() {
                       ))}
                     </div>
 
+                    {/* Add Custom Role Tag Input */}
                     <div className="flex items-center space-x-2 pt-1">
                       <input
                         type="text"
@@ -1008,73 +1109,75 @@ export default function ParticipantProfilePage() {
               </div>
             )}
 
-            {/* MODULE 2: LOCATION, ROAMING & TRANSPORTATION (LOGISTICS MODULE) */}
+            {/* MODULE 2: LOCATION, ROAMING & TRANSPORTATION (LOGISTICS MODULE & LIVE LOCATION BEACON) */}
             {activeTab === 'logistics' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Live Beacon Logistics</h2>
-                  <p className="text-xs text-white/60">Logistical realities feeding directly into grounds.beamthinktank.space ride dispatch & housing engines.</p>
+                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Live Location Beacon</h2>
+                  <p className="text-xs text-white/60">Cross-domain Life360 location beacon broadcasting live coordinates for grounds.beamthinktank.space transport & housing dispatch.</p>
                 </div>
 
-                {/* Feature 2: Life360 Cross-Domain Live Location Beacon Card */}
-                <div className="p-5 rounded-2xl bg-black/50 border border-emerald-500/40 space-y-4 shadow-xl">
+                {/* FEATURE 2 & 3: Live Location Beacon Broadcasting Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-4 shadow-xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center font-bold">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
                         <Radio className="w-5 h-5 animate-pulse" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                          <span>Broadcast My Live Location (Life360 Beacon)</span>
-                          {isBroadcastingLocation && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/40 uppercase font-bold">
-                              Broadcasting Live
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-xs text-white/60">
-                          Syncs real-time coordinates to <code>grounds.beamthinktank.space</code> & <code>hood.beamthinktank.space</code> for instant ride dispatch & housing.
-                        </p>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-sm font-bold text-white">Broadcast My Live Location (Life360 Beacon)</h3>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono">
+                            grounds.beamthinktank.space
+                          </span>
+                        </div>
+                        <p className="text-xs text-white/60">Broadcasts exact GPS position to BEAM logistics engine for rides & housing.</p>
                       </div>
                     </div>
 
-                    {/* Geolocation Toggle Switch */}
-                    <button
-                      type="button"
-                      onClick={handleToggleLiveLocation}
-                      disabled={isGeoLoading}
-                      className={`px-4 py-2.5 rounded-full text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
-                        isBroadcastingLocation
-                          ? 'bg-emerald-500 text-black shadow-lg hover:bg-emerald-400'
-                          : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
-                      }`}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full ${isBroadcastingLocation ? 'bg-black animate-ping' : 'bg-white/40'}`} />
-                      <span>{isGeoLoading ? 'Locating...' : (isBroadcastingLocation ? 'Broadcast ON' : 'Broadcast OFF')}</span>
-                    </button>
+                    <div className="flex items-center space-x-3 bg-black/60 px-4 py-2 rounded-xl border border-white/10">
+                      <span className="text-xs font-mono text-white/80">
+                        {isBroadcastingLocation ? '🟢 BROADCASTING LIVE' : '⚪ BEACON OFF'}
+                      </span>
+                      <button
+                        onClick={handleToggleBroadcasting}
+                        className={`w-12 h-6 rounded-full transition p-1 ${isBroadcastingLocation ? 'bg-emerald-500' : 'bg-white/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isBroadcastingLocation ? 'translate-x-6' : ''}`} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Geolocation Status Info & Coordinates */}
+                  {/* Geolocation Status / Details */}
                   {isBroadcastingLocation && (
-                    <div className="space-y-3 pt-1">
-                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-mono space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-white/80">Active Live Beacon City:</span>
-                          <span className="text-emerald-300 font-bold">{liveBeaconCity}</span>
+                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2 text-emerald-300 font-bold text-sm">
+                          <MapPin className="w-4 h-4" />
+                          <span>Active Beacon Location: {liveBeaconCity}</span>
                         </div>
-                        {liveLat !== 0 && (
-                          <div className="flex items-center justify-between text-[11px] text-emerald-300/80 pt-1 border-t border-emerald-500/20">
-                            <span>Coordinates: Lat {liveLat.toFixed(4)}, Lng {liveLng.toFixed(4)}</span>
-                            <span>Accuracy: ±{liveAccuracy}m</span>
-                          </div>
-                        )}
+
+                        <button
+                          onClick={handleCaptureLiveLocation}
+                          disabled={isGeoLoading}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition"
+                        >
+                          <Radio className={`w-3.5 h-3.5 ${isGeoLoading ? 'animate-spin' : ''}`} />
+                          <span>{isGeoLoading ? 'Capturing GPS...' : 'Refresh GPS Beacon'}</span>
+                        </button>
                       </div>
 
-                      {geoError && (
-                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between">
-                          <span>{geoError}</span>
-                        </div>
-                      )}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-white/70 text-[11px] pt-1 border-t border-emerald-500/20">
+                        <div>Latitude: <strong className="text-white">{liveLat.toFixed(4)}</strong></div>
+                        <div>Longitude: <strong className="text-white">{liveLng.toFixed(4)}</strong></div>
+                        <div>GPS Accuracy: <strong className="text-emerald-400">±{liveAccuracy}m</strong></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {geoError && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-mono">
+                      <span>⚠️ {geoError}</span>
                     </div>
                   )}
                 </div>
@@ -1172,14 +1275,12 @@ export default function ParticipantProfilePage() {
 
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs space-y-2">
                     <p className="font-bold text-white text-sm">
-                      {isBroadcastingLocation ? `Live Beacon Hub — ${liveBeaconCity}` : (isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI')}
+                      {isBroadcastingLocation ? `Live Beacon: ${liveBeaconCity}` : (isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI')}
                     </p>
                     <p className="text-white/70 leading-relaxed">
                       {isBroadcastingLocation
-                        ? `Live location beacon active in ${liveBeaconCity}. Connected to grounds.beamthinktank.space dispatch engine.`
-                        : (isRoaming
-                          ? 'Full access to Steinway & Sons Orlando recording hall, Steinway D concert grand, and Concord Symphony residency studio.'
-                          : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.')}
+                        ? `BEAM logistics engine is tracking your live location in ${liveBeaconCity}. Ground transit and residency housing can be dispatched directly to your position.`
+                        : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.'}
                     </p>
                   </div>
                 </div>
