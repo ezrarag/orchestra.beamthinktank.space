@@ -11,5 +11,7 @@ export const ADMIN_GATEWAYS_DISABLED =
 export function isAdminEmailAllowed(email: unknown): boolean {
   if (typeof email !== 'string') return false
   const norm = email.trim().toLowerCase()
-  return ADMIN_EMAIL_ALLOWLIST.some(e => e.toLowerCase() === norm)
+  if (ADMIN_EMAIL_ALLOWLIST.some(e => e.toLowerCase() === norm)) return true
+  if (norm.endsWith('@readyaimgo.biz') || norm.endsWith('@beamthinktank.space')) return true
+  return false
 }

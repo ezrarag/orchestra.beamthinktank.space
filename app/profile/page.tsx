@@ -54,7 +54,8 @@ import {
   Award,
   FileText,
   Radio,
-  Tv
+  Tv,
+  ShieldCheck
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'

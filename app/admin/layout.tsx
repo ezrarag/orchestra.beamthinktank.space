@@ -19,7 +19,7 @@ import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import { ADMIN_GATEWAYS_DISABLED } from '@/lib/config/adminAccess'
+import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
 const ADMIN_PAGE_META: Array<{
   prefix: string
@@ -241,9 +241,9 @@ export default function AdminLayout({
   const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({})
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
-  const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
-  const effectiveRole = ADMIN_GATEWAYS_DISABLED ? 'beam_admin' : role
-  const hasAdminShellAccess = ADMIN_GATEWAYS_DISABLED || role === 'beam_admin' || role === 'partner_admin' || role === 'board'
+  const isAllowedAdmin = isAdminEmailAllowed(user?.email)
+  const effectiveRole = ADMIN_GATEWAYS_DISABLED || isAllowedAdmin ? 'beam_admin' : role
+  const hasAdminShellAccess = ADMIN_GATEWAYS_DISABLED || isAllowedAdmin || role === 'beam_admin' || role === 'partner_admin' || role === 'board'
   const navGroups = useMemo(
     () => getAdminNavGroups({ role: effectiveRole, partnerProjectId }),
     [effectiveRole, partnerProjectId],
