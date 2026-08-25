@@ -241,6 +241,7 @@ export default function AdminLayout({
   const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({})
   const [signingOut, setSigningOut] = useState(false)
   const pathname = usePathname()
+  const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
   const isAllowedAdmin = isAdminEmailAllowed(user?.email)
   const effectiveRole = ADMIN_GATEWAYS_DISABLED || isAllowedAdmin ? 'beam_admin' : role
   const hasAdminShellAccess = ADMIN_GATEWAYS_DISABLED || isAllowedAdmin || role === 'beam_admin' || role === 'partner_admin' || role === 'board'
