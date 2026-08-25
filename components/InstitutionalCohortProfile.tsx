@@ -36,7 +36,7 @@ import {
   LogOut
 } from 'lucide-react'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { 
   DEFAULT_BADO_FLORIDA_PROFILE, 
@@ -130,6 +130,15 @@ export default function InstitutionalCohortProfile() {
   // Request Media / Legal Team State
   const [requestNotice, setRequestNotice] = useState('')
 
+  // Handle redirect result on mount for mobile / iPad Safari compatibility
+  useEffect(() => {
+    if (auth) {
+      void getRedirectResult(auth).catch((err) => {
+        console.warn('Redirect auth result warning:', err)
+      })
+    }
+  }, [])
+
   // Dynamically fetch profile keyed by Google UID
   useEffect(() => {
     async function loadProfile() {
@@ -148,8 +157,15 @@ export default function InstitutionalCohortProfile() {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
       await signInWithPopup(auth, provider)
-    } catch (err) {
-      console.error('Institutional Google Sign-In Error:', err)
+    } catch (err: any) {
+      console.warn('Popup sign in failed/blocked on device (e.g. iPad Safari), falling back to redirect:', err)
+      try {
+        const provider = new GoogleAuthProvider()
+        provider.setCustomParameters({ prompt: 'select_account' })
+        await signInWithRedirect(auth, provider)
+      } catch (redirectErr) {
+        console.error('Redirect sign in error:', redirectErr)
+      }
     } finally {
       setSigningIn(false)
     }
@@ -270,10 +286,10 @@ export default function InstitutionalCohortProfile() {
 
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
-              Institutional Account Sign-In
+              Institutional & Business Account Portal
             </h1>
             <p className="text-xs text-white/60 leading-relaxed font-sans max-w-xs mx-auto">
-              Sign in with your institutional Google account (<strong className="text-purple-300">badoflorida@gmail.com</strong>, <strong className="text-purple-300">bdso.orchestra@gmail.com</strong>) to manage your organization's business profile, incorporation status, and media pipeline.
+              Sign in or register your organization with Google to manage your institution's profile, legal incorporation status, multi-state node mapping, media pipeline, and participant roster.
             </p>
           </div>
 

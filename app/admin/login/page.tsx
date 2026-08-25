@@ -1,7 +1,7 @@
 'use client'
 
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
@@ -13,6 +13,16 @@ export default function AdminLoginPage() {
   const router = useRouter()
 
   useEffect(() => {
+    if (auth) {
+      void getRedirectResult(auth).then((res) => {
+        if (res?.user) router.push('/admin/orchestra-network')
+      }).catch((err) => {
+        console.warn('Redirect auth result warning:', err)
+      })
+    }
+  }, [router])
+
+  useEffect(() => {
     if (user && (role === 'beam_admin' || role === 'partner_admin')) {
       router.push('/admin/orchestra-network')
     }
@@ -22,12 +32,20 @@ export default function AdminLoginPage() {
     if (!auth) return
     try {
       const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
       const res = await signInWithPopup(auth, provider)
-      if (res.user) {
+      if (res?.user) {
         router.push('/admin/orchestra-network')
       }
-    } catch (err) {
-      console.error('Admin Google Sign-In Error:', err)
+    } catch (err: any) {
+      console.warn('Popup sign in failed/blocked on device (e.g. iPad Safari), falling back to redirect:', err)
+      try {
+        const provider = new GoogleAuthProvider()
+        provider.setCustomParameters({ prompt: 'select_account' })
+        await signInWithRedirect(auth, provider)
+      } catch (redirectErr) {
+        console.error('Redirect sign in error:', redirectErr)
+      }
     }
   }
 

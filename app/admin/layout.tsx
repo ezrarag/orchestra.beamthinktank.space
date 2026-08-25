@@ -19,7 +19,7 @@ import {
 import { getAdminNavGroups } from '@/lib/config/adminNav'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
-import { signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { signOut, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
@@ -175,6 +175,16 @@ function AdminAuthScreen() {
   const [signingOut, setSigningOut] = useState(false)
   const [signingIn, setSigningIn] = useState(false)
 
+  useEffect(() => {
+    if (auth) {
+      void getRedirectResult(auth).then((res) => {
+        if (res?.user) router.refresh()
+      }).catch((err) => {
+        console.warn('Redirect auth result warning:', err)
+      })
+    }
+  }, [router])
+
   const handleGoogleSignIn = async () => {
     if (!auth) return
     setSigningIn(true)
@@ -182,11 +192,18 @@ function AdminAuthScreen() {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
       const res = await signInWithPopup(auth, provider)
-      if (res.user) {
+      if (res?.user) {
         router.refresh()
       }
-    } catch (error) {
-      console.error('Google Sign-In error:', error)
+    } catch (error: any) {
+      console.warn('Popup auth failed or blocked (e.g. iPad Safari), falling back to redirect:', error)
+      try {
+        const provider = new GoogleAuthProvider()
+        provider.setCustomParameters({ prompt: 'select_account' })
+        await signInWithRedirect(auth, provider)
+      } catch (redirectErr) {
+        console.error('Redirect sign in error:', redirectErr)
+      }
     } finally {
       setSigningIn(false)
     }
