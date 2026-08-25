@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { 
   Building2, 
@@ -31,10 +31,18 @@ import {
   Briefcase,
   AlertTriangle,
   Scale,
-  Camera
+  Camera,
+  LogIn,
+  LogOut
 } from 'lucide-react'
+import { useUserRole } from '@/lib/hooks/useUserRole'
+import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { 
   DEFAULT_BADO_FLORIDA_PROFILE, 
+  DEFAULT_BDSO_PROFILE,
+  fetchInstitutionalProfile,
+  saveInstitutionalProfile,
   type InstitutionalBusinessProfile, 
   type InstitutionalPortfolioLink, 
   type StateOperationDesignation 
@@ -99,10 +107,13 @@ const INITIAL_ROSTER: CohortMusician[] = [
 ]
 
 export default function InstitutionalCohortProfile() {
+  const { user, loading: authLoading } = useUserRole()
   const [businessProfile, setBusinessProfile] = useState<InstitutionalBusinessProfile>(DEFAULT_BADO_FLORIDA_PROFILE)
   const [roster, setRoster] = useState<CohortMusician[]>(INITIAL_ROSTER)
   const [activeTab, setActiveTab] = useState<'business' | 'states' | 'portfolio' | 'roster' | 'sync'>('business')
   const [copied, setCopied] = useState(false)
+  const [signingIn, setSigningIn] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   // Dispatch Ground Transit Modal State
   const [showDispatchModal, setShowDispatchModal] = useState(false)
@@ -119,6 +130,43 @@ export default function InstitutionalCohortProfile() {
   // Request Media / Legal Team State
   const [requestNotice, setRequestNotice] = useState('')
 
+  // Dynamically fetch profile keyed by Google UID
+  useEffect(() => {
+    async function loadProfile() {
+      if (user?.email) {
+        const loaded = await fetchInstitutionalProfile(user.email, user.uid, user.displayName || undefined)
+        setBusinessProfile(loaded)
+      }
+    }
+    loadProfile()
+  }, [user])
+
+  const handleGoogleSignIn = async () => {
+    if (!auth) return
+    setSigningIn(true)
+    try {
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
+      await signInWithPopup(auth, provider)
+    } catch (err) {
+      console.error('Institutional Google Sign-In Error:', err)
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    if (!auth) return
+    setSigningOut(true)
+    try {
+      await signOut(auth)
+    } catch (err) {
+      console.error('Sign Out Error:', err)
+    } finally {
+      setSigningOut(false)
+    }
+  }
+
   const handleOpenDispatch = (musician: CohortMusician) => {
     setSelectedMusician(musician)
     setDispatchDestination(musician.currentCity)
@@ -132,7 +180,7 @@ export default function InstitutionalCohortProfile() {
     setTimeout(() => setDispatchNotice(''), 6000)
   }
 
-  const handleAddPortfolioLink = () => {
+  const handleAddPortfolioLink = async () => {
     if (!newLinkTitle.trim() || !newLinkUrl.trim()) return
 
     const newLink: InstitutionalPortfolioLink = {
@@ -143,15 +191,21 @@ export default function InstitutionalCohortProfile() {
       dateAdded: new Date().toISOString().split('T')[0]
     }
 
-    setBusinessProfile(prev => ({
-      ...prev,
-      portfolioLinks: [newLink, ...prev.portfolioLinks]
-    }))
+    const updatedProfile = {
+      ...businessProfile,
+      portfolioLinks: [newLink, ...businessProfile.portfolioLinks]
+    }
+
+    setBusinessProfile(updatedProfile)
+
+    if (user?.uid && user?.email) {
+      await saveInstitutionalProfile(user.uid, user.email, { portfolioLinks: updatedProfile.portfolioLinks })
+    }
 
     setNewLinkTitle('')
     setNewLinkUrl('')
     setShowAddLinkModal(false)
-    setRequestNotice('Added accomplishment link to Institutional Portfolio!')
+    setRequestNotice('Saved new accomplishment link to Institutional Portfolio!')
     setTimeout(() => setRequestNotice(''), 4000)
   }
 
@@ -166,6 +220,7 @@ export default function InstitutionalCohortProfile() {
   }
 
   const institutionalPayload = {
+    authUid: user?.uid || null,
     institutionName: businessProfile.organizationName,
     legalName: businessProfile.legalName,
     email: businessProfile.email,
@@ -191,25 +246,94 @@ export default function InstitutionalCohortProfile() {
     setTimeout(() => setCopied(false), 2500)
   }
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#07080A] text-white flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-10 w-10 rounded-full border-2 border-white/20 border-t-purple-400 animate-spin" />
+          <p className="text-white/60 text-xs tracking-widest uppercase font-mono">
+            Loading Institutional Profile...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Institutional Auth Gate: Require Google Sign-In to connect institution identity
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#07080A] text-white flex flex-col justify-between items-center p-6 font-sans">
+        <div className="w-full max-w-md my-auto text-center space-y-6 bg-[#0F1015] p-8 rounded-3xl border border-purple-500/40 shadow-2xl">
+          <div className="w-16 h-16 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center justify-center mx-auto shadow-lg">
+            <Building2 className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
+              Institutional Account Sign-In
+            </h1>
+            <p className="text-xs text-white/60 leading-relaxed font-sans max-w-xs mx-auto">
+              Sign in with your institutional Google account (<strong className="text-purple-300">badoflorida@gmail.com</strong>, <strong className="text-purple-300">bdso.orchestra@gmail.com</strong>) to manage your organization's business profile, incorporation status, and media pipeline.
+            </p>
+          </div>
+
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={signingIn}
+            className="w-full py-3.5 px-6 rounded-full bg-purple-500 text-white font-bold text-sm hover:bg-purple-400 transition shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50"
+          >
+            <LogIn className="w-4 h-4 text-white" />
+            <span>{signingIn ? 'Signing in...' : 'Sign In with Institutional Google Account'}</span>
+          </button>
+
+          <div className="pt-4 border-t border-white/10 flex flex-col space-y-2">
+            <Link
+              href="/"
+              className="text-xs text-white/60 hover:text-white transition font-medium"
+            >
+              ← Return to BEAM Orchestra Homepage
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full bg-[#07080A] text-white font-sans selection:bg-white/20">
       
       {/* Toast Notification */}
       {(dispatchNotice || requestNotice) && (
-        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-amber-400 text-black font-bold text-xs shadow-2xl flex items-center space-x-2 animate-bounce">
+        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-purple-500 text-white font-bold text-xs shadow-2xl flex items-center space-x-2 animate-bounce">
           <Sparkles className="w-4 h-4" />
           <span>{dispatchNotice || requestNotice}</span>
         </div>
       )}
 
       {/* Hero Header Section */}
-      <div className="relative w-full h-[54dvh] min-h-[360px] max-h-[540px] overflow-hidden bg-[#0A0B0E]">
+      <div className="relative w-full h-[56dvh] min-h-[380px] max-h-[560px] overflow-hidden bg-[#0A0B0E]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#1E1B38] via-[#121424] to-[#07080A] flex items-center justify-center relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(168,85,247,0.22),_transparent_65%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(212,175,55,0.15),_transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(168,85,247,0.25),_transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(212,175,55,0.18),_transparent_65%)]" />
         </div>
 
-        {/* Top Scrim */}
+        {/* Top Right Log Out Bar */}
+        <div className="absolute top-6 right-6 z-30 flex items-center space-x-3">
+          <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-xs font-mono text-white/80">
+            Institution: <strong className="text-purple-300">{user.email}</strong>
+          </div>
+
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="px-4 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold transition flex items-center space-x-1.5 shadow-lg"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>{signingOut ? 'Logging out...' : 'Log Out'}</span>
+          </button>
+        </div>
+
+        {/* Bottom Scrim */}
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
         {/* Overlaid Left-Aligned Institution Banner */}
@@ -245,7 +369,7 @@ export default function InstitutionalCohortProfile() {
               {businessProfile.organizationName}
             </h1>
             <p className="text-xs sm:text-sm font-sans text-white/80 max-w-2xl leading-relaxed">
-              Institutional Business & Production Profile — Incubating performance division operating across Florida, Wisconsin, and Illinois with active media content pipelines and participant mapping.
+              Institutional Business & Production Profile — Operating across Florida, Wisconsin, and Illinois with active media content pipelines, legal incorporation tracking, and participant mapping.
             </p>
           </div>
         </div>
@@ -272,9 +396,15 @@ export default function InstitutionalCohortProfile() {
             </button>
           </div>
 
-          <span className="text-xs font-mono text-white/50">
-            FEIN Status: <strong className="text-amber-300">{businessProfile.feinStatus}</strong>
-          </span>
+          <div className="flex items-center space-x-3 text-xs font-mono">
+            <span className="text-white/50">FEIN: <strong className="text-amber-300">{businessProfile.feinStatus}</strong></span>
+            <button
+              onClick={handleSignOut}
+              className="text-red-400 hover:underline font-bold"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -394,10 +524,11 @@ export default function InstitutionalCohortProfile() {
                   </div>
 
                   <div className="space-y-2 text-xs">
+                    <p className="text-white/80">Organization Name: <strong className="text-white">{businessProfile.organizationName}</strong></p>
                     <p className="text-white/80">State of Registration: <strong className="text-white">{businessProfile.stateOfRegistration}</strong></p>
                     <p className="text-white/80">FEIN Status: <strong className="text-amber-300">{businessProfile.feinStatus}</strong></p>
                     <p className="text-white/60 leading-relaxed pt-1">
-                      BADO Florida is currently incubating within the BEAM ecosystem. BEAM Law division assists with 501(c)(3) filing, entity chartering, and fiscal sponsorship.
+                      {businessProfile.organizationName} is synced within the BEAM ecosystem. BEAM Law division assists with 501(c)(3) filing, entity chartering, and fiscal sponsorship.
                     </p>
                   </div>
                 </div>

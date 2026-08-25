@@ -617,3 +617,139 @@ export const DEFAULT_BADO_FLORIDA_PROFILE: InstitutionalBusinessProfile = {
   allocatedStipendsBudgetUsd: 8910,
   generatedBeamCoins: 216
 }
+
+export const DEFAULT_BDSO_PROFILE: InstitutionalBusinessProfile = {
+  id: 'inst-bdso',
+  organizationName: 'Black Diaspora Symphony Orchestra (BDSO)',
+  legalName: 'Black Diaspora Symphony Orchestra, Inc.',
+  email: 'bdso.orchestra@gmail.com',
+  contactPerson: 'Executive Director & Board Chair',
+  incorporationStatus: '501(c)(3) Non-Profit',
+  stateOfRegistration: 'Wisconsin (WI)',
+  feinStatus: 'Assigned',
+  legalDevelopmentNeeds: [
+    '501(c)(3) Annual IRS Filing Review',
+    'Multi-State Tour Performance Contracts',
+    'BEAM Endowment Grant Agreement'
+  ],
+  hasContentPipeline: true,
+  contentCapabilities: [
+    '4K Symphonic Multi-Cam Stream Production',
+    'Orchestral Masterclass Recording',
+    'Stereo & Spatial Audio Mastering'
+  ],
+  needsMediaTeamSupport: false,
+  stateOperations: [
+    {
+      stateCode: 'WI',
+      stateName: 'Wisconsin',
+      hubName: 'Bradley Symphony Center — Milwaukee, WI',
+      operationsDescription: 'Mainstage symphonic subscription series, youth education concerts, and guest soloist recitals.',
+      neededMusicianRoles: ['Violin I', 'Violoncello (Cello)', 'French Horn', 'Timpani']
+    },
+    {
+      stateCode: 'IL',
+      stateName: 'Illinois',
+      hubName: 'Symphony Center Hub — Chicago, IL',
+      operationsDescription: 'Midwest regional showcase concerts and soloist residency intensives.',
+      neededMusicianRoles: ['Viola', 'Oboe Lead']
+    }
+  ],
+  portfolioLinks: [
+    {
+      id: 'pl-bdso-1',
+      title: 'BDSO Inaugural Symphonic Concert — Bradley Symphony Center',
+      url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
+      type: 'Video Reel',
+      dateAdded: '2025-11-20'
+    }
+  ],
+  totalRosterSize: 32,
+  allocatedStipendsBudgetUsd: 14200,
+  generatedBeamCoins: 340
+}
+
+export async function fetchInstitutionalProfile(
+  email: string,
+  userUid?: string,
+  googleName?: string
+): Promise<InstitutionalBusinessProfile> {
+  const normEmail = normalizeEmail(email)
+
+  if (db && userUid) {
+    const primaryId = `inst_role_${userUid}`
+    try {
+      const snap = await getDoc(doc(db, 'institutionalProfiles', primaryId))
+      if (snap.exists()) {
+        const data = snap.data() as InstitutionalBusinessProfile
+        return {
+          ...data,
+          email: normEmail
+        }
+      }
+    } catch (err) {
+      console.warn('Could not read Firestore institutional profile, using default:', err)
+    }
+  }
+
+  // Pre-populated defaults for known entities
+  if (normEmail.includes('bado') || normEmail.includes('ballet')) {
+    return { ...DEFAULT_BADO_FLORIDA_PROFILE, email: normEmail }
+  }
+  if (normEmail.includes('bdso') || normEmail.includes('blackdiaspora')) {
+    return { ...DEFAULT_BDSO_PROFILE, email: normEmail }
+  }
+
+  // Default initial profile for new institutional sign-ins
+  const orgName = googleName ? `${googleName} (Institutional)` : `${normEmail.split('@')[0].toUpperCase()} Organization`
+  return {
+    id: userUid ? `inst_${userUid}` : `inst_${normEmail}`,
+    organizationName: orgName,
+    legalName: orgName,
+    email: normEmail,
+    contactPerson: 'Institutional Admin',
+    incorporationStatus: 'Unincorporated / Incubating',
+    stateOfRegistration: 'Florida (FL)',
+    feinStatus: 'Pending Registration',
+    legalDevelopmentNeeds: [
+      'Entity Incorporation & Legal Chartering',
+      '501(c)(3) Non-Profit Support',
+      'BEAM Fiscal Sponsorship Agreement'
+    ],
+    hasContentPipeline: true,
+    contentCapabilities: ['Live Recording', 'Recital Capture'],
+    needsMediaTeamSupport: true,
+    stateOperations: [
+      {
+        stateCode: 'FL',
+        stateName: 'Florida',
+        hubName: 'Regional Institution Hub',
+        operationsDescription: 'Primary performance, rehearsal, and masterclass node.',
+        neededMusicianRoles: ['Violin I', 'Cello']
+      }
+    ],
+    portfolioLinks: [],
+    totalRosterSize: 12,
+    allocatedStipendsBudgetUsd: 5000,
+    generatedBeamCoins: 100
+  }
+}
+
+export async function saveInstitutionalProfile(
+  userUid: string,
+  email: string,
+  profile: Partial<InstitutionalBusinessProfile>
+): Promise<void> {
+  if (!db || !userUid) return
+  const normEmail = normalizeEmail(email)
+  const primaryId = `inst_role_${userUid}`
+
+  const payload = {
+    ...profile,
+    email: normEmail,
+    authUid: userUid,
+    updatedAt: serverTimestamp()
+  }
+
+  await setDoc(doc(db, 'institutionalProfiles', primaryId), payload, { merge: true })
+}
