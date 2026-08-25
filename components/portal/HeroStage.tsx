@@ -278,8 +278,97 @@ export default function HeroStage() {
                     transition={{ duration: 0.15 }}
                     className="absolute left-0 top-full mt-2 w-72 rounded-2xl bg-[#090b14]/95 backdrop-blur-xl border border-white/15 p-2 shadow-2xl z-50 text-left normal-case tracking-normal"
                   >
-                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 border-b border-white/10 mb-1">
-                      Select Portal Section
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300/80 border-b border-white/10 mb-1">
+                      Network Destinations & Profiles
+                    </div>
+
+                    {/* 1. Musician Participants Profile */}
+                    <Link
+                      href="/profile"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-emerald-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-white">Participants</span>
+                          <span className="text-[10px] font-mono text-emerald-400 font-semibold">(Musicians)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          Musicians, Section Leaders & Resident Cellists
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* 2. Institutional Cohorts & Businesses */}
+                    <Link
+                      href="/institution/profile"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-purple-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-purple-300">Institutions</span>
+                          <span className="text-[10px] font-mono text-purple-400 font-semibold">(BADO / BDSO)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          Ballet & Dance Orchestra, BDSO & Business Partners
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* 3. Studio & Media Vault (Audience Viewers) */}
+                    <Link
+                      href="/audience/profile"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-blue-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-blue-300">Studio & Media Vault</span>
+                          <span className="text-[10px] font-mono text-blue-400 font-semibold">(Viewers)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          Watch Recital Recordings, Steinway Takes & Streams
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* 4. General Orchestra Admin */}
+                    <Link
+                      href="/admin/login"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white border-t border-white/10 pt-2"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-amber-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-amber-300">Orchestra Admin</span>
+                          <span className="text-[10px] font-mono text-amber-400 font-semibold">(Admin)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          Central Directory for ezra@readyaimgo.biz
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* Section Divider */}
+                    <div className="px-3 pt-2 text-[9px] font-bold uppercase tracking-[0.2em] text-white/30 border-t border-white/10 mt-1 mb-0.5">
+                      STAGE DOORS & CAROUSEL
                     </div>
 
                     {CATEGORIES.map((cat, idx) => (
@@ -291,69 +380,24 @@ export default function HeroStage() {
                           setActiveIndex(idx)
                           setIsDropdownOpen(false)
                         }}
-                        className={`w-full flex items-start space-x-3 p-3 rounded-xl transition-all ${
+                        className={`w-full flex items-start space-x-3 p-2 rounded-xl transition-all ${
                           activeIndex === idx
                             ? 'bg-white/15 border border-white/20 text-white'
-                            : 'hover:bg-white/10 text-white/70 hover:text-white'
+                            : 'hover:bg-white/10 text-white/60 hover:text-white'
                         }`}
                       >
                         <div
-                          className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+                          className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                           style={{ backgroundColor: cat.colorAccent }}
                         />
                         <div>
-                          <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-bold flex items-center justify-between gap-2">
                             <span>{cat.label}</span>
-                            <span className="text-[10px] font-mono text-white/40">({cat.doorNumber})</span>
-                          </div>
-                          <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                            {cat.subtitle}
+                            <span className="text-[9px] font-mono text-white/40">({cat.doorNumber})</span>
                           </div>
                         </div>
                       </button>
                     ))}
-
-                    {/* Requirement 3: 4th Entry "My Profile" in Dropdown Menu */}
-                    <Link
-                      href="/profile"
-                      onClick={() => {
-                        handleManualInteraction()
-                        setIsDropdownOpen(false)
-                      }}
-                      className="w-full flex items-start space-x-3 p-3 rounded-xl transition-all hover:bg-white/10 text-white/70 hover:text-white border-t border-white/10 mt-1"
-                    >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-emerald-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-white">My Profile</span>
-                          <span className="text-[10px] font-mono text-emerald-400 font-semibold">(04)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          View & Manage Musician Profile
-                        </div>
-                      </div>
-                    </Link>
-
-                    {/* 5th Entry: General Orchestra Admin Login */}
-                    <Link
-                      href="/admin/login"
-                      onClick={() => {
-                        handleManualInteraction()
-                        setIsDropdownOpen(false)
-                      }}
-                      className="w-full flex items-start space-x-3 p-3 rounded-xl transition-all hover:bg-white/10 text-white/70 hover:text-white border-t border-white/10 mt-1"
-                    >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-amber-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-amber-300">Orchestra Admin Portal</span>
-                          <span className="text-[10px] font-mono text-amber-400 font-semibold">(Admin)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          Admin Directory for ezra@readyaimgo.biz
-                        </div>
-                      </div>
-                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>

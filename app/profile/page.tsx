@@ -13,9 +13,11 @@ import {
   saveParticipantProfile, 
   ensureParticipantProfileExists,
   DEFAULT_EZRA_EVENTS,
+  BEAM_CATALOG_WORKS,
   type ParticipantDemographics,
   type EventPlayed,
   type MediaPortfolioItem,
+  type CatalogWorkItem,
   type InfrastructureNeedTag,
   type LiveLocationBeacon
 } from '@/lib/api/profile'
@@ -59,6 +61,12 @@ import {
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
+
+function getYouTubeEmbedUrl(url: string): string | null {
+  if (!url) return null
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/)
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null
+}
 
 export default function ParticipantProfilePage() {
   const { user, role, loading: authLoading } = useUserRole()
@@ -113,9 +121,44 @@ export default function ParticipantProfilePage() {
   // Portfolio Media State
   const [portfolioItems, setPortfolioItems] = useState<MediaPortfolioItem[]>([])
   const [showAddMediaModal, setShowAddMediaModal] = useState(false)
+  const [showCatalogModal, setShowCatalogModal] = useState(false)
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>('All')
+  const [activePlayingMedia, setActivePlayingMedia] = useState<MediaPortfolioItem | null>(null)
   const [newMediaTitle, setNewMediaTitle] = useState('')
   const [newMediaUrl, setNewMediaUrl] = useState('')
   const [newMediaCategory, setNewMediaCategory] = useState<MediaPortfolioItem['category']>('Steinway Session')
+
+  const handleToggleCatalogWork = async (work: CatalogWorkItem) => {
+    const exists = portfolioItems.some(item => item.url === work.url || item.workId === work.id || item.title === work.title)
+    let updated: MediaPortfolioItem[]
+    if (exists) {
+      updated = portfolioItems.filter(item => item.url !== work.url && item.workId !== work.id && item.title !== work.title)
+    } else {
+      const newItem: MediaPortfolioItem = {
+        id: `work-attached-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        workId: work.id,
+        title: work.title,
+        url: work.url,
+        category: work.category,
+        composer: work.composer,
+        description: work.description,
+        dateAdded: work.dateRecorded || new Date().toISOString().split('T')[0]
+      }
+      updated = [newItem, ...portfolioItems]
+    }
+    setPortfolioItems(updated)
+    if (targetEmail) {
+      await saveParticipantProfile(targetEmail, { portfolioMedia: updated }, user?.uid)
+    }
+  }
+
+  const handleRemovePortfolioItem = async (itemId: string) => {
+    const updated = portfolioItems.filter(item => item.id !== itemId)
+    setPortfolioItems(updated)
+    if (targetEmail) {
+      await saveParticipantProfile(targetEmail, { portfolioMedia: updated }, user?.uid)
+    }
+  }
 
   // Roaming Presence & Logistics State
   const [isRoaming, setIsRoaming] = useState(false)
@@ -965,62 +1008,166 @@ export default function ParticipantProfilePage() {
             {/* MODULE 1: IDENTITY & CRAFT (PORTFOLIO & CV) */}
             {activeTab === 'portfolio' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-serif font-bold text-white">Media Portfolio & Recording CV</h2>
-                    <p className="text-xs text-white/60">High-caliber recording sessions (e.g. Florida Steinway Sessions) presented to institutions.</p>
+                    <h2 className="text-lg font-serif font-bold text-white flex items-center space-x-2">
+                      <span>Media Portfolio & Recording CV</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-mono">
+                        {portfolioItems.length} {portfolioItems.length === 1 ? 'Work' : 'Works'}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-white/60">High-caliber recording sessions (e.g. Florida Steinway Sessions, Margaret Bonds Rehearsals) presented to institutions.</p>
                   </div>
 
-                  <button
-                    onClick={() => setShowAddMediaModal(true)}
-                    className="px-3.5 py-2 rounded-full bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg flex items-center space-x-1.5"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Recording Link</span>
-                  </button>
+                  <div className="flex items-center space-x-2.5 shrink-0">
+                    <button
+                      onClick={() => setShowCatalogModal(true)}
+                      className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 text-black text-xs font-bold hover:brightness-110 transition shadow-lg flex items-center space-x-1.5"
+                    >
+                      <Sparkles className="w-4 h-4 fill-black/20" />
+                      <span>Select Works from BEAM Catalog</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowAddMediaModal(true)}
+                      className="px-3.5 py-2 rounded-full bg-black/60 border border-white/20 text-white/80 hover:text-white text-xs font-semibold hover:border-white/40 transition flex items-center space-x-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Custom Link</span>
+                    </button>
+                  </div>
                 </div>
 
                 {portfolioItems.length === 0 ? (
-                  <div className="p-8 text-center rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                    <Video className="w-8 h-8 text-white/30 mx-auto" />
-                    <p className="text-xs font-semibold text-white/80">No recording sessions added yet.</p>
-                    <p className="text-[11px] text-white/50">Click &quot;Add Recording Link&quot; above to embed YouTube or Vimeo recital links.</p>
+                  <div className="p-10 text-center rounded-2xl bg-black/40 border border-white/10 space-y-4">
+                    <Video className="w-10 h-10 text-amber-400/40 mx-auto" />
+                    <div>
+                      <p className="text-sm font-bold text-white">No works attached to your portfolio yet.</p>
+                      <p className="text-xs text-white/50 mt-1 max-w-md mx-auto">Select your uploaded recordings from the BEAM Orchestra Catalog (Steinway Gallery Sessions, Rehearsal Footage, Chamber Masterworks) or paste a custom link.</p>
+                    </div>
+
+                    <button
+                      onClick={() => setShowCatalogModal(true)}
+                      className="px-5 py-2.5 rounded-full bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-lg inline-flex items-center space-x-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Browse BEAM Catalog Works</span>
+                    </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {portfolioItems.map((item) => (
-                      <div key={item.id} className="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-amber-400/40 transition space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-mono font-semibold">
-                            {item.category}
-                          </span>
-                          {item.dateAdded && (
-                            <span className="text-[10px] text-white/40 font-mono">{item.dateAdded}</span>
-                          )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {portfolioItems.map((item) => {
+                      const ytEmbed = getYouTubeEmbedUrl(item.url)
+                      const isMov = item.url.includes('firebasestorage') || item.url.toLowerCase().endsWith('.mov') || item.url.includes('.mov?')
+
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-black/50 border border-white/10 hover:border-amber-400/40 transition space-y-3 shadow-lg flex flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-mono font-semibold">
+                                  {item.category}
+                                </span>
+                                {item.composer && (
+                                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono font-medium">
+                                    {item.composer}
+                                  </span>
+                                )}
+                              </div>
+                              {item.dateAdded && (
+                                <span className="text-[10px] text-white/40 font-mono shrink-0">{item.dateAdded}</span>
+                              )}
+                            </div>
+
+                            <h3 className="text-sm font-serif font-bold text-white leading-snug">{item.title}</h3>
+                            {item.description && (
+                              <p className="text-xs text-white/60 line-clamp-2 leading-relaxed">{item.description}</p>
+                            )}
+
+                            {/* Video / Embed Player Section */}
+                            <div className="pt-1">
+                              {ytEmbed ? (
+                                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
+                                  <iframe
+                                    src={ytEmbed}
+                                    title={item.title}
+                                    className="w-full h-full"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  />
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black group">
+                                    <video
+                                      src={item.url}
+                                      controls
+                                      playsInline
+                                      preload="metadata"
+                                      className="w-full h-44 object-cover rounded-xl"
+                                    >
+                                      <source src={item.url} type="video/mp4" />
+                                      <source src={item.url} type="video/quicktime" />
+                                      Your browser does not support video playback.
+                                    </video>
+
+                                    <button
+                                      onClick={() => setActivePlayingMedia(item)}
+                                      className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-amber-400 hover:text-black text-white text-[10px] font-bold backdrop-blur-md transition flex items-center space-x-1 border border-white/20"
+                                    >
+                                      <PlayCircle className="w-3.5 h-3.5" />
+                                      <span>Expand Player</span>
+                                    </button>
+                                  </div>
+
+                                  {isMov && (
+                                    <div className="p-2 rounded-lg bg-amber-400/10 border border-amber-400/20 text-[10px] font-mono text-amber-200/80 flex items-center justify-between">
+                                      <span>🎥 High-Definition QuickTime MOV Session</span>
+                                      <button
+                                        onClick={() => setActivePlayingMedia(item)}
+                                        className="text-amber-300 font-bold underline hover:text-white"
+                                      >
+                                        Open Fullscreen Modal
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Footer Action Bar */}
+                          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                            <button
+                              onClick={() => setActivePlayingMedia(item)}
+                              className="text-amber-300 hover:text-amber-200 font-semibold flex items-center space-x-1 text-[11px]"
+                            >
+                              <PlayCircle className="w-3.5 h-3.5" />
+                              <span>Play in Modal</span>
+                            </button>
+
+                            <div className="flex items-center space-x-2">
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white/60 hover:text-white flex items-center space-x-1 text-[11px]"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Direct Link</span>
+                              </a>
+
+                              <button
+                                onClick={() => handleRemovePortfolioItem(item.id)}
+                                className="text-red-400/70 hover:text-red-400 text-[11px] font-medium ml-2"
+                              >
+                                Detach
+                              </button>
+                            </div>
+                          </div>
                         </div>
-
-                        <h3 className="text-sm font-serif font-bold text-white">{item.title}</h3>
-
-                        {/* Video Embed or Link Card */}
-                        {item.url.includes('firebasestorage') || item.url.endsWith('.mov') || item.url.endsWith('.mp4') ? (
-                          <video
-                            src={item.url}
-                            controls
-                            className="w-full h-40 object-cover rounded-xl border border-white/10"
-                          />
-                        ) : (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between text-xs font-mono text-amber-300 hover:text-amber-200 transition"
-                          >
-                            <span className="truncate max-w-[240px]">{item.url}</span>
-                            <ExternalLink className="w-4 h-4 shrink-0 ml-2" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -1412,6 +1559,201 @@ export default function ParticipantProfilePage() {
                 className="w-full py-3 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg mt-2 disabled:opacity-50"
               >
                 Save to Portfolio
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BEAM Recording Catalog Picker Modal */}
+      {showCatalogModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-3xl max-h-[90vh] flex flex-col p-6 rounded-3xl bg-[#14151C] border border-white/20 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="text-lg font-serif font-bold text-white flex items-center space-x-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                  <span>BEAM Orchestra Recording Catalog</span>
+                </h3>
+                <p className="text-xs text-white/60">Select recordings uploaded to Orchestra to claim and feature in your profile portfolio & CV.</p>
+              </div>
+
+              <button
+                onClick={() => setShowCatalogModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar">
+              {['All', 'Steinway Session', 'Rehearsal Footage', 'Chamber Masterclass', 'Orchestral Performance'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCatalogCategoryFilter(cat)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                    catalogCategoryFilter === cat
+                      ? 'bg-amber-400 text-black font-bold'
+                      : 'bg-white/10 text-white/70 hover:text-white'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Catalog Grid */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar max-h-[60vh]">
+              {BEAM_CATALOG_WORKS
+                .filter(w => catalogCategoryFilter === 'All' || w.category === catalogCategoryFilter)
+                .map((work) => {
+                  const isSelected = portfolioItems.some(item => item.url === work.url || item.workId === work.id || item.title === work.title)
+
+                  return (
+                    <div
+                      key={work.id}
+                      onClick={() => handleToggleCatalogWork(work)}
+                      className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-amber-400/10 border-amber-400/60 shadow-lg shadow-amber-400/5'
+                          : 'bg-black/40 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold">
+                            {work.category}
+                          </span>
+                          {work.composer && (
+                            <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono">
+                              {work.composer}
+                            </span>
+                          )}
+                          {work.dateRecorded && (
+                            <span className="text-[10px] text-white/40 font-mono">{work.dateRecorded}</span>
+                          )}
+                        </div>
+
+                        <h4 className="text-sm font-bold text-white leading-snug">{work.title}</h4>
+                        {work.description && (
+                          <p className="text-xs text-white/60 leading-relaxed">{work.description}</p>
+                        )}
+                        {work.ensemble && (
+                          <p className="text-[11px] text-white/40 font-mono">Ensemble: {work.ensemble}</p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleCatalogWork(work)
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition flex items-center space-x-1.5 ${
+                          isSelected
+                            ? 'bg-amber-400 text-black'
+                            : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                        }`}
+                      >
+                        {isSelected ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-black" />
+                            <span>Attached to Profile</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4" />
+                            <span>Claim Work</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )
+                })}
+            </div>
+
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <span className="text-xs text-white/50 font-mono">
+                {portfolioItems.length} work(s) attached to portfolio
+              </span>
+              <button
+                onClick={() => setShowCatalogModal(false)}
+                className="px-6 py-2.5 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg"
+              >
+                Done / Save Selection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Modal Player */}
+      {activePlayingMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl font-sans">
+          <div className="w-full max-w-4xl p-6 rounded-3xl bg-[#121319] border border-white/20 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold">
+                  {activePlayingMedia.category}
+                </span>
+                <h3 className="text-lg font-serif font-bold text-white mt-1">{activePlayingMedia.title}</h3>
+              </div>
+
+              <button
+                onClick={() => setActivePlayingMedia(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-white/10">
+              {getYouTubeEmbedUrl(activePlayingMedia.url) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(activePlayingMedia.url)!}
+                  title={activePlayingMedia.title}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video
+                  src={activePlayingMedia.url}
+                  controls
+                  autoPlay
+                  playsInline
+                  preload="auto"
+                  className="w-full h-full object-contain"
+                >
+                  <source src={activePlayingMedia.url} type="video/mp4" />
+                  <source src={activePlayingMedia.url} type="video/quicktime" />
+                  Your browser does not support video playback.
+                </video>
+              )}
+            </div>
+
+            {activePlayingMedia.description && (
+              <p className="text-xs text-white/70 bg-black/40 p-3 rounded-xl border border-white/10">
+                {activePlayingMedia.description}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <a
+                href={activePlayingMedia.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition flex items-center space-x-1.5 border border-white/10"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                <span>Open Direct Source Link</span>
+              </a>
+
+              <button
+                onClick={() => setActivePlayingMedia(null)}
+                className="px-5 py-2 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition"
+              >
+                Close Player
               </button>
             </div>
           </div>

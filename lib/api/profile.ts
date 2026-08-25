@@ -20,9 +20,148 @@ export interface MediaPortfolioItem {
   id: string
   title: string
   url: string
-  category: 'Steinway Session' | 'Orchestral Performance' | 'Chamber Masterclass' | 'Solo Recital'
+  category: 'Steinway Session' | 'Orchestral Performance' | 'Chamber Masterclass' | 'Solo Recital' | 'Rehearsal Footage' | 'Publishing Release'
   dateAdded?: string
+  description?: string
+  composer?: string
+  thumbnailUrl?: string
+  workId?: string
 }
+
+export interface CatalogWorkItem {
+  id: string
+  title: string
+  url: string
+  category: MediaPortfolioItem['category']
+  composer?: string
+  dateRecorded?: string
+  description?: string
+  thumbnailUrl?: string
+  ensemble?: string
+}
+
+export const BEAM_CATALOG_WORKS: CatalogWorkItem[] = [
+  {
+    id: 'work-steinway-schumann-01',
+    title: 'Schumann Adagio & Allegro — Steinway Gallery Orlando',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
+    category: 'Steinway Session',
+    composer: 'Robert Schumann',
+    dateRecorded: '2025-12-05',
+    description: 'Solo cello and Steinway grand recording at Steinway Gallery Orlando residency.',
+    ensemble: 'BDSO Chamber Duo'
+  },
+  {
+    id: 'work-bonds-rehearsal-508',
+    title: 'Margaret Bonds Montgomery Variations — Rehearsal Cut (5:08 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FBonds%20-%205%2008%20pm%20-%2011%2010%2025.mov?alt=media&token=68f26fd3-60ed-465a-841b-71073d683034',
+    category: 'Rehearsal Footage',
+    composer: 'Margaret Bonds',
+    dateRecorded: '2025-11-10',
+    description: 'Rehearsal footage of Montgomery Variations sectional performance (5:08 PM session).',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-bonds-rehearsal-528',
+    title: 'Margaret Bonds Montgomery Variations — Rehearsal Cut (5:28 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FBonds%20-%205%2028%20pm%20-%2011%2010%2025.mov?alt=media&token=cab69290-25d3-4c9b-9e06-f34ce1e67c9c',
+    category: 'Rehearsal Footage',
+    composer: 'Margaret Bonds',
+    dateRecorded: '2025-11-10',
+    description: 'Rehearsal footage of Montgomery Variations sectional performance (5:28 PM session).',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-bonds-rehearsal-540',
+    title: 'Margaret Bonds Montgomery Variations — Full Tutti Run (5:40 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%FBonds%20-%205%2040%20pm%20-%2011%2010%2025.mov?alt=media&token=35402118-7f27-4cfd-bb7b-39bf9b150414',
+    category: 'Rehearsal Footage',
+    composer: 'Margaret Bonds',
+    dateRecorded: '2025-11-10',
+    description: 'Full orchestra tutti rehearsal run of Margaret Bonds Montgomery Variations.',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-bonds-rehearsal-605',
+    title: 'Margaret Bonds Montgomery Variations — Rehearsal Cut (6:05 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FBonds%20-%206%2005%20pm%20-%2011%2010%2025.mov?alt=media&token=774347b4-5d30-4cf1-8007-cda0243e95a6',
+    category: 'Rehearsal Footage',
+    composer: 'Margaret Bonds',
+    dateRecorded: '2025-11-10',
+    description: 'Evening rehearsal take for Margaret Bonds orchestral suite.',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-grieg-rehearsal-508',
+    title: 'Grieg Peer Gynt Suite — Rehearsal Cut (5:08 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FGrieg%20-%205%2008%20pm%20-%2011%2010%2025.mov?alt=media&token=7ae6ce2a-833f-4da4-849d-cc99c9aac768',
+    category: 'Rehearsal Footage',
+    composer: 'Edvard Grieg',
+    dateRecorded: '2025-11-10',
+    description: 'Orchestral rehearsal cut for Grieg Peer Gynt suite (5:08 PM session).',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-grieg-rehearsal-514',
+    title: 'Grieg Peer Gynt Suite — Rehearsal Cut (5:14 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FGrieg%20-%205%2014%20pm%20-%2011%2010%2025.mov?alt=media&token=17486778-436a-4c68-b5fe-ecf3a1302401',
+    category: 'Rehearsal Footage',
+    composer: 'Edvard Grieg',
+    dateRecorded: '2025-11-10',
+    description: 'Orchestral rehearsal cut for Grieg Peer Gynt suite (5:14 PM session).',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-ravel-rehearsal-649',
+    title: 'Ravel Pavane for a Dead Princess — Rehearsal Cut (6:49 PM)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2FMusic%2Frehearsal%20footage%2FRavel%20-%206%2049%20pm%20-%2011%2010%2025.mov?alt=media&token=1a893711-d08c-45bd-8963-1036d162731c',
+    category: 'Rehearsal Footage',
+    composer: 'Maurice Ravel',
+    dateRecorded: '2025-11-10',
+    description: 'Full string and wind section rehearsal take for Ravel Pavane.',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  },
+  {
+    id: 'work-brahms-sonata-mke',
+    title: 'Brahms Sonata (Milwaukee Residency)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fbrahms_sonata.mp4?alt=media',
+    category: 'Chamber Masterclass',
+    composer: 'Johannes Brahms',
+    dateRecorded: '2025-12-05',
+    description: 'Recorded live at UWM Chamber Series.',
+    ensemble: 'BEAM Chamber Duo'
+  },
+  {
+    id: 'work-schumann-sonata-mke',
+    title: 'Schumann Sonata (Milwaukee Residency)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fschumann_sonata.mp4?alt=media',
+    category: 'Chamber Masterclass',
+    composer: 'Robert Schumann',
+    dateRecorded: '2025-12-05',
+    description: 'Recorded live at UWM Chamber Series.',
+    ensemble: 'BEAM Chamber Duo'
+  },
+  {
+    id: 'work-pachelbel-sonata-mke',
+    title: 'Pachelbel Sonata (Milwaukee Residency)',
+    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/viewer%2Fchamber%2F2025-milwaukee%2Fpachelbel_sonata.mp4?alt=media',
+    category: 'Chamber Masterclass',
+    composer: 'Johann Pachelbel',
+    dateRecorded: '2025-12-05',
+    description: 'Recorded live at UWM Chamber Series.',
+    ensemble: 'BEAM Chamber Trio'
+  },
+  {
+    id: 'work-atlanta-showcase',
+    title: 'Black Diaspora Symphony: Atlanta Showcase',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    category: 'Orchestral Performance',
+    composer: 'Living Composers Suite',
+    dateRecorded: '2025-12-05',
+    description: 'Atlanta Community Orchestra Network showcase & mentorship concert.',
+    ensemble: 'Black Diaspora Symphony Orchestra'
+  }
+]
 
 export interface InfrastructureNeedTag {
   id: 'housing' | 'transit' | 'meals' | 'instrument_maintenance'

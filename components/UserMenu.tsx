@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { User, LogOut, LogIn, LayoutDashboard, ChevronDown, Settings, Home } from 'lucide-react'
+import { User, LogOut, LogIn, LayoutDashboard, ChevronDown, Settings, Home, Building2, Tv, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 
 export default function UserMenu() {
@@ -147,42 +147,44 @@ export default function UserMenu() {
                   </div>
 
                   <div className="p-2 space-y-1">
-                    {/* Profile/Account Link */}
+                    {/* 1. Musician Participants Profile Link */}
                     <Link
                       href="/profile"
                       onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
+                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
                     >
-                      <User className="h-5 w-5 text-orchestra-gold group-hover:scale-110 transition-transform" />
-                      <span className="font-medium">My Profile</span>
+                      <User className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <span className="font-medium text-xs">Musician Participants</span>
                     </Link>
 
-                    {/* Admin Dashboard Link - Always visible, but only accessible if admin */}
+                    {/* 2. Institutional Cohorts & Businesses (BADO & BDSO) */}
                     <Link
-                      href="/admin/dashboard"
-                      onClick={(e) => {
-                        if (role !== 'beam_admin' && role !== 'partner_admin') {
-                          e.preventDefault()
-                          alert('Admin access required. Please contact an administrator.')
-                        } else {
-                          setIsOpen(false)
-                        }
-                      }}
-                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors group ${
-                        role === 'beam_admin' || role === 'partner_admin'
-                          ? 'hover:bg-orchestra-gold/10 text-orchestra-cream'
-                          : 'hover:bg-gray-500/10 text-orchestra-cream/60 cursor-not-allowed opacity-50'
-                      }`}
+                      href="/institution/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
                     >
-                      <LayoutDashboard className={`h-5 w-5 group-hover:scale-110 transition-transform ${
-                        role === 'beam_admin' || role === 'partner_admin' ? 'text-orchestra-gold' : 'text-gray-400'
-                      }`} />
-                      <span className="font-medium">
-                        Admin Dashboard
-                        {role !== 'beam_admin' && role !== 'partner_admin' && (
-                          <span className="ml-2 text-xs text-gray-400">(Admin Only)</span>
-                        )}
-                      </span>
+                      <Building2 className="h-4 w-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                      <span className="font-medium text-xs">Institutions (BADO & BDSO)</span>
+                    </Link>
+
+                    {/* 3. Studio & Media Vault (Audience Viewers) */}
+                    <Link
+                      href="/audience/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
+                    >
+                      <Tv className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                      <span className="font-medium text-xs">Studio & Media Vault</span>
+                    </Link>
+
+                    {/* 4. General Orchestra Admin Link */}
+                    <Link
+                      href="/admin/orchestra-network"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group border-t border-white/10 pt-2"
+                    >
+                      <ShieldCheck className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                      <span className="font-medium text-xs text-amber-300">Orchestra Admin Directory</span>
                     </Link>
 
                     {/* Board Dashboard Link - Visible to board members and admins */}
