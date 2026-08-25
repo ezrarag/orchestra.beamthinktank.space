@@ -24,8 +24,21 @@ import {
   Wrench, 
   Utensils, 
   Layers,
-  Globe
+  Globe,
+  FileText,
+  Video,
+  Film,
+  Briefcase,
+  AlertTriangle,
+  Scale,
+  Camera
 } from 'lucide-react'
+import { 
+  DEFAULT_BADO_FLORIDA_PROFILE, 
+  type InstitutionalBusinessProfile, 
+  type InstitutionalPortfolioLink, 
+  type StateOperationDesignation 
+} from '@/lib/api/profile'
 
 export interface CohortMusician {
   id: string
@@ -86,8 +99,9 @@ const INITIAL_ROSTER: CohortMusician[] = [
 ]
 
 export default function InstitutionalCohortProfile() {
+  const [businessProfile, setBusinessProfile] = useState<InstitutionalBusinessProfile>(DEFAULT_BADO_FLORIDA_PROFILE)
   const [roster, setRoster] = useState<CohortMusician[]>(INITIAL_ROSTER)
-  const [activeTab, setActiveTab] = useState<'roster' | 'projects' | 'services' | 'sync'>('roster')
+  const [activeTab, setActiveTab] = useState<'business' | 'states' | 'portfolio' | 'roster' | 'sync'>('business')
   const [copied, setCopied] = useState(false)
 
   // Dispatch Ground Transit Modal State
@@ -95,6 +109,15 @@ export default function InstitutionalCohortProfile() {
   const [selectedMusician, setSelectedMusician] = useState<CohortMusician | null>(null)
   const [dispatchDestination, setDispatchDestination] = useState('')
   const [dispatchNotice, setDispatchNotice] = useState('')
+
+  // Add Portfolio Link Modal State
+  const [showAddLinkModal, setShowAddLinkModal] = useState(false)
+  const [newLinkTitle, setNewLinkTitle] = useState('')
+  const [newLinkUrl, setNewLinkUrl] = useState('')
+  const [newLinkType, setNewLinkType] = useState<InstitutionalPortfolioLink['type']>('Video Reel')
+
+  // Request Media / Legal Team State
+  const [requestNotice, setRequestNotice] = useState('')
 
   const handleOpenDispatch = (musician: CohortMusician) => {
     setSelectedMusician(musician)
@@ -109,27 +132,57 @@ export default function InstitutionalCohortProfile() {
     setTimeout(() => setDispatchNotice(''), 6000)
   }
 
-  const institutionalPayload = {
-    institutionName: 'Ballet & Dance Orchestra (BDO)',
-    institutionalTier: 'Core Institutional Performance Partner',
-    subdomainSource: 'orchestra',
-    hubs: ['Milwaukee, WI', 'Chicago, IL', 'Orlando, FL'],
-    rosterSize: roster.length + 14,
-    allocatedStipendsUsd: 8910,
-    generatedBeamCoins: 216,
-    activeLiveBeaconsCount: roster.filter(r => r.isLive).length,
-    activeLiveBeacons: roster.filter(r => r.isLive).map(r => ({
-      musician: r.name,
-      role: r.role,
-      location: r.currentCity,
-      coords: r.coords
-    })),
-    wraparoundDelivered: {
-      transitRidesFunded: 42,
-      housingNightsAllocated: 18,
-      mealPerDiemsIssued: 54,
-      luthierMaintenanceFunded: 6
+  const handleAddPortfolioLink = () => {
+    if (!newLinkTitle.trim() || !newLinkUrl.trim()) return
+
+    const newLink: InstitutionalPortfolioLink = {
+      id: `pl-${Date.now()}`,
+      title: newLinkTitle.trim(),
+      url: newLinkUrl.trim(),
+      type: newLinkType,
+      dateAdded: new Date().toISOString().split('T')[0]
     }
+
+    setBusinessProfile(prev => ({
+      ...prev,
+      portfolioLinks: [newLink, ...prev.portfolioLinks]
+    }))
+
+    setNewLinkTitle('')
+    setNewLinkUrl('')
+    setShowAddLinkModal(false)
+    setRequestNotice('Added accomplishment link to Institutional Portfolio!')
+    setTimeout(() => setRequestNotice(''), 4000)
+  }
+
+  const handleRequestLegalSupport = () => {
+    setRequestNotice('Legal & Incorporation support request submitted to law.beamthinktank.space!')
+    setTimeout(() => setRequestNotice(''), 6000)
+  }
+
+  const handleRequestMediaTeam = () => {
+    setRequestNotice('BEAM Media & Video Production team request submitted to forge.beamthinktank.space!')
+    setTimeout(() => setRequestNotice(''), 6000)
+  }
+
+  const institutionalPayload = {
+    institutionName: businessProfile.organizationName,
+    legalName: businessProfile.legalName,
+    email: businessProfile.email,
+    incorporationStatus: businessProfile.incorporationStatus,
+    stateOfRegistration: businessProfile.stateOfRegistration,
+    feinStatus: businessProfile.feinStatus,
+    legalDevelopmentNeeds: businessProfile.legalDevelopmentNeeds,
+    hasContentPipeline: businessProfile.hasContentPipeline,
+    contentCapabilities: businessProfile.contentCapabilities,
+    needsMediaTeamSupport: businessProfile.needsMediaTeamSupport,
+    stateOperations: businessProfile.stateOperations,
+    portfolioLinksCount: businessProfile.portfolioLinks.length,
+    subdomainSource: 'orchestra',
+    rosterSize: roster.length + 14,
+    allocatedStipendsUsd: businessProfile.allocatedStipendsBudgetUsd,
+    generatedBeamCoins: businessProfile.generatedBeamCoins,
+    activeLiveBeaconsCount: roster.filter(r => r.isLive).length
   }
 
   const handleCopyJson = () => {
@@ -142,18 +195,18 @@ export default function InstitutionalCohortProfile() {
     <div className="w-full bg-[#07080A] text-white font-sans selection:bg-white/20">
       
       {/* Toast Notification */}
-      {dispatchNotice && (
-        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-emerald-500 text-black font-bold text-xs shadow-2xl flex items-center space-x-2 animate-bounce">
-          <Truck className="w-4 h-4" />
-          <span>{dispatchNotice}</span>
+      {(dispatchNotice || requestNotice) && (
+        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl bg-amber-400 text-black font-bold text-xs shadow-2xl flex items-center space-x-2 animate-bounce">
+          <Sparkles className="w-4 h-4" />
+          <span>{dispatchNotice || requestNotice}</span>
         </div>
       )}
 
       {/* Hero Header Section */}
-      <div className="relative w-full h-[52dvh] min-h-[340px] max-h-[520px] overflow-hidden bg-[#0A0B0E]">
+      <div className="relative w-full h-[54dvh] min-h-[360px] max-h-[540px] overflow-hidden bg-[#0A0B0E]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#1E1B38] via-[#121424] to-[#07080A] flex items-center justify-center relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(168,85,247,0.18),_transparent_65%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(212,175,55,0.12),_transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(168,85,247,0.22),_transparent_65%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(212,175,55,0.15),_transparent_65%)]" />
         </div>
 
         {/* Top Scrim */}
@@ -163,60 +216,64 @@ export default function InstitutionalCohortProfile() {
         <div className="absolute bottom-6 inset-x-0 z-20">
           <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-3">
             
-            {/* Institution Badges */}
+            {/* Business & Legal Badges */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 rounded-full bg-amber-400/20 backdrop-blur-md border border-amber-400/40 text-amber-300 text-xs font-mono font-bold flex items-center space-x-1.5 shadow-lg">
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Ballet & Dance Orchestra (BDO)</span>
+                <span>{businessProfile.organizationName}</span>
+              </span>
+
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold border backdrop-blur-md ${
+                businessProfile.incorporationStatus === 'Unincorporated / Incubating'
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                  : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+              }`}>
+                🏛️ {businessProfile.incorporationStatus}
               </span>
 
               <span className="px-3 py-1 rounded-full bg-purple-500/20 backdrop-blur-md border border-purple-500/40 text-purple-300 text-xs font-mono font-semibold">
-                Core Performance Partner
+                📍 Multi-State: Florida · Wisconsin · Illinois
               </span>
 
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
                 <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>3 Live Beacons Broadcasting</span>
+                <span>3 Live Beacons</span>
               </span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-md">
-              Ballet & Dance Orchestra Cohort
+              {businessProfile.organizationName}
             </h1>
             <p className="text-xs sm:text-sm font-sans text-white/80 max-w-2xl leading-relaxed">
-              Institutional Ensemble Hub coordinating contract orchestra projects, live musician location tracking, and ground transit wraparound logistics across Milwaukee, Chicago, and Orlando.
+              Institutional Business & Production Profile — Incubating performance division operating across Florida, Wisconsin, and Illinois with active media content pipelines and participant mapping.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Action Row */}
+      {/* Action Bar Below Hero */}
       <div className="relative z-20 bg-[#0F1015] py-4 border-b border-white/10">
         <div className="max-w-6xl mx-auto w-full px-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => {
-                if (roster.length > 0) handleOpenDispatch(roster[0])
-              }}
-              className="py-3 px-6 rounded-full bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-xl flex items-center space-x-2"
+              onClick={handleRequestLegalSupport}
+              className="py-2.5 px-5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-300 font-bold text-xs transition shadow-lg flex items-center space-x-1.5"
             >
-              <Truck className="w-4 h-4" />
-              <span>Dispatch Ground Transit (grounds.beamthinktank.space)</span>
+              <Scale className="w-4 h-4" />
+              <span>Legal & Incorporation Support (law.beamthinktank.space)</span>
             </button>
 
-            <Link
-              href="https://grounds.beamthinktank.space"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-3 px-5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs transition flex items-center space-x-1.5"
+            <button
+              onClick={handleRequestMediaTeam}
+              className="py-2.5 px-5 rounded-full bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 font-bold text-xs transition shadow-lg flex items-center space-x-1.5"
             >
-              <span>Open Grounds Portal</span>
-              <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-            </Link>
+              <Camera className="w-4 h-4" />
+              <span>Request BEAM Media Team (forge.beamthinktank.space)</span>
+            </button>
           </div>
 
           <span className="text-xs font-mono text-white/50">
-            Institutional ID: <strong className="text-white">inst_bdo_2026</strong>
+            FEIN Status: <strong className="text-amber-300">{businessProfile.feinStatus}</strong>
           </span>
         </div>
       </div>
@@ -227,26 +284,26 @@ export default function InstitutionalCohortProfile() {
           
           <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
             <Users className="w-5 h-5 text-purple-400 mx-auto" />
-            <p className="text-2xl font-serif font-bold text-white">18</p>
-            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Assigned Musicians</p>
+            <p className="text-2xl font-serif font-bold text-white">{businessProfile.totalRosterSize}</p>
+            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Musician Roster</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-            <DollarSign className="w-5 h-5 text-emerald-400 mx-auto" />
-            <p className="text-2xl font-serif font-bold text-emerald-400">$8,910</p>
+            <Globe className="w-5 h-5 text-amber-400 mx-auto" />
+            <p className="text-2xl font-serif font-bold text-amber-300">{businessProfile.stateOperations.length} States</p>
+            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Multi-State Hubs</p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
+            <Film className="w-5 h-5 text-emerald-400 mx-auto" />
+            <p className="text-2xl font-serif font-bold text-emerald-300">{businessProfile.portfolioLinks.length}</p>
+            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Portfolio Items</p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
+            <DollarSign className="w-5 h-5 text-blue-400 mx-auto" />
+            <p className="text-2xl font-serif font-bold text-blue-300">${businessProfile.allocatedStipendsBudgetUsd}</p>
             <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Stipends Allocated</p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-            <Coins className="w-5 h-5 text-amber-400 mx-auto" />
-            <p className="text-2xl font-serif font-bold text-amber-400">216</p>
-            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">BEAM Coins Generated</p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-            <Calendar className="w-5 h-5 text-blue-400 mx-auto" />
-            <p className="text-2xl font-serif font-bold text-blue-300">3</p>
-            <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Active Contract Projects</p>
           </div>
 
         </div>
@@ -256,41 +313,53 @@ export default function InstitutionalCohortProfile() {
       <div className="relative z-10 py-6">
         <div className="max-w-6xl mx-auto w-full px-6 space-y-6">
           
-          <div className="flex items-center justify-start overflow-x-auto space-x-2 border-b border-white/10 pb-3">
+          <div className="flex items-center justify-start overflow-x-auto space-x-2 border-b border-white/10 pb-3 no-scrollbar">
             <button
-              onClick={() => setActiveTab('roster')}
+              onClick={() => setActiveTab('business')}
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                activeTab === 'roster'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                  : 'text-white/50 hover:text-white'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span>1. Live Location Roster Radar</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('projects')}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                activeTab === 'projects'
+                activeTab === 'business'
                   ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
                   : 'text-white/50 hover:text-white'
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>2. Cohort Projects & Runs</span>
+              <Scale className="w-3.5 h-3.5" />
+              <span>1. Legal & Business Readiness</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('services')}
+              onClick={() => setActiveTab('states')}
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                activeTab === 'services'
+                activeTab === 'states'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>2. Multi-State Operations & Needs ({businessProfile.stateOperations.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('portfolio')}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                activeTab === 'portfolio'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   : 'text-white/50 hover:text-white'
               }`}
             >
-              <Truck className="w-3.5 h-3.5" />
-              <span>3. Wraparound Logistics Delivered</span>
+              <Film className="w-3.5 h-3.5" />
+              <span>3. Aggregate Accomplishments Vault ({businessProfile.portfolioLinks.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('roster')}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                activeTab === 'roster'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>4. Live Musician Radar</span>
             </button>
 
             <button
@@ -301,12 +370,174 @@ export default function InstitutionalCohortProfile() {
                   : 'text-white/50 hover:text-white'
               }`}
             >
-              <Globe className="w-3.5 h-3.5" />
+              <Layers className="w-3.5 h-3.5" />
               <span>Cross-Domain Payload</span>
             </button>
           </div>
 
-          {/* TAB 1: LIVE LOCATION ROSTER RADAR */}
+          {/* TAB 1: LEGAL & BUSINESS READINESS */}
+          {activeTab === 'business' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-serif font-bold text-white">Incorporation & Legal Development Status</h2>
+                <p className="text-xs text-white/60">Business entity readiness synced with law.beamthinktank.space and BEAM Business Incubator.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Legal Structure Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-amber-400/30 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-mono font-bold text-amber-300 uppercase">Entity Incorporation Status</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/40 text-[10px] font-mono">
+                      {businessProfile.incorporationStatus}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <p className="text-white/80">State of Registration: <strong className="text-white">{businessProfile.stateOfRegistration}</strong></p>
+                    <p className="text-white/80">FEIN Status: <strong className="text-amber-300">{businessProfile.feinStatus}</strong></p>
+                    <p className="text-white/60 leading-relaxed pt-1">
+                      BADO Florida is currently incubating within the BEAM ecosystem. BEAM Law division assists with 501(c)(3) filing, entity chartering, and fiscal sponsorship.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Content Generation Pipeline Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-purple-500/30 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-mono font-bold text-purple-300 uppercase">Content Generation Pipeline</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono">
+                      ACTIVE PIPELINE
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <p className="text-white/80">Media Capabilities:</p>
+                    <ul className="space-y-1 text-white/70 pl-2">
+                      {businessProfile.contentCapabilities.map((cap, idx) => (
+                        <li key={idx} className="flex items-center space-x-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          <span>{cap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legal Development Needs List */}
+              <div className="p-5 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-white/80">
+                    Active Business & Legal Development Needs (law.beamthinktank.space)
+                  </h3>
+                  <button
+                    onClick={handleRequestLegalSupport}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition flex items-center space-x-1"
+                  >
+                    <Scale className="w-3.5 h-3.5" />
+                    <span>Dispatch Legal Support</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {businessProfile.legalDevelopmentNeeds.map((need, idx) => (
+                    <div key={idx} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>{need}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: MULTI-STATE OPERATIONS & PARTICIPANT NEED MAPPING */}
+          {activeTab === 'states' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-serif font-bold text-white">Multi-State Operations & Participant Need Mapping</h2>
+                <p className="text-xs text-white/60">State-by-state node designations mapping regional musician needs for orchestra.beamthinktank.space.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {businessProfile.stateOperations.map((op) => (
+                  <div key={op.stateCode} className="p-5 rounded-2xl bg-black/40 border border-purple-500/30 space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-sm font-bold text-white flex items-center space-x-1.5">
+                        <Globe className="w-4 h-4 text-purple-400" />
+                        <span>{op.stateName} ({op.stateCode})</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
+                        ACTIVE NODE
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-bold text-amber-300">{op.hubName}</p>
+                    <p className="text-[11px] text-white/70 leading-relaxed">{op.operationsDescription}</p>
+
+                    <div className="pt-2 border-t border-white/10 space-y-1">
+                      <span className="text-[10px] text-white/50 uppercase font-mono block">Musician Roles Needed in {op.stateCode}:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {op.neededMusicianRoles.map((role, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded bg-white/10 text-white text-[10px] font-mono">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: AGGREGATE ACCOMPLISHMENTS VAULT */}
+          {activeTab === 'portfolio' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-serif font-bold text-white">Aggregate Accomplishments & Media Vault</h2>
+                  <p className="text-xs text-white/60">Portfolio of completed recitals, recording reels, grant documents, and press files.</p>
+                </div>
+
+                <button
+                  onClick={() => setShowAddLinkModal(true)}
+                  className="px-4 py-2 rounded-full bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shadow-lg flex items-center space-x-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Project Link or File</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {businessProfile.portfolioLinks.map((link) => (
+                  <div key={link.id} className="p-4 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono">
+                        {link.type}
+                      </span>
+                      <span className="text-[10px] text-white/40 font-mono">{link.dateAdded}</span>
+                    </div>
+
+                    <h3 className="text-sm font-serif font-bold text-white">{link.title}</h3>
+
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between text-xs font-mono text-emerald-300 hover:text-emerald-200 transition"
+                    >
+                      <span className="truncate max-w-[260px]">{link.url}</span>
+                      <ExternalLink className="w-4 h-4 shrink-0 ml-2" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: LIVE MUSICIAN RADAR */}
           {activeTab === 'roster' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -372,97 +603,11 @@ export default function InstitutionalCohortProfile() {
             </div>
           )}
 
-          {/* TAB 2: COHORT PROJECTS */}
-          {activeTab === 'projects' && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-serif font-bold text-white">Active Cohort Contract Runs</h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/30 space-y-2">
-                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold uppercase">
-                    Full Symphony Showcase
-                  </span>
-                  <h3 className="text-sm font-serif font-bold text-white">Spring 2026 Ballet & Dance Symphonic Showcase</h3>
-                  <p className="text-xs text-white/60">Miller High Life Theatre · Milwaukee, WI</p>
-                  <div className="pt-2 border-t border-white/10 flex justify-between text-xs font-mono">
-                    <span className="text-emerald-400 font-bold">$3,200 USD</span>
-                    <span className="text-amber-400 font-bold">+48 BEAM</span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/30 space-y-2">
-                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold uppercase">
-                    Recording Residency
-                  </span>
-                  <h3 className="text-sm font-serif font-bold text-white">Schumann & Bonds Masterwork Recording Series</h3>
-                  <p className="text-xs text-white/60">Steinway Gallery · Orlando, FL</p>
-                  <div className="pt-2 border-t border-white/10 flex justify-between text-xs font-mono">
-                    <span className="text-emerald-400 font-bold">$2,400 USD</span>
-                    <span className="text-amber-400 font-bold">+36 BEAM</span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-blue-500/30 space-y-2">
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-mono font-bold uppercase">
-                    Multi-City Tour
-                  </span>
-                  <h3 className="text-sm font-serif font-bold text-white">BDSO & BDO Joint Multi-City Tour 2026</h3>
-                  <p className="text-xs text-white/60">Milwaukee → Concord → Orlando → Miami</p>
-                  <div className="pt-2 border-t border-white/10 flex justify-between text-xs font-mono">
-                    <span className="text-emerald-400 font-bold">$3,310 USD</span>
-                    <span className="text-amber-400 font-bold">+48 BEAM</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: WRAPAROUND LOGISTICS DELIVERED */}
-          {activeTab === 'services' && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-serif font-bold text-white">Wraparound Infrastructure Delivered to Musicians</h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/30 flex items-start space-x-3">
-                  <Truck className="w-6 h-6 text-amber-400 mt-1 shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">42 Ground Transit Rides Funded</h3>
-                    <p className="text-xs text-white/60 mt-0.5">Dispatched through grounds.beamthinktank.space for multi-city travel & airport pick-ups.</p>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/30 flex items-start space-x-3">
-                  <Building2 className="w-6 h-6 text-purple-400 mt-1 shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">18 Residency Housing Nights Allocated</h3>
-                    <p className="text-xs text-white/60 mt-0.5">Steinway Gallery Orlando lodgings & Concord Symphony artist housing.</p>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-emerald-500/30 flex items-start space-x-3">
-                  <Utensils className="w-6 h-6 text-emerald-400 mt-1 shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">54 Catering & Meal Per Diems Issued</h3>
-                    <p className="text-xs text-white/60 mt-0.5">Nutritional & rehearsal catering support provided during contract intensive runs.</p>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-blue-500/30 flex items-start space-x-3">
-                  <Wrench className="w-6 h-6 text-blue-400 mt-1 shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">6 Luthier & Bow Rehairs Funded</h3>
-                    <p className="text-xs text-white/60 mt-0.5">Instrument care & repair credits issued via BEAM Coin redemption Phase 1.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: CROSS-DOMAIN PAYLOAD */}
+          {/* TAB 5: CROSS-DOMAIN PAYLOAD */}
           {activeTab === 'sync' && (
             <div className="p-5 rounded-2xl bg-black/40 border border-purple-500/30 space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-purple-300 font-semibold font-mono">Institutional Cross-Domain Sync Payload</span>
+                <span className="text-purple-300 font-semibold font-mono">Institutional Business Cross-Domain Payload</span>
                 <button
                   onClick={handleCopyJson}
                   className="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[11px] flex items-center space-x-1"
@@ -479,6 +624,66 @@ export default function InstitutionalCohortProfile() {
 
         </div>
       </div>
+
+      {/* Add Portfolio Link Modal */}
+      {showAddLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-serif font-bold text-white">Add Project Link or File</h3>
+              <button onClick={() => setShowAddLinkModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Item Title</label>
+                <input
+                  type="text"
+                  value={newLinkTitle}
+                  onChange={(e) => setNewLinkTitle(e.target.value)}
+                  placeholder="e.g. BADO Florida 2026 Recital Series / Grant Proposal"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Link Category</label>
+                <select
+                  value={newLinkType}
+                  onChange={(e) => setNewLinkType(e.target.value as InstitutionalPortfolioLink['type'])}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-emerald-400"
+                >
+                  <option value="Video Reel">Video Reel</option>
+                  <option value="Performance Link">Performance Link</option>
+                  <option value="Press Kit / Doc">Press Kit / Doc</option>
+                  <option value="Grant Document">Grant Document</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">URL or File Link</label>
+                <input
+                  type="url"
+                  value={newLinkUrl}
+                  onChange={(e) => setNewLinkUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or https://.../proposal.pdf"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <button
+                onClick={handleAddPortfolioLink}
+                disabled={!newLinkTitle || !newLinkUrl}
+                className="w-full py-3 rounded-xl bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition shadow-lg mt-2 disabled:opacity-50"
+              >
+                Save to Accomplishments Vault
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dispatch Transit Modal */}
       {showDispatchModal && selectedMusician && (

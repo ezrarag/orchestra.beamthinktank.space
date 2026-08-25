@@ -376,3 +376,105 @@ export async function fetchCrossSiteRecordPayload(email: string): Promise<Orches
     eventsPlayed: events
   }
 }
+
+export interface StateOperationDesignation {
+  stateCode: string
+  stateName: string
+  hubName: string
+  operationsDescription: string
+  neededMusicianRoles: string[]
+}
+
+export interface InstitutionalPortfolioLink {
+  id: string
+  title: string
+  url: string
+  type: 'Video Reel' | 'Performance Link' | 'Press Kit / Doc' | 'Grant Document'
+  dateAdded: string
+}
+
+export interface InstitutionalBusinessProfile {
+  id: string
+  organizationName: string
+  legalName?: string
+  email: string
+  contactPerson: string
+  incorporationStatus: 'Unincorporated / Incubating' | '501(c)(3) Non-Profit' | 'LLC' | 'C-Corp' | 'Pending Registration'
+  stateOfRegistration: string
+  feinStatus: 'Assigned' | 'Pending Registration' | 'Exempt'
+  legalDevelopmentNeeds: string[]
+  hasContentPipeline: boolean
+  contentCapabilities: string[]
+  needsMediaTeamSupport: boolean
+  stateOperations: StateOperationDesignation[]
+  portfolioLinks: InstitutionalPortfolioLink[]
+  totalRosterSize: number
+  allocatedStipendsBudgetUsd: number
+  generatedBeamCoins: number
+}
+
+export const DEFAULT_BADO_FLORIDA_PROFILE: InstitutionalBusinessProfile = {
+  id: 'inst-bado-fl',
+  organizationName: 'Ballet & Dance Orchestra Florida (BADO FL)',
+  legalName: 'Ballet and Dance Orchestra (Florida Division)',
+  email: 'badoflorida@gmail.com',
+  contactPerson: 'Director of Business Development & Artistic Operations',
+  incorporationStatus: 'Unincorporated / Incubating',
+  stateOfRegistration: 'Florida (FL)',
+  feinStatus: 'Pending Registration',
+  legalDevelopmentNeeds: [
+    '501(c)(3) Non-Profit Tax-Exempt Filing Support',
+    'Florida State Entity Incorporation & Charter',
+    'BEAM Fiscal Sponsorship Agreement',
+    'Participant Contract & Repertoire Review'
+  ],
+  hasContentPipeline: true,
+  contentCapabilities: [
+    'Florida Steinway Gallery Live Session Capture',
+    'Multi-Cam Ballet Recital Video Recording',
+    'High-Fidelity Audio Mastering'
+  ],
+  needsMediaTeamSupport: true,
+  stateOperations: [
+    {
+      stateCode: 'FL',
+      stateName: 'Florida',
+      hubName: 'Steinway Gallery Node — Orlando, FL',
+      operationsDescription: 'Chamber masterclasses, Steinway D recording sessions, and ballet company performance accompaniments.',
+      neededMusicianRoles: ['Violoncello (Cello)', 'Steinway Piano Technician', 'Principal Concertmaster']
+    },
+    {
+      stateCode: 'WI',
+      stateName: 'Wisconsin',
+      hubName: 'Miller High Life Theatre — Milwaukee, WI',
+      operationsDescription: 'Full symphonic showcase rehearsal intensives and midwest tour staging.',
+      neededMusicianRoles: ['Violin II', 'Double Bass', 'Percussion Lead']
+    },
+    {
+      stateCode: 'IL',
+      stateName: 'Illinois',
+      hubName: 'Symphony Center Hub — Chicago, IL',
+      operationsDescription: 'Regional audition screening, string sectionals, and donor galas.',
+      neededMusicianRoles: ['Viola', 'Flute']
+    }
+  ],
+  portfolioLinks: [
+    {
+      id: 'pl-1',
+      title: 'BADO Florida 2025 Steinway Gallery Recital Series',
+      url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
+      type: 'Video Reel',
+      dateAdded: '2025-12-05'
+    },
+    {
+      id: 'pl-2',
+      title: 'Florida Cultural Endowment & BEAM Wraparound Grant Proposal',
+      url: 'https://www.beamthinktank.space/proposals/bado-fl-grant.pdf',
+      type: 'Grant Document',
+      dateAdded: '2026-01-15'
+    }
+  ],
+  totalRosterSize: 18,
+  allocatedStipendsBudgetUsd: 8910,
+  generatedBeamCoins: 216
+}
