@@ -1468,6 +1468,14 @@ export default function ParticipantProfilePage() {
               <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider">Switch Dedicated Profile View</p>
               
               <Link
+                href="/admin/orchestra-network"
+                className="w-full py-2.5 rounded-xl bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition flex items-center justify-center space-x-2 shadow-lg"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>General Orchestra Admin Directory →</span>
+              </Link>
+
+              <Link
                 href="/institution/profile"
                 className="w-full py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center justify-center space-x-2 transition"
               >

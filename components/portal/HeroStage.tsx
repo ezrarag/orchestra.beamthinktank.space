@@ -333,6 +333,27 @@ export default function HeroStage() {
                         </div>
                       </div>
                     </Link>
+
+                    {/* 5th Entry: General Orchestra Admin Login */}
+                    <Link
+                      href="/admin/login"
+                      onClick={() => {
+                        handleManualInteraction()
+                        setIsDropdownOpen(false)
+                      }}
+                      className="w-full flex items-start space-x-3 p-3 rounded-xl transition-all hover:bg-white/10 text-white/70 hover:text-white border-t border-white/10 mt-1"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-amber-400" />
+                      <div>
+                        <div className="text-xs font-bold flex items-center justify-between gap-2">
+                          <span className="text-amber-300">Orchestra Admin Portal</span>
+                          <span className="text-[10px] font-mono text-amber-400 font-semibold">(Admin)</span>
+                        </div>
+                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
+                          Admin Directory for ezra@readyaimgo.biz
+                        </div>
+                      </div>
+                    </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
