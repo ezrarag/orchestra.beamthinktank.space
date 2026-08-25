@@ -13,11 +13,13 @@ import {
   ChevronRight,
   Loader2,
   LogOut,
+  ShieldCheck,
+  LogIn
 } from 'lucide-react'
 import { getAdminNavGroups } from '@/lib/config/adminNav'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { usePartnerProject } from '@/lib/hooks/useProjectAccess'
-import { signOut } from 'firebase/auth'
+import { signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ADMIN_GATEWAYS_DISABLED, isAdminEmailAllowed } from '@/lib/config/adminAccess'
 
@@ -100,58 +102,64 @@ const ADMIN_PAGE_META: Array<{
     description: 'Institution accounts, project links, and partner dashboard access.',
   },
   {
-    prefix: '/admin/member-audit',
-    title: 'Member Audit',
+    prefix: '/admin/people',
+    title: 'People Audit',
     eyebrow: 'People',
-    description: 'Current Auth users, Firestore user records, memberships, and admin access signals.',
+    description: 'Cross-tab participant rosters, missing metadata audits, and profile state.',
   },
   {
     prefix: '/admin/projects/new',
     title: 'New Project',
     eyebrow: 'Projects',
-    description: 'Spin up a new project workspace with core budget and staffing metadata.',
+    description: 'Provision a new orchestra production, venue node, or partner project.',
   },
   {
     prefix: '/admin/projects/',
-    title: 'Project Workspace',
+    title: 'Project Admin',
     eyebrow: 'Projects',
-    description: 'Project-level operations, analytics, board views, invites, and media.',
+    description: 'Project staffing, media library, board, invites, and roster management.',
   },
   {
     prefix: '/admin/projects',
     title: 'Projects',
     eyebrow: 'Projects',
-    description: 'Portfolio-wide project status, planning, and entry points into each workspace.',
+    description: 'Production portfolio, roster fulfillment, and partner projects.',
   },
   {
-    prefix: '/admin/studio/interviews',
-    title: 'Interview Library',
-    eyebrow: 'Studio',
-    description: 'Interview uploads, metadata, and publishing for the studio interviews surface.',
+    prefix: '/admin/pulse',
+    title: 'Pulse Center',
+    eyebrow: 'System',
+    description: 'Operational health, task readiness, media gaps, and system alerts.',
   },
   {
-    prefix: '/admin/studio/chamber',
-    title: 'Chamber Studio',
-    eyebrow: 'Studio',
-    description: 'Chamber project metadata, uploads, and presentation on the studio surface.',
+    prefix: '/admin/finance',
+    title: 'Finance & Stipends',
+    eyebrow: 'System',
+    description: 'Musician stipends, budget allocation, payout logs, and BEAM coin tracking.',
   },
   {
-    prefix: '/admin/studio',
-    title: 'Studio Content',
-    eyebrow: 'Studio',
-    description: 'Video ingest, categorization, and publishing across the studio experience.',
-  },
-  {
-    prefix: '/admin/board',
-    title: 'Board Dashboard',
-    eyebrow: 'Board Access',
-    description: 'Read-only oversight metrics for attendance, payouts, and orchestral readiness.',
+    prefix: '/admin/system',
+    title: 'System Health',
+    eyebrow: 'System',
+    description: 'Operational monitoring, environment flags, and system telemetry.',
   },
   {
     prefix: '/admin/settings',
     title: 'Settings',
-    eyebrow: 'Platform',
-    description: 'Global configuration, system controls, and operational defaults.',
+    eyebrow: 'System',
+    description: 'Platform defaults, global toggles, and administrative configuration.',
+  },
+  {
+    prefix: '/admin/dashboard',
+    title: 'Executive Dashboard',
+    eyebrow: 'Overview',
+    description: 'High-level operational metrics, active project snapshot, and system pulse.',
+  },
+  {
+    prefix: '/admin/orchestra-network',
+    title: 'Orchestra Network Directory',
+    eyebrow: 'Overview',
+    description: 'Central directory managing Participants, Institutional Cohorts & Studio Vault Viewers.',
   },
 ]
 
@@ -161,18 +169,34 @@ function humanizeAdminSegment(segment: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function AccessDeniedPage() {
+function AdminAuthScreen() {
   const router = useRouter()
   const { user } = useUserRole()
   const [signingOut, setSigningOut] = useState(false)
+  const [signingIn, setSigningIn] = useState(false)
+
+  const handleGoogleSignIn = async () => {
+    if (!auth) return
+    setSigningIn(true)
+    try {
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
+      const res = await signInWithPopup(auth, provider)
+      if (res.user) {
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('Google Sign-In error:', error)
+    } finally {
+      setSigningIn(false)
+    }
+  }
 
   const handleSignOut = async () => {
     if (!auth) return
-    
     setSigningOut(true)
     try {
       await signOut(auth)
-      // Redirect to home page after sign out
       router.push('/')
     } catch (error) {
       console.error('Error signing out:', error)
@@ -181,47 +205,55 @@ function AccessDeniedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-orchestra-dark flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#07080A] text-white flex items-center justify-center p-6 font-sans">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center max-w-md w-full"
+        className="w-full max-w-md text-center space-y-6 bg-[#0F1015] p-8 rounded-3xl border border-amber-400/40 shadow-2xl"
       >
-        <h1 className="text-3xl font-bold text-orchestra-gold mb-4">Access Denied</h1>
-        <p className="text-orchestra-cream/80 mb-6">
-          You need admin privileges to access this area.
-        </p>
-        
+        <div className="w-16 h-16 rounded-full bg-amber-400/20 text-amber-400 border border-amber-400/40 flex items-center justify-center mx-auto shadow-lg">
+          <ShieldCheck className="w-8 h-8" />
+        </div>
+
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-wide">
+            Orchestra Admin Portal
+          </h1>
+          <p className="text-xs text-white/60 leading-relaxed max-w-xs mx-auto">
+            {user ? (
+              <>Signed in as <strong className="text-amber-300">{user.email}</strong>. To access the admin area, please sign in with an authorized admin Google account (<strong className="text-white">ezra@readyaimgo.biz</strong>).</>
+            ) : (
+              <>Sign in with your admin Google account (<strong className="text-amber-300">ezra@readyaimgo.biz</strong>) to access the BEAM Orchestra Admin Area.</>
+            )}
+          </p>
+        </div>
+
+        <button
+          onClick={handleGoogleSignIn}
+          disabled={signingIn}
+          className="w-full py-3.5 px-6 rounded-full bg-amber-400 text-black font-bold text-sm hover:bg-amber-300 transition shadow-xl flex items-center justify-center space-x-2 disabled:opacity-50"
+        >
+          <LogIn className="w-4 h-4 text-black" />
+          <span>{signingIn ? 'Signing in...' : 'Sign In with Admin Google Account'}</span>
+        </button>
+
         {user && (
-          <div className="bg-orchestra-cream/5 backdrop-blur-sm rounded-xl border border-orchestra-gold/20 p-6 mb-6">
-            <p className="text-sm text-orchestra-cream/70 mb-2">Currently signed in as:</p>
-            <p className="text-orchestra-cream font-medium mb-4">{user.email}</p>
-            <p className="text-xs text-orchestra-cream/60 mb-4">
-              If you were just granted admin access, please sign out and sign back in to refresh your permissions.
-            </p>
-            <motion.button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-400 font-medium rounded-lg transition-colors border border-red-500/30"
-              whileHover={!signingOut ? { scale: 1.02 } : {}}
-              whileTap={!signingOut ? { scale: 0.98 } : {}}
-            >
-              <LogOut className="h-5 w-5" />
-              <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
-            </motion.button>
-          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="w-full py-2.5 px-4 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-semibold border border-red-500/30 transition"
+          >
+            {signingOut ? 'Signing out...' : `Sign Out (${user.email})`}
+          </button>
         )}
 
-        <div className="space-y-3">
+        <div className="pt-4 border-t border-white/10 flex flex-col space-y-2">
           <Link
             href="/"
-            className="inline-block px-6 py-3 bg-orchestra-gold/20 hover:bg-orchestra-gold/30 text-orchestra-gold font-medium rounded-lg transition-colors border border-orchestra-gold/30"
+            className="text-xs text-white/60 hover:text-white transition font-medium"
           >
-            Go to Home Page
+            ← Return to Orchestra Homepage
           </Link>
-          <p className="text-xs text-orchestra-cream/50 mt-4">
-            Need admin access? Contact an existing admin or check the documentation.
-          </p>
         </div>
       </motion.div>
     </div>
@@ -341,7 +373,7 @@ export default function AdminLayout({
   }
 
   if ((!user && !ADMIN_GATEWAYS_DISABLED) || !hasAdminShellAccess) {
-    return <AccessDeniedPage />
+    return <AdminAuthScreen />
   }
 
   return (
@@ -349,227 +381,149 @@ export default function AdminLayout({
       {/* Staging Watermark */}
       {isStaging && (
         <div className="fixed inset-0 pointer-events-none z-[9999] opacity-5">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-purple-400 text-9xl font-bold transform -rotate-45">STAGING</div>
-          </div>
+          <div className="absolute inset-0 bg-[radial-gradient(#a855f7_1px,transparent_1px)] [background-size:16px_16px]" />
         </div>
       )}
-      {/* Mobile sidebar backdrop */}
+
+      {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-52 bg-orchestra-dark/95 backdrop-blur-md border-r border-orchestra-gold/20 transform transition-[transform,width] duration-300 flex-shrink-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${desktopSidebarCollapsed ? 'lg:w-[4.5rem]' : 'lg:w-52'} lg:translate-x-0`}
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#0E0F14] border-r border-white/10 flex flex-col transition-all duration-300 lg:static ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${desktopSidebarCollapsed ? 'lg:w-20' : 'w-72'}`}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-orchestra-gold/20">
-            <Link href={adminHomeHref} className={`flex items-center ${desktopSidebarCollapsed ? 'justify-center' : 'space-x-2'}`}>
-              <Music className="h-6 w-6 text-orchestra-gold" />
-              {!desktopSidebarCollapsed ? (
-                <span className="text-lg font-bold text-orchestra-gold">BEAM Admin</span>
-              ) : null}
-            </Link>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setDesktopSidebarCollapsed((current) => !current)}
-                className="hidden rounded-lg border border-orchestra-gold/20 bg-orchestra-gold/5 p-1.5 text-orchestra-cream transition hover:border-orchestra-gold/35 hover:text-orchestra-gold lg:inline-flex"
-                aria-label={desktopSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {desktopSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              </button>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden text-orchestra-cream hover:text-orchestra-gold"
-              >
-                <X className="h-6 w-6" />
-              </button>
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <Link href={adminHomeHref} className="flex items-center space-x-3 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
+              <Music className="w-5 h-5" />
             </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className={`flex-1 overflow-y-auto p-3 ${desktopSidebarCollapsed ? 'space-y-2' : 'space-y-3'}`}>
-            {navGroups.map((group) => {
-              const isCollapsibleGroup = group.items.length > 1 || Boolean(group.title)
-              const groupHasActiveItem = group.items.some(
-                (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-              )
-              const isGroupOpen =
-                desktopSidebarCollapsed || !isCollapsibleGroup || groupHasActiveItem || openNavGroups[group.key]
-              const groupLabel = group.title ?? 'Navigation'
-
-              return (
-                <div key={group.key} className="space-y-1.5">
-                  {!desktopSidebarCollapsed && isCollapsibleGroup ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenNavGroups((current) => ({
-                          ...current,
-                          [group.key]: !current[group.key],
-                        }))
-                      }
-                      className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold tracking-[0.16em] transition ${
-                        groupHasActiveItem
-                          ? 'bg-orchestra-gold/10 text-orchestra-gold'
-                          : 'text-orchestra-gold/70 hover:bg-orchestra-gold/5 hover:text-orchestra-gold'
-                      }`}
-                    >
-                      <span>{groupLabel}</span>
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isGroupOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                  ) : null}
-
-                  {isGroupOpen ? (
-                    group.items.map((link) => {
-                      const Icon = link.icon
-                      const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`)
-
-                      if (!link.enabled) {
-                        return (
-                          <div
-                            key={link.key}
-                            className={`rounded-lg border border-orchestra-gold/10 bg-orchestra-gold/5 text-sm text-orchestra-cream/55 ${
-                              desktopSidebarCollapsed
-                                ? 'flex items-center justify-center px-2 py-2.5'
-                                : 'flex items-center justify-between px-3 py-2'
-                            }`}
-                            title={link.label}
-                          >
-                            <div className={`flex items-center ${desktopSidebarCollapsed ? '' : 'space-x-2'}`}>
-                              <Icon className="h-4 w-4 flex-shrink-0" />
-                              {!desktopSidebarCollapsed ? (
-                                <span className="font-medium truncate">{link.label}</span>
-                              ) : null}
-                            </div>
-                            {!desktopSidebarCollapsed ? (
-                              <span className="text-[10px] uppercase tracking-wide text-orchestra-gold/70">Soon</span>
-                            ) : null}
-                          </div>
-                        )
-                      }
-
-                      return (
-                        <Link
-                          key={link.key}
-                          href={link.href}
-                          className={`rounded-lg transition-all duration-200 text-sm ${
-                            isActive
-                              ? 'bg-orchestra-gold/20 text-orchestra-gold border border-orchestra-gold/30'
-                              : 'text-orchestra-cream hover:bg-orchestra-gold/10 hover:text-orchestra-gold'
-                          } ${
-                            desktopSidebarCollapsed
-                              ? 'flex items-center justify-center px-2 py-2.5'
-                              : 'flex items-center space-x-2 px-3 py-2'
-                          }`}
-                          onClick={() => setSidebarOpen(false)}
-                          title={link.label}
-                        >
-                          <Icon className="h-4 w-4 flex-shrink-0" />
-                          {!desktopSidebarCollapsed ? (
-                            <span className="font-medium truncate">{link.label}</span>
-                          ) : null}
-                        </Link>
-                      )
-                    })
-                  ) : null}
-                </div>
-              )
-            })}
-          </nav>
-
-          {/* Footer */}
-          <div className="p-3 border-t border-orchestra-gold/20 space-y-2">
-            {user && !desktopSidebarCollapsed ? (
-              <div className="text-xs text-orchestra-cream/70 truncate px-2">
-                {user.email}
+            {!desktopSidebarCollapsed && (
+              <div className="truncate">
+                <p className="text-sm font-serif font-bold text-white truncate">BEAM Orchestra</p>
+                <p className="text-[10px] font-mono text-amber-300 uppercase tracking-wider">Admin Portal</p>
               </div>
-            ) : null}
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className={`rounded-lg transition-colors text-sm text-orchestra-cream hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 ${
-                desktopSidebarCollapsed
-                  ? 'flex w-full items-center justify-center px-2 py-2.5'
-                  : 'flex w-full items-center space-x-2 px-3 py-2'
-              }`}
-              title={signingOut ? 'Signing out...' : 'Sign Out'}
-            >
-              <LogOut className="h-4 w-4 flex-shrink-0" />
-              {!desktopSidebarCollapsed ? (
-                <span className="font-medium">{signingOut ? 'Signing out...' : 'Sign Out'}</span>
-              ) : null}
-            </button>
-            <div className={`text-xs text-orchestra-cream/50 pt-2 border-t border-orchestra-gold/10 ${desktopSidebarCollapsed ? 'text-center' : ''}`}>
-              BEAM Orchestra Admin Portal
+            )}
+          </Link>
+
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-white/60 hover:text-white p-1"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Sidebar Nav Items */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
+          {navGroups.map((group) => (
+            <div key={group.key} className="space-y-1">
+              {!desktopSidebarCollapsed && group.title && (
+                <p className="px-3 text-[10px] font-mono text-white/40 uppercase tracking-wider mb-2">
+                  {group.title}
+                </p>
+              )}
+
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                const Icon = item.icon
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                      isActive
+                        ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    {!desktopSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  </Link>
+                )
+              })}
             </div>
-          </div>
+          ))}
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {user && !desktopSidebarCollapsed && (
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs font-mono">
+              <p className="text-white/50 text-[10px] uppercase">Signed In</p>
+              <p className="text-white font-bold truncate">{user.email}</p>
+              <p className="text-amber-300 text-[10px] capitalize mt-0.5">{roleLabel}</p>
+            </div>
+          )}
+
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold border border-red-500/20 transition"
+          >
+            <LogOut className="w-4 h-4" />
+            {!desktopSidebarCollapsed && <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>}
+          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className={`flex-1 min-w-0 flex flex-col overflow-hidden transition-[margin] duration-300 ${desktopSidebarCollapsed ? 'lg:ml-[4.5rem]' : 'lg:ml-52'}`}>
-        {/* Mobile header */}
-        <header className="lg:hidden bg-orchestra-dark/95 backdrop-blur-md border-b border-orchestra-gold/20 px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/75">
-                {activePageMeta.eyebrow}
-              </p>
-              <p className="truncate text-sm font-semibold text-orchestra-cream">{activePageMeta.title}</p>
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Bar */}
+        <header className="bg-[#0E0F14] border-b border-white/10 px-6 py-4 flex items-center justify-between z-30">
+          <div className="flex items-center space-x-4">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="text-orchestra-cream hover:text-orchestra-gold"
+              className="lg:hidden text-white/60 hover:text-white p-1"
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="w-6 h-6" />
             </button>
-          </div>
-        </header>
 
-        {/* Desktop header */}
-        <header className="hidden lg:flex items-center justify-between gap-5 bg-orchestra-dark/95 backdrop-blur-md border-b border-orchestra-gold/20 px-5 py-4 flex-shrink-0 relative z-[60]">
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orchestra-gold/75">
-              {activePageMeta.eyebrow}
-            </p>
-            <div className="mt-1 flex items-center gap-3">
-              <h1 className="truncate text-lg font-semibold text-orchestra-cream">{activePageMeta.title}</h1>
-              <span className="rounded-full border border-orchestra-gold/20 bg-orchestra-gold/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-orchestra-gold/85">
-                {roleLabel}
-              </span>
+            <div>
+              <p className="text-[10px] font-mono text-amber-400 uppercase tracking-wider">
+                {activePageMeta.eyebrow}
+              </p>
+              <h1 className="text-lg font-serif font-bold text-white">
+                {activePageMeta.title}
+              </h1>
             </div>
-            <p className="mt-1 truncate text-sm text-orchestra-cream/60">{activePageMeta.description}</p>
           </div>
 
-          <div className="relative flex items-center gap-2.5">
-            {user && (
-              <div className="max-w-[260px] truncate rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-orchestra-cream/70">
-                {user.email}
-              </div>
-            )}
+          <div className="flex items-center space-x-3">
+            <Link
+              href="/admin/orchestra-network"
+              className="px-3.5 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold hover:bg-amber-400/30 transition flex items-center space-x-1"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Network Directory</span>
+            </Link>
+
+            <Link
+              href="/profile"
+              className="px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-white text-xs font-semibold hover:bg-white/20 transition"
+            >
+              My Profile
+            </Link>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="relative flex-1 overflow-y-auto overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.12),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0))]">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_30%)]" />
-          <div className="relative mr-auto w-full max-w-[1560px] px-4 py-4 sm:px-5 lg:px-6 xl:px-8 lg:py-5">
-            {children}
-          </div>
+        {/* Page Body */}
+        <main className="flex-1 overflow-y-auto p-6">
+          {children}
         </main>
       </div>
     </div>
