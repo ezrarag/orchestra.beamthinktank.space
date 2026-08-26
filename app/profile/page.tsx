@@ -855,38 +855,9 @@ export default function ParticipantProfilePage() {
           {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
 
-          {/* Overlaid Left-Aligned Name, Handle, Live Status Badge & Dynamic Role Pills */}
+          {/* Overlaid Left-Aligned Name & Handle */}
           <div className="absolute bottom-4 inset-x-0 z-20">
-            <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-2">
-              
-              {/* Live Presence Header Badge */}
-              <div className="flex flex-wrap items-center gap-2">
-                {isBroadcastingLocation ? (
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold shadow-lg">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                    </span>
-                    <span>🟢 LIVE BEACON: {liveBeaconCity}</span>
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-800/80 backdrop-blur-md border border-slate-700/60 text-slate-300 text-xs font-mono">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>📍 Home: {profile?.homeHub || 'Milwaukee, WI'}</span>
-                  </div>
-                )}
-
-                {/* Dynamic Role / Discipline Pills */}
-                {disciplinePills.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-white text-xs font-mono font-semibold tracking-wide"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
+            <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-1">
               <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-md">
                 {displayName}
               </h1>
@@ -993,7 +964,7 @@ export default function ParticipantProfilePage() {
             {/* Stats Bar */}
             <div className="w-full grid grid-cols-3 gap-3 text-center">
               <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 1485}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 0}</p>
                 <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Institutional Earnings</p>
               </div>
 
@@ -1005,7 +976,7 @@ export default function ParticipantProfilePage() {
               >
                 <div className="flex items-center justify-center space-x-1.5 text-amber-400">
                   <span className="text-2xl sm:text-3xl font-bold font-serif">
-                    ${(profile?.hoodVillageBalance || 480).toLocaleString()}
+                    ${(profile?.hoodVillageBalance || 0).toLocaleString()}
                   </span>
                 </div>
                 <p className="text-xs font-semibold text-amber-300 uppercase font-sans tracking-wider">
@@ -1963,7 +1934,7 @@ export default function ParticipantProfilePage() {
               <div>
                 <span className="text-[10px] uppercase font-mono tracking-wider text-amber-300/80">Total Hood Fund Raised</span>
                 <p className="text-2xl font-serif font-bold text-amber-400">
-                  ${(profile?.hoodVillageBalance || 480).toLocaleString()} USD
+                  ${(profile?.hoodVillageBalance || 0).toLocaleString()} USD
                 </p>
                 <p className="text-[11px] text-white/60">Sourced from hood.beamthinktank.space + vault stream rev shares</p>
               </div>
@@ -1983,7 +1954,7 @@ export default function ParticipantProfilePage() {
                     <span>Ground Transit & Flights ({hoodAllocations.travelPercent}%)</span>
                   </div>
                   <span className="font-mono text-amber-300 font-bold">
-                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.travelPercent) / 100).toFixed(2)}
+                    ${(((profile?.hoodVillageBalance || 0) * hoodAllocations.travelPercent) / 100).toFixed(2)}
                   </span>
                 </div>
                 <input
@@ -2004,7 +1975,7 @@ export default function ParticipantProfilePage() {
                     <span>Residency Housing & Hotels ({hoodAllocations.housingPercent}%)</span>
                   </div>
                   <span className="font-mono text-purple-300 font-bold">
-                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.housingPercent) / 100).toFixed(2)}
+                    ${(((profile?.hoodVillageBalance || 0) * hoodAllocations.housingPercent) / 100).toFixed(2)}
                   </span>
                 </div>
                 <input
@@ -2025,7 +1996,7 @@ export default function ParticipantProfilePage() {
                     <span>Catering & Per Diem Meals ({hoodAllocations.mealsPercent}%)</span>
                   </div>
                   <span className="font-mono text-emerald-300 font-bold">
-                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.mealsPercent) / 100).toFixed(2)}
+                    ${(((profile?.hoodVillageBalance || 0) * hoodAllocations.mealsPercent) / 100).toFixed(2)}
                   </span>
                 </div>
                 <input
@@ -2046,7 +2017,7 @@ export default function ParticipantProfilePage() {
                     <span>Instrument Care & Luthier ({hoodAllocations.maintenancePercent}%)</span>
                   </div>
                   <span className="font-mono text-blue-300 font-bold">
-                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.maintenancePercent) / 100).toFixed(2)}
+                    ${(((profile?.hoodVillageBalance || 0) * hoodAllocations.maintenancePercent) / 100).toFixed(2)}
                   </span>
                 </div>
                 <input

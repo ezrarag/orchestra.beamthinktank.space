@@ -255,7 +255,7 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   homeHub: 'Milwaukee, WI / Chicago, IL',
   isRoamingActive: true,
   roamingCity: 'Orlando, FL (Steinway Gallery Residency)',
-  hoodVillageBalance: 480,
+  hoodVillageBalance: 0,
   hoodAllocations: DEFAULT_HOOD_ALLOCATION,
   infrastructureNeeds: [
     { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/reimbursement for multi-city travel.' },
@@ -285,8 +285,8 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   educationBackground: 'Master of Music (M.M.) Cellist',
   culturalCapitalNotes: 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.',
   uncompensatedRehearsalHours: 24,
-  beamCoinBalance: 48,
-  usdTotalEarned: 1485
+  beamCoinBalance: 0,
+  usdTotalEarned: 0
 }
 
 export const DEFAULT_EZRA_EVENTS: EventPlayed[] = [
