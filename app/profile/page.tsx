@@ -14,6 +14,7 @@ import {
   fetchParticipantProfile, 
   saveParticipantProfile, 
   ensureParticipantProfileExists,
+  DEFAULT_EZRA_PROFILE,
   DEFAULT_EZRA_EVENTS,
   BEAM_CATALOG_WORKS,
   DEFAULT_HOOD_ALLOCATION,
@@ -90,7 +91,9 @@ export default function ParticipantProfilePage() {
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'nodes' | 'portfolio' | 'logistics' | 'triangle' | 'interop'>('nodes')
+  const [activeTab, setActiveTab] = useState<'nodes' | 'portfolio'>('nodes')
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showLogisticsDrawer, setShowLogisticsDrawer] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
 
   const handleShareProfile = () => {
@@ -601,13 +604,14 @@ export default function ParticipantProfilePage() {
   }
 
   const handleSaveAllEdits = async () => {
-    if (!profile) return
     setSaving(true)
     try {
-      await saveParticipantProfile(targetEmail, { 
+      const emailToUse = targetEmail || 'ezra.haugabrooks@gmail.com'
+      const updatedProfileData = {
         ...formData,
-        fullName: editName,
-        culturalCapitalNotes: bioText,
+        fullName: editName.trim() || 'Participant Musician',
+        email: emailToUse,
+        culturalCapitalNotes: bioText.trim(),
         headshotUrl: profilePhoto,
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
@@ -620,28 +624,19 @@ export default function ParticipantProfilePage() {
           cityState: liveBeaconCity,
           lastBeaconTime: new Date().toISOString()
         }
-      }, user?.uid)
-      setProfile({ 
-        ...profile, 
-        ...formData, 
-        fullName: editName, 
-        culturalCapitalNotes: bioText,
-        headshotUrl: profilePhoto,
-        disciplineTags: disciplinePills,
-        isRoamingActive: isRoaming,
-        roamingCity: roamingLocation,
-        current_live_location: {
-          isBroadcasting: isBroadcastingLocation,
-          latitude: liveLat,
-          longitude: liveLng,
-          accuracy: liveAccuracy,
-          cityState: liveBeaconCity,
-          lastBeaconTime: new Date().toISOString()
-        }
-      })
+      }
+
+      await saveParticipantProfile(emailToUse, updatedProfileData, user?.uid)
+
+      setProfile((prev) => ({
+        ...(prev || DEFAULT_EZRA_PROFILE),
+        ...updatedProfileData,
+      }))
       setIsEditingBio(false)
+      alert('Musician profile updated successfully!')
     } catch (err) {
       console.error('Error saving profile:', err)
+      alert('Could not save profile changes. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -816,39 +811,104 @@ export default function ParticipantProfilePage() {
               <X className="w-5 h-5" />
             </Link>
 
-            <div className="flex items-center space-x-2">
-              {!user && !isSandboxPreview ? (
+            <div className="flex items-center space-x-2 relative">
+              {user || isSandboxPreview ? (
+                <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Signed In</span>
+                </span>
+              ) : null}
+
+              {/* ... Dropdown Action Menu */}
+              <div className="relative">
                 <button
-                  onClick={handleGoogleSignIn}
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg"
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-lg"
+                  title="More Options Menu"
                 >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>Google Sign In</span>
+                  <MoreHorizontal className="w-5 h-5" />
                 </button>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Signed In</span>
-                  </span>
 
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 backdrop-blur-md border border-red-500/40 text-red-300 text-xs font-semibold transition shadow-lg"
-                    title="Sign Out of Profile"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
+                {showMoreMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-30" 
+                      onClick={() => setShowMoreMenu(false)} 
+                    />
+                    <div className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-[#151722]/95 backdrop-blur-xl border border-white/20 shadow-2xl z-40 space-y-1 text-xs">
+                      <button
+                        onClick={() => {
+                          setIsEditingBio(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Edit3 className="w-4 h-4 text-amber-400" />
+                        <span>Edit Profile & CV</span>
+                      </button>
 
-              <button
-                onClick={() => setShowPhotoModal(true)}
-                className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
+                      <button
+                        onClick={() => {
+                          setShowPhotoModal(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <UserIcon className="w-4 h-4 text-purple-400" />
+                        <span>Update Headshot Photo</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleShareProfile()
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Copy className="w-4 h-4 text-emerald-400" />
+                        <span>{shareCopied ? 'Link Copied!' : 'Copy Shareable Link'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowLogisticsDrawer(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Truck className="w-4 h-4 text-blue-400" />
+                        <span>Logistics & Support Settings</span>
+                      </button>
+
+                      <div className="border-t border-white/10 my-1" />
+
+                      {!user && !isSandboxPreview ? (
+                        <button
+                          onClick={() => {
+                            handleGoogleSignIn()
+                            setShowMoreMenu(false)
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-amber-400/20 text-amber-300 flex items-center space-x-2.5 transition"
+                        >
+                          <LogIn className="w-4 h-4 text-amber-400" />
+                          <span>Google Sign In</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleSignOut()
+                            setShowMoreMenu(false)
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-red-500/20 text-red-300 flex items-center space-x-2.5 transition"
+                        >
+                          <LogOut className="w-4 h-4 text-red-400" />
+                          <span>Sign Out</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -865,25 +925,6 @@ export default function ParticipantProfilePage() {
                 {handleName}
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Action Row Below Photo */}
-        <div className="relative z-20 bg-[#0F1015] py-4">
-          <div className="max-w-6xl mx-auto w-full px-6 flex items-center space-x-4">
-            <button
-              onClick={() => setIsEditingBio(!isEditingBio)}
-              className="flex-1 py-3.5 px-6 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 transition shadow-xl text-center"
-            >
-              {isEditingBio ? 'Done Editing' : 'Edit Profile & CV'}
-            </button>
-
-            <button
-              onClick={() => setShowPhotoModal(true)}
-              className="w-12 h-12 rounded-full border border-white/20 bg-black/40 text-white flex items-center justify-center hover:bg-white/10 transition shadow-xl shrink-0"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
           </div>
         </div>
 
@@ -905,35 +946,6 @@ export default function ParticipantProfilePage() {
                   <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl">
                     BEAM bridges direct institutional contracting with community patron backing so you earn professional stipends while touring with full travel & lodging coverage.
                   </p>
-                </div>
-
-                <div className="flex items-center space-x-2 shrink-0">
-                  <button
-                    onClick={handleShareProfile}
-                    className="px-4 py-2.5 rounded-full bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-lg flex items-center space-x-1.5"
-                  >
-                    {shareCopied ? (
-                      <>
-                        <Check className="w-4 h-4 text-black" />
-                        <span>Village Link Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        <span>Share Profile & Village Link</span>
-                      </>
-                    )}
-                  </button>
-
-                  {!user && (
-                    <button
-                      onClick={handleGoogleSignIn}
-                      className="px-4 py-2.5 rounded-full bg-white text-black font-bold text-xs hover:bg-white/90 transition shadow-lg flex items-center space-x-1.5"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      <span>Continue with Google</span>
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -1174,65 +1186,39 @@ export default function ParticipantProfilePage() {
           <div className="max-w-6xl mx-auto w-full px-6 space-y-6">
             
             {/* Module Switcher Tabs */}
-            <div className="flex items-center justify-start overflow-x-auto space-x-2 border-b border-white/10 pb-3 no-scrollbar">
-              <button
-                onClick={() => setActiveTab('nodes')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'nodes'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                <Building2 className="w-3.5 h-3.5" />
-                <span>1. Upcoming Work & Node Gigs</span>
-              </button>
+            <div className="flex items-center justify-between overflow-x-auto border-b border-white/10 pb-3 no-scrollbar gap-2">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveTab('nodes')}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                    activeTab === 'nodes'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                      : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>1. Upcoming Work & Node Gigs</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('portfolio')}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                    activeTab === 'portfolio'
+                      ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                      : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>2. Media Portfolio & CV</span>
+                </button>
+              </div>
 
               <button
-                onClick={() => setActiveTab('portfolio')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'portfolio'
-                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                <Video className="w-3.5 h-3.5" />
-                <span>2. Media Portfolio & CV</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('logistics')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'logistics'
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                    : 'text-white/50 hover:text-white'
-                }`}
+                onClick={() => setShowLogisticsDrawer(true)}
+                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 shrink-0"
               >
                 <Truck className="w-3.5 h-3.5" />
-                <span>3. Location & Logistics</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('triangle')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'triangle'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                <Award className="w-3.5 h-3.5" />
-                <span>4. Village & Benefits Tracker</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('interop')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'interop'
-                    ? 'bg-white/20 text-white border border-white/30'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span>Global Vision</span>
+                <span>Logistics & Support Settings</span>
               </button>
             </div>
 
@@ -1404,152 +1390,110 @@ export default function ParticipantProfilePage() {
               </div>
             )}
 
-            {/* MODULE 2: LOCATION, ROAMING & TRANSPORTATION (LOGISTICS MODULE & LIVE LOCATION BEACON) */}
-            {activeTab === 'logistics' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-serif font-bold text-white">Location, Roaming & Live Location Beacon</h2>
-                  <p className="text-xs text-white/60">Cross-domain Life360 location beacon broadcasting live coordinates for grounds.beamthinktank.space transport & housing dispatch.</p>
-                </div>
-
-                {/* Live Location Beacon Broadcasting Card */}
-                <div className="p-5 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-4 shadow-xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                        <Radio className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-sm font-bold text-white">Broadcast My Live Location (Life360 Beacon)</h3>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono">
-                            grounds.beamthinktank.space
-                          </span>
+            {/* Slide-Over Logistics & Support Settings Drawer */}
+            {showLogisticsDrawer && (
+              <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm transition-opacity font-sans">
+                <div 
+                  className="fixed inset-0" 
+                  onClick={() => setShowLogisticsDrawer(false)} 
+                />
+                <div className="relative z-10 w-full max-w-md h-full bg-[#14151D] border-l border-white/20 p-6 overflow-y-auto space-y-6 shadow-2xl flex flex-col justify-between">
+                  <div className="space-y-6">
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-9 h-9 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                          <Truck className="w-5 h-5" />
                         </div>
-                        <p className="text-xs text-white/60">Broadcasts exact GPS position to BEAM logistics engine for rides & housing.</p>
+                        <div>
+                          <h3 className="text-base font-serif font-bold text-white">Logistics & Support Settings</h3>
+                          <p className="text-xs text-white/50">Manage location beacon, roaming, and infrastructure needs.</p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 bg-black/60 px-4 py-2 rounded-xl border border-white/10">
-                      <span className="text-xs font-mono text-white/80">
-                        {isBroadcastingLocation ? '🟢 BROADCASTING LIVE' : '⚪ BEACON OFF'}
-                      </span>
-                      <button
-                        onClick={handleToggleBroadcasting}
-                        className={`w-12 h-6 rounded-full transition p-1 ${isBroadcastingLocation ? 'bg-emerald-500' : 'bg-white/20'}`}
+                      <button 
+                        onClick={() => setShowLogisticsDrawer(false)}
+                        className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition"
                       >
-                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isBroadcastingLocation ? 'translate-x-6' : ''}`} />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
 
-                  {/* Geolocation Status / Details */}
-                  {isBroadcastingLocation && (
-                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center space-x-2 text-emerald-300 font-bold text-sm">
-                          <MapPin className="w-4 h-4" />
-                          <span>Active Beacon Location: {liveBeaconCity}</span>
+                    {/* 1. Live Location Beacon Card */}
+                    <div className="p-4 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                          <span className="text-xs font-bold text-white">Life360 Live Location Beacon</span>
                         </div>
-
                         <button
-                          onClick={handleCaptureLiveLocation}
-                          disabled={isGeoLoading}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-bold flex items-center space-x-1 shrink-0 transition"
+                          onClick={handleToggleBroadcasting}
+                          className={`w-10 h-5 rounded-full transition p-0.5 ${isBroadcastingLocation ? 'bg-emerald-500' : 'bg-white/20'}`}
                         >
-                          <Radio className={`w-3.5 h-3.5 ${isGeoLoading ? 'animate-spin' : ''}`} />
-                          <span>{isGeoLoading ? 'Capturing GPS...' : 'Refresh GPS Beacon'}</span>
+                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isBroadcastingLocation ? 'translate-x-5' : ''}`} />
                         </button>
                       </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-white/70 text-[11px] pt-1 border-t border-emerald-500/20">
-                        <div>Latitude: <strong className="text-white">{liveLat.toFixed(4)}</strong></div>
-                        <div>Longitude: <strong className="text-white">{liveLng.toFixed(4)}</strong></div>
-                        <div>GPS Accuracy: <strong className="text-emerald-400">±{liveAccuracy}m</strong></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {geoError && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-mono">
-                      <span>⚠️ {geoError}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Location & Roaming Card */}
-                <div className="p-5 rounded-2xl bg-black/40 border border-purple-500/30 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
-                    <div className="flex items-center space-x-2">
-                      <Home className="w-5 h-5 text-amber-400 shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-white/50 uppercase tracking-wider">Primary Home Node</p>
-                        <p className="text-sm font-bold text-white">{profile?.homeHub || 'Milwaukee, WI / Chicago, IL'}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 bg-white/5 px-3 py-2 rounded-xl border border-white/10">
-                      <Navigation className="w-4 h-4 text-purple-400" />
-                      <div className="text-left">
-                        <span className="text-[10px] text-white/50 block">Roaming Presence Status</span>
-                        <span className="text-xs font-semibold text-purple-300">
-                          {isRoaming ? 'ACTIVE ROAMING' : 'STATIONARY AT HOME NODE'}
-                        </span>
-                      </div>
-                      <button
-                        onClick={handleToggleRoaming}
-                        className={`w-10 h-6 rounded-full transition p-1 ${isRoaming ? 'bg-purple-500' : 'bg-white/20'}`}
-                      >
-                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isRoaming ? 'translate-x-4' : ''}`} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {isRoaming && (
-                    <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-200 text-xs flex items-center justify-between font-mono">
-                      <span>Currently Active In: <strong>{roamingLocation}</strong></span>
-                      <MapPin className="w-4 h-4 text-purple-400" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Infrastructure Needs Tags */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
-                    Wraparound Infrastructure Needs Tags
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {profile?.infrastructureNeeds?.map((need) => (
-                      <div
-                        key={need.id}
-                        className={`p-4 rounded-2xl border transition flex items-start space-x-3 ${
-                          need.id === 'transit'
-                            ? 'bg-amber-500/10 border-amber-400/50 shadow-lg'
-                            : 'bg-black/40 border-white/10'
-                        }`}
-                      >
-                        {need.id === 'transit' && <Truck className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />}
-                        {need.id === 'housing' && <Building2 className="w-5 h-5 text-purple-400 mt-0.5 shrink-0" />}
-                        {need.id === 'meals' && <Utensils className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />}
-                        {need.id === 'instrument_maintenance' && <Wrench className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />}
-
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white">{need.label}</span>
-                            {need.id === 'transit' ? (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-mono font-bold uppercase">
-                                Support Delta Priority
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-white/40 font-mono capitalize">{need.priority}</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-white/60 leading-tight">{need.description}</p>
+                      
+                      {isBroadcastingLocation && (
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono space-y-2">
+                          <p className="text-emerald-300 font-bold">📍 Active Beacon: {liveBeaconCity}</p>
+                          <button
+                            onClick={handleCaptureLiveLocation}
+                            disabled={isGeoLoading}
+                            className="w-full py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition"
+                          >
+                            <Radio className={`w-3.5 h-3.5 ${isGeoLoading ? 'animate-spin' : ''}`} />
+                            <span>{isGeoLoading ? 'Capturing GPS...' : 'Refresh GPS Location'}</span>
+                          </button>
                         </div>
+                      )}
+                    </div>
+
+                    {/* 2. Roaming Presence Card */}
+                    <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Navigation className="w-4 h-4 text-purple-400" />
+                          <span className="text-xs font-bold text-white">Roaming Presence Status</span>
+                        </div>
+                        <button
+                          onClick={handleToggleRoaming}
+                          className={`w-10 h-5 rounded-full transition p-0.5 ${isRoaming ? 'bg-purple-500' : 'bg-white/20'}`}
+                        >
+                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isRoaming ? 'translate-x-5' : ''}`} />
+                        </button>
                       </div>
-                    ))}
+                      {isRoaming && (
+                        <p className="text-xs font-mono text-purple-300">Currently active in: <strong>{roamingLocation}</strong></p>
+                      )}
+                    </div>
+
+                    {/* 3. Infrastructure Needs Tags */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
+                        Wraparound Infrastructure Needs Tags
+                      </h4>
+                      <div className="space-y-2">
+                        {profile?.infrastructureNeeds?.map((need) => (
+                          <div
+                            key={need.id}
+                            className="p-3 rounded-xl bg-black/50 border border-white/10 text-xs flex items-center justify-between"
+                          >
+                            <span className="text-white font-medium">{need.label}</span>
+                            <span className="text-[10px] font-mono text-amber-300 capitalize">{need.priority}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                   </div>
+
+                  <button
+                    onClick={() => setShowLogisticsDrawer(false)}
+                    className="w-full py-3 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition shadow-lg mt-4"
+                  >
+                    Done & Close Settings
+                  </button>
                 </div>
               </div>
             )}
