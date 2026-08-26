@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useUserRole } from '@/lib/hooks/useUserRole'
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
+import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { auth, db, storage } from '@/lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
@@ -41,6 +41,7 @@ import {
   Edit3, 
   Save, 
   LogIn, 
+  LogOut,
   User as UserIcon,
   Video,
   Plus,
@@ -268,6 +269,18 @@ export default function ParticipantProfilePage() {
         alert(`Google Sign-In Notice: ${err?.message || 'Could not complete Google Sign-In.'}`)
       }
     }
+  }
+
+  const handleSignOut = async () => {
+    if (auth) {
+      try {
+        await signOut(auth)
+      } catch (err) {
+        console.error('Sign Out Error:', err)
+      }
+    }
+    setIsSandboxPreview(false)
+    setProfile(null)
   }
 
   // Trigger Browser Geolocation API Capture
@@ -803,20 +816,31 @@ export default function ParticipantProfilePage() {
               <X className="w-5 h-5" />
             </Link>
 
-            <div className="flex items-center space-x-3">
-              {!user ? (
+            <div className="flex items-center space-x-2">
+              {!user && !isSandboxPreview ? (
                 <button
                   onClick={handleGoogleSignIn}
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold hover:bg-white/30 transition shadow-lg"
+                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Google Login</span>
+                  <span>Google Sign In</span>
                 </button>
               ) : (
-                <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Signed In</span>
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Signed In</span>
+                  </span>
+
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 backdrop-blur-md border border-red-500/40 text-red-300 text-xs font-semibold transition shadow-lg"
+                    title="Sign Out of Profile"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               )}
 
               <button

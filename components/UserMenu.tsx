@@ -147,45 +147,47 @@ export default function UserMenu() {
                   </div>
 
                   <div className="p-2 space-y-1">
-                    {/* 1. Musician Participants Profile Link */}
+                    {/* 1. Musician Participant Profile Link */}
                     <Link
                       href="/profile"
                       onClick={() => setIsOpen(false)}
                       className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
                     >
                       <User className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                      <span className="font-medium text-xs">Musician Participants</span>
+                      <span className="font-medium text-xs">My Musician Profile</span>
                     </Link>
 
-                    {/* 2. Institutional Cohorts & Businesses (BADO & BDSO) */}
-                    <Link
-                      href="/institution/profile"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
-                    >
-                      <Building2 className="h-4 w-4 text-purple-400 group-hover:scale-110 transition-transform" />
-                      <span className="font-medium text-xs">Institutions (BADO & BDSO)</span>
-                    </Link>
+                    {/* Admin & Dev Testing Role Links - Hidden from regular participants to prevent confusion */}
+                    {(role === 'beam_admin' || role === 'partner_admin' || role === 'board' || (typeof window !== 'undefined' && window.location.search.includes('admin=true'))) && (
+                      <>
+                        <Link
+                          href="/institution/profile"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
+                        >
+                          <Building2 className="h-4 w-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                          <span className="font-medium text-xs">Institutions (BADO & BDSO)</span>
+                        </Link>
 
-                    {/* 3. Studio & Media Vault (Audience Viewers) */}
-                    <Link
-                      href="/audience/profile"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
-                    >
-                      <Tv className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform" />
-                      <span className="font-medium text-xs">Studio & Media Vault</span>
-                    </Link>
+                        <Link
+                          href="/audience/profile"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group"
+                        >
+                          <Tv className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                          <span className="font-medium text-xs">Studio & Media Vault</span>
+                        </Link>
 
-                    {/* 4. General Orchestra Admin Link */}
-                    <Link
-                      href="/admin/orchestra-network"
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group border-t border-white/10 pt-2"
-                    >
-                      <ShieldCheck className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                      <span className="font-medium text-xs text-amber-300">Orchestra Admin Directory</span>
-                    </Link>
+                        <Link
+                          href="/admin/orchestra-network"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center space-x-3 px-4 py-2.5 rounded-lg hover:bg-orchestra-gold/10 text-orchestra-cream transition-colors group border-t border-white/10 pt-2"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                          <span className="font-medium text-xs text-amber-300">Orchestra Admin Directory</span>
+                        </Link>
+                      </>
+                    )}
 
                     {/* Board Dashboard Link - Visible to board members and admins */}
                     {(role === 'board' || role === 'beam_admin' || role === 'partner_admin') && (
