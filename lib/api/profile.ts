@@ -218,6 +218,8 @@ export interface ParticipantDemographics {
   usdTotalEarned: number
   hoodVillageBalance?: number
   hoodAllocations?: HoodFundAllocation
+  academicInstitution?: string
+  homeOrchestra?: string
   headshotUrl?: string
 }
 

@@ -513,7 +513,7 @@ export default function ParticipantProfilePage() {
             projectId: 'beam-training-orchestra',
             ensembleId: 'beam-training-orchestra',
             ensembleName: 'BEAM Training Orchestra',
-            institutionName: profile?.academicInstitution || profile?.homeOrchestra || 'Partner Conservatory',
+            institutionName: profile?.academicInstitution || profile?.homeOrchestra || profile?.originProject || 'Partner Conservatory',
             featuredMusicianName: profile?.fullName || user?.displayName || user?.email?.split('@')[0] || 'Participant Musician',
             uploaderType: 'participant',
             title: newMediaTitle.trim(),
