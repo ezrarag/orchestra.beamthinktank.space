@@ -191,8 +191,8 @@ export default function AudienceVaultProfile() {
     membershipTier: 'All-Access Patron Supporter',
     vaultTokensBalance: 120,
     savedFavoritesCount: savedFavorites.length,
-    watchHistoryCount: watchHistory.length,
-    lastWatchedSession: watchHistory[0]?.title || 'None'
+    watchHistoryCount: liveVaultMedia.length,
+    lastWatchedSession: liveVaultMedia[0]?.title || 'None'
   }
 
   const handleCopyJson = () => {
