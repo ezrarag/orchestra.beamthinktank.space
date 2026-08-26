@@ -358,7 +358,7 @@ export default function AudienceVaultProfile() {
 
           <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
             <Clock className="w-5 h-5 text-purple-400 mx-auto" />
-            <p className="text-2xl font-serif font-bold text-purple-300">{watchHistory.length}</p>
+            <p className="text-2xl font-serif font-bold text-purple-300">{liveVaultMedia.length}</p>
             <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider">Sessions Watched</p>
           </div>
 
