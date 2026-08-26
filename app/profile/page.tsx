@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { auth, db, storage } from '@/lib/firebase'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { parseVCard } from '@/lib/vcard'
 import { parseCVText } from '@/lib/cvParser'
 import { getBrowserCoordinates } from '@/lib/geolocation'
@@ -14,10 +16,12 @@ import {
   ensureParticipantProfileExists,
   DEFAULT_EZRA_EVENTS,
   BEAM_CATALOG_WORKS,
+  DEFAULT_HOOD_ALLOCATION,
   type ParticipantDemographics,
   type EventPlayed,
   type MediaPortfolioItem,
   type CatalogWorkItem,
+  type HoodFundAllocation,
   type InfrastructureNeedTag,
   type LiveLocationBeacon
 } from '@/lib/api/profile'
@@ -57,7 +61,8 @@ import {
   FileText,
   Radio,
   Tv,
-  ShieldCheck
+  ShieldCheck,
+  SlidersHorizontal
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
@@ -84,7 +89,17 @@ export default function ParticipantProfilePage() {
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'logistics' | 'nodes' | 'triangle' | 'interop'>('portfolio')
+  const [activeTab, setActiveTab] = useState<'nodes' | 'portfolio' | 'logistics' | 'triangle' | 'interop'>('nodes')
+  const [shareCopied, setShareCopied] = useState(false)
+
+  const handleShareProfile = () => {
+    const shareUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/profile?musician=${encodeURIComponent(targetEmail || 'ezra.haugabrooks@gmail.com')}`
+      : 'https://orchestra.beamthinktank.space/profile'
+    navigator.clipboard.writeText(shareUrl)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 3500)
+  }
   
   // Photo management & CV File input refs
   const [profilePhoto, setProfilePhoto] = useState<string>('')
@@ -124,9 +139,18 @@ export default function ParticipantProfilePage() {
   const [showCatalogModal, setShowCatalogModal] = useState(false)
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>('All')
   const [activePlayingMedia, setActivePlayingMedia] = useState<MediaPortfolioItem | null>(null)
+
+  // Media Upload & Add Form State
+  const [uploadMethod, setUploadMethod] = useState<'file' | 'url'>('file')
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false)
   const [newMediaTitle, setNewMediaTitle] = useState('')
   const [newMediaUrl, setNewMediaUrl] = useState('')
+  const [newMediaComposer, setNewMediaComposer] = useState('')
+  const [newMediaDescription, setNewMediaDescription] = useState('')
   const [newMediaCategory, setNewMediaCategory] = useState<MediaPortfolioItem['category']>('Steinway Session')
+  const videoFileInputRef = useRef<HTMLInputElement>(null)
 
   const handleToggleCatalogWork = async (work: CatalogWorkItem) => {
     const exists = portfolioItems.some(item => item.url === work.url || item.workId === work.id || item.title === work.title)
@@ -160,6 +184,18 @@ export default function ParticipantProfilePage() {
     }
   }
 
+  // Hood Fund & Allocation State
+  const [showHoodAllocationModal, setShowHoodAllocationModal] = useState(false)
+  const [hoodAllocations, setHoodAllocations] = useState<HoodFundAllocation>(DEFAULT_HOOD_ALLOCATION)
+
+  const handleSaveHoodAllocations = async (updated: HoodFundAllocation) => {
+    setHoodAllocations(updated)
+    setShowHoodAllocationModal(false)
+    if (targetEmail) {
+      await saveParticipantProfile(targetEmail, { hoodAllocations: updated }, user?.uid)
+    }
+  }
+
   // Roaming Presence & Logistics State
   const [isRoaming, setIsRoaming] = useState(false)
   const [roamingLocation, setRoamingLocation] = useState('')
@@ -187,6 +223,7 @@ export default function ParticipantProfilePage() {
         setDisciplinePills(data.disciplineTags || ['Resident Cellist', 'Steinway Recording Specialist', 'Media Producer'])
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
         setPortfolioItems(data.portfolioMedia || [])
+        if (data.hoodAllocations) setHoodAllocations(data.hoodAllocations)
         setIsRoaming(Boolean(data.isRoamingActive))
         setRoamingLocation(data.roamingCity || 'Orlando, FL (Steinway Gallery Residency)')
 
@@ -212,15 +249,24 @@ export default function ParticipantProfilePage() {
   }, [targetEmail, user?.uid, user?.photoURL, user?.displayName, isBdsoEzra, authLoading])
 
   const handleGoogleSignIn = async () => {
-    if (!auth) return
+    if (!auth) {
+      setIsSandboxPreview(true)
+      alert('Firebase Auth client API key is not configured in .env.local (NEXT_PUBLIC_FIREBASE_API_KEY). Enabled Sandbox Participant Profile Mode for testing.')
+      return
+    }
     try {
       const provider = new GoogleAuthProvider()
       const res = await signInWithPopup(auth, provider)
       if (res.user) {
         await ensureParticipantProfileExists(res.user)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google Sign-In Error:', err)
+      if (err?.code === 'auth/popup-blocked') {
+        alert('Sign-In Popup was blocked by your browser. Please allow popups for this site or open in Safari/Chrome directly.')
+      } else {
+        alert(`Google Sign-In Notice: ${err?.message || 'Could not complete Google Sign-In.'}`)
+      }
     }
   }
 
@@ -401,26 +447,131 @@ export default function ParticipantProfilePage() {
     setDisciplinePills(disciplinePills.filter(t => t !== tagToRemove))
   }
 
-  // Add Portfolio Media Item
+  // Add Portfolio Media Item (supports real file upload to Firebase Storage & projectRehearsalMedia Firestore entry)
   const handleAddMediaItem = async () => {
-    if (!newMediaTitle.trim() || !newMediaUrl.trim()) return
-
-    const newItem: MediaPortfolioItem = {
-      id: `p-${Date.now()}`,
-      title: newMediaTitle.trim(),
-      url: newMediaUrl.trim(),
-      category: newMediaCategory,
-      dateAdded: new Date().toISOString().split('T')[0]
+    if (!newMediaTitle.trim()) {
+      alert('Please enter a recording title')
+      return
     }
 
-    const updatedPortfolio = [newItem, ...portfolioItems]
-    setPortfolioItems(updatedPortfolio)
-    setNewMediaTitle('')
-    setNewMediaUrl('')
-    setShowAddMediaModal(false)
+    if (uploadMethod === 'file' && !selectedUploadFile) {
+      alert('Please select a video or audio file to upload from your device')
+      return
+    }
 
-    if (profile) {
-      await saveParticipantProfile(targetEmail, { portfolioMedia: updatedPortfolio }, user?.uid)
+    if (uploadMethod === 'url' && !newMediaUrl.trim()) {
+      alert('Please enter a valid video URL (YouTube, Vimeo, or MP4 link)')
+      return
+    }
+
+    setIsUploadingMedia(true)
+    setUploadProgress(0)
+
+    try {
+      let finalMediaUrl = newMediaUrl.trim()
+      let storagePath: string | null = null
+
+      if (uploadMethod === 'file') {
+        if (!selectedUploadFile) throw new Error('No file selected')
+        if (!storage) {
+          throw new Error('Firebase Storage is not initialized on this environment. Please check your Firebase configuration.')
+        }
+
+        const timestamp = Date.now()
+        const sanitizedTitle = newMediaTitle.trim().replace(/[^a-zA-Z0-9]/g, '_')
+        const fileExt = selectedUploadFile.name.split('.').pop() || 'mp4'
+        const fileName = `${sanitizedTitle}_${timestamp}.${fileExt}`
+        storagePath = `Black Diaspora Symphony/studio/participant-uploads/${fileName}`
+
+        const storageRef = ref(storage, storagePath)
+        const uploadTask = uploadBytesResumable(storageRef, selectedUploadFile)
+
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              setUploadProgress(Math.round(progress))
+            },
+            (error) => {
+              console.error('Firebase Storage upload error:', error)
+              reject(error)
+            },
+            async () => {
+              finalMediaUrl = await getDownloadURL(uploadTask.snapshot.ref)
+              resolve()
+            }
+          )
+        })
+      }
+
+      // 1. Create canonical Firestore document in 'projectRehearsalMedia' collection
+      let docId = `doc-${Date.now()}`
+      if (db) {
+        try {
+          const mediaData = {
+            projectId: 'beam-training-orchestra',
+            ensembleId: 'beam-training-orchestra',
+            ensembleName: 'BEAM Training Orchestra',
+            institutionName: profile?.academicInstitution || profile?.homeOrchestra || 'Partner Conservatory',
+            featuredMusicianName: profile?.fullName || user?.displayName || user?.email?.split('@')[0] || 'Participant Musician',
+            uploaderType: 'participant',
+            title: newMediaTitle.trim(),
+            description: newMediaDescription.trim() || null,
+            composer: newMediaComposer.trim() || null,
+            date: serverTimestamp(),
+            url: finalMediaUrl,
+            thumbnailUrl: null,
+            private: false,
+            category: newMediaCategory,
+            instrumentGroup: profile?.primaryInstrument || 'Strings',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            uploadedBy: targetEmail || user?.email || 'participant',
+            storagePath: storagePath
+          }
+
+          const docRef = await addDoc(collection(db, 'projectRehearsalMedia'), mediaData)
+          docId = docRef.id
+        } catch (firestoreErr) {
+          console.warn('Could not write to projectRehearsalMedia collection directly:', firestoreErr)
+        }
+      }
+
+      // 2. Attach newly uploaded work directly to participant's portfolioMedia
+      const newItem: MediaPortfolioItem = {
+        id: docId,
+        workId: docId,
+        title: newMediaTitle.trim(),
+        url: finalMediaUrl,
+        category: newMediaCategory,
+        composer: newMediaComposer.trim() || undefined,
+        description: newMediaDescription.trim() || undefined,
+        dateAdded: new Date().toISOString().split('T')[0]
+      }
+
+      const updatedPortfolio = [newItem, ...portfolioItems]
+      setPortfolioItems(updatedPortfolio)
+
+      // Reset Form State
+      setNewMediaTitle('')
+      setNewMediaUrl('')
+      setNewMediaComposer('')
+      setNewMediaDescription('')
+      setSelectedUploadFile(null)
+      setUploadProgress(0)
+      setShowAddMediaModal(false)
+
+      if (targetEmail) {
+        await saveParticipantProfile(targetEmail, { portfolioMedia: updatedPortfolio }, user?.uid)
+      }
+
+      alert('Recording session uploaded & added to your profile portfolio successfully!')
+    } catch (error: any) {
+      console.error('Error adding recording session:', error)
+      alert(error?.message || 'Failed to upload media. Please try again.')
+    } finally {
+      setIsUploadingMedia(false)
     }
   }
 
@@ -741,25 +892,110 @@ export default function ParticipantProfilePage() {
           </div>
         </div>
 
-        {/* STATS BAR & BIO DESCRIPTION */}
+        {/* TWO PILLARS HERO CARD & STATS BAR */}
         <div className="relative z-10 py-4">
           <div className="max-w-6xl mx-auto w-full px-6 space-y-4">
             
+            {/* The Two Pillars Welcome Banner */}
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-950/40 via-purple-950/30 to-black/60 backdrop-blur-xl border border-amber-400/30 shadow-2xl space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                <div>
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-mono font-bold mb-2">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>BEAM Musician Ecosystem</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
+                    Play Institutions. Build Your Village. Tour at Zero Cost.
+                  </h2>
+                  <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl">
+                    BEAM bridges direct institutional contracting with community patron backing so you earn professional stipends while touring with full travel & lodging coverage.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2 shrink-0">
+                  <button
+                    onClick={handleShareProfile}
+                    className="px-4 py-2.5 rounded-full bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-lg flex items-center space-x-1.5"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check className="w-4 h-4 text-black" />
+                        <span>Village Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Share Profile & Village Link</span>
+                      </>
+                    )}
+                  </button>
+
+                  {!user && (
+                    <button
+                      onClick={handleGoogleSignIn}
+                      className="px-4 py-2.5 rounded-full bg-white text-black font-bold text-xs hover:bg-white/90 transition shadow-lg flex items-center space-x-1.5"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Continue with Google</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Two Pillars Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/20 space-y-1.5">
+                  <div className="flex items-center space-x-2 text-amber-300 font-bold font-mono">
+                    <Building2 className="w-4 h-4" />
+                    <span>1. Direct Institutional Work</span>
+                  </div>
+                  <p className="text-white/70 text-[11px] leading-relaxed">
+                    Verified profiles are directly pitched to partner orchestras, halls, and Steinway recording sessions contracting through BEAM.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-1.5">
+                  <div className="flex items-center space-x-2 text-purple-300 font-bold font-mono">
+                    <Coins className="w-4 h-4" />
+                    <span>2. Community Village Support (&quot;The Hood&quot;)</span>
+                  </div>
+                  <p className="text-white/70 text-[11px] leading-relaxed">
+                    Family, friends, and patrons follow & back your profile to cover travel, lodging, and continuing education at zero out-of-pocket cost.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Stats Bar */}
             <div className="w-full grid grid-cols-3 gap-3 text-center">
               <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-amber-400 font-serif">{profile?.beamCoinBalance || 48}</p>
-                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">BEAM Coins</p>
+                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 1485}</p>
+                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Institutional Earnings</p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 1485}</p>
-                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">USD Stipends</p>
+              {/* Clickable Hood Village Support Fund Card */}
+              <div
+                onClick={() => setShowHoodAllocationModal(true)}
+                className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/40 to-black/60 backdrop-blur-md border border-amber-400/30 hover:border-amber-400/60 transition cursor-pointer group shadow-lg text-center space-y-1"
+                title="Click to manage Hood fund allocations"
+              >
+                <div className="flex items-center justify-center space-x-1.5 text-amber-400">
+                  <span className="text-2xl sm:text-3xl font-bold font-serif">
+                    ${(profile?.hoodVillageBalance || 480).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-amber-300 uppercase font-sans tracking-wider">
+                  Hood Village Fund
+                </p>
+                <div className="inline-flex items-center space-x-1 text-[10px] text-white/50 group-hover:text-amber-200 transition font-mono">
+                  <SlidersHorizontal className="w-3 h-3 text-amber-400" />
+                  <span>Configure Allocations</span>
+                </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
                 <p className="text-2xl sm:text-3xl font-bold text-purple-300 font-serif">{events.length}</p>
-                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Events Played</p>
+                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Events & Gigs</p>
               </div>
             </div>
 
@@ -945,6 +1181,18 @@ export default function ParticipantProfilePage() {
             {/* Module Switcher Tabs */}
             <div className="flex items-center justify-start overflow-x-auto space-x-2 border-b border-white/10 pb-3 no-scrollbar">
               <button
+                onClick={() => setActiveTab('nodes')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
+                  activeTab === 'nodes'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>1. Upcoming Work & Node Gigs</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('portfolio')}
                 className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
                   activeTab === 'portfolio'
@@ -953,7 +1201,7 @@ export default function ParticipantProfilePage() {
                 }`}
               >
                 <Video className="w-3.5 h-3.5" />
-                <span>1. Portfolio & CV</span>
+                <span>2. Media Portfolio & CV</span>
               </button>
 
               <button
@@ -965,19 +1213,7 @@ export default function ParticipantProfilePage() {
                 }`}
               >
                 <Truck className="w-3.5 h-3.5" />
-                <span>2. Location & Logistics</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('nodes')}
-                className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                  activeTab === 'nodes'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                <Building2 className="w-3.5 h-3.5" />
-                <span>3. Node Access & Gigs</span>
+                <span>3. Location & Logistics</span>
               </button>
 
               <button
@@ -989,7 +1225,7 @@ export default function ParticipantProfilePage() {
                 }`}
               >
                 <Award className="w-3.5 h-3.5" />
-                <span>4. Benefits & Unlock Tracker</span>
+                <span>4. Village & Benefits Tracker</span>
               </button>
 
               <button
@@ -1505,62 +1741,322 @@ export default function ParticipantProfilePage() {
 
       </div>
 
-      {/* Add Media Portfolio Item Modal */}
+      {/* Add / Upload Media Portfolio Item Modal */}
       {showAddMediaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
-          <div className="w-full max-w-md p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 shadow-2xl">
+          <div className="w-full max-w-lg p-6 rounded-3xl bg-[#14151C] border border-white/20 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-base font-serif font-bold text-white">Add Recording Session / Media Link</h3>
+              <div>
+                <h3 className="text-base font-serif font-bold text-white">Add Recording Session / Video Upload</h3>
+                <p className="text-xs text-white/50">Upload a video/audio file or paste a video URL. Creates a record in projectRehearsalMedia & attaches to portfolio.</p>
+              </div>
               <button onClick={() => setShowAddMediaModal(false)} className="text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Mode Switcher: File Upload vs URL Paste */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-black/50 border border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => setUploadMethod('file')}
+                className={`py-2 rounded-lg font-semibold transition flex items-center justify-center space-x-1.5 ${
+                  uploadMethod === 'file' ? 'bg-amber-400 text-black shadow-md' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Video File</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUploadMethod('url')}
+                className={`py-2 rounded-lg font-semibold transition flex items-center justify-center space-x-1.5 ${
+                  uploadMethod === 'url' ? 'bg-amber-400 text-black shadow-md' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Paste Video Link</span>
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 no-scrollbar">
               <div>
-                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Recording Title</label>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Recording Title *</label>
                 <input
                   type="text"
                   value={newMediaTitle}
                   onChange={(e) => setNewMediaTitle(e.target.value)}
-                  placeholder="e.g. Schumann Adagio & Allegro — Steinway Gallery"
+                  placeholder="e.g. Schumann Adagio & Allegro — Take II"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Media Category</label>
-                <select
-                  value={newMediaCategory}
-                  onChange={(e) => setNewMediaCategory(e.target.value as MediaPortfolioItem['category'])}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
-                >
-                  <option value="Steinway Session">Steinway Session</option>
-                  <option value="Orchestral Performance">Orchestral Performance</option>
-                  <option value="Chamber Masterclass">Chamber Masterclass</option>
-                  <option value="Solo Recital">Solo Recital</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Category</label>
+                  <select
+                    value={newMediaCategory}
+                    onChange={(e) => setNewMediaCategory(e.target.value as MediaPortfolioItem['category'])}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                  >
+                    <option value="Steinway Session">Steinway Session</option>
+                    <option value="Rehearsal Footage">Rehearsal Footage</option>
+                    <option value="Orchestral Performance">Orchestral Performance</option>
+                    <option value="Chamber Masterclass">Chamber Masterclass</option>
+                    <option value="Solo Recital">Solo Recital</option>
+                    <option value="Publishing Release">Publishing Release</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Composer / Work</label>
+                  <input
+                    type="text"
+                    value={newMediaComposer}
+                    onChange={(e) => setNewMediaComposer(e.target.value)}
+                    placeholder="e.g. Robert Schumann"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                  />
+                </div>
               </div>
 
+              {/* Upload Input Mode */}
+              {uploadMethod === 'file' ? (
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Video File (.mp4, .mov, .webm) *</label>
+                  <input
+                    type="file"
+                    ref={videoFileInputRef}
+                    accept="video/*,audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) setSelectedUploadFile(file)
+                    }}
+                  />
+
+                  <div
+                    onClick={() => videoFileInputRef.current?.click()}
+                    className="p-5 rounded-2xl bg-black/60 border-2 border-dashed border-white/20 hover:border-amber-400/60 transition cursor-pointer text-center space-y-2"
+                  >
+                    <Upload className="w-7 h-7 text-amber-400/80 mx-auto" />
+                    {selectedUploadFile ? (
+                      <div>
+                        <p className="text-xs font-bold text-amber-300 truncate max-w-xs mx-auto">{selectedUploadFile.name}</p>
+                        <p className="text-[10px] text-white/50 font-mono">{(selectedUploadFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-semibold text-white/80">Click to choose a video file from device</p>
+                        <p className="text-[10px] text-white/40 font-mono">Supports MP4, MOV, WebM (up to 500MB)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Video URL (YouTube / Vimeo / Direct MP4) *</label>
+                  <input
+                    type="url"
+                    value={newMediaUrl}
+                    onChange={(e) => setNewMediaUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or https://firebasestorage..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              )}
+
               <div>
-                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Video URL (YouTube / Vimeo / MP4)</label>
-                <input
-                  type="url"
-                  value={newMediaUrl}
-                  onChange={(e) => setNewMediaUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400"
+                <label className="text-[10px] text-white/50 block mb-1 uppercase font-mono tracking-wider">Description / Program Notes</label>
+                <textarea
+                  rows={2}
+                  value={newMediaDescription}
+                  onChange={(e) => setNewMediaDescription(e.target.value)}
+                  placeholder="Rehearsal details, venue notes, or ensemble performance context..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs focus:outline-none focus:border-amber-400 resize-none"
                 />
               </div>
+
+              {/* Progress Bar during upload */}
+              {isUploadingMedia && (
+                <div className="space-y-1.5 p-3 rounded-xl bg-amber-400/10 border border-amber-400/30">
+                  <div className="flex items-center justify-between text-xs font-mono text-amber-300 font-bold">
+                    <span>Uploading to Firebase Storage...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-black/60 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-amber-300 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleAddMediaItem}
-                disabled={!newMediaTitle || !newMediaUrl}
-                className="w-full py-3 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg mt-2 disabled:opacity-50"
+                disabled={isUploadingMedia || !newMediaTitle.trim() || (uploadMethod === 'file' ? !selectedUploadFile : !newMediaUrl.trim())}
+                className="w-full py-3 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg mt-2 disabled:opacity-50 flex items-center justify-center space-x-2"
               >
-                Save to Portfolio
+                {isUploadingMedia ? (
+                  <span>Uploading Media ({uploadProgress}%)...</span>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Upload & Save to Portfolio</span>
+                  </>
+                )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hood Village Fund Allocation Modal */}
+      {showHoodAllocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-lg p-6 rounded-3xl bg-[#14151C] border border-amber-400/30 space-y-5 shadow-2xl">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                  <Coins className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-serif font-bold text-white">Hood Village Support Allocations</h3>
+                  <p className="text-xs text-white/50">Configure how patron backing & stream revenues are split across travel, lodging, & care.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHoodAllocationModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Total Balance Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 to-black/60 border border-amber-400/30 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-wider text-amber-300/80">Total Hood Fund Raised</span>
+                <p className="text-2xl font-serif font-bold text-amber-400">
+                  ${(profile?.hoodVillageBalance || 480).toLocaleString()} USD
+                </p>
+                <p className="text-[11px] text-white/60">Sourced from hood.beamthinktank.space + vault stream rev shares</p>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold">
+                100% Backed
+              </div>
+            </div>
+
+            {/* Allocation Sliders Grid */}
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar text-xs">
+              
+              {/* 1. Ground & Flight Transit */}
+              <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-white font-semibold">
+                    <Truck className="w-4 h-4 text-amber-400" />
+                    <span>Ground Transit & Flights ({hoodAllocations.travelPercent}%)</span>
+                  </div>
+                  <span className="font-mono text-amber-300 font-bold">
+                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.travelPercent) / 100).toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={hoodAllocations.travelPercent}
+                  onChange={(e) => setHoodAllocations({ ...hoodAllocations, travelPercent: Number(e.target.value) })}
+                  className="w-full accent-amber-400 bg-white/20 h-1.5 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* 2. Residency Housing & Hotels */}
+              <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-white font-semibold">
+                    <Building2 className="w-4 h-4 text-purple-400" />
+                    <span>Residency Housing & Hotels ({hoodAllocations.housingPercent}%)</span>
+                  </div>
+                  <span className="font-mono text-purple-300 font-bold">
+                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.housingPercent) / 100).toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={hoodAllocations.housingPercent}
+                  onChange={(e) => setHoodAllocations({ ...hoodAllocations, housingPercent: Number(e.target.value) })}
+                  className="w-full accent-purple-400 bg-white/20 h-1.5 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* 3. Catering & Per Diem Meals */}
+              <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-white font-semibold">
+                    <Utensils className="w-4 h-4 text-emerald-400" />
+                    <span>Catering & Per Diem Meals ({hoodAllocations.mealsPercent}%)</span>
+                  </div>
+                  <span className="font-mono text-emerald-300 font-bold">
+                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.mealsPercent) / 100).toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={hoodAllocations.mealsPercent}
+                  onChange={(e) => setHoodAllocations({ ...hoodAllocations, mealsPercent: Number(e.target.value) })}
+                  className="w-full accent-emerald-400 bg-white/20 h-1.5 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* 4. Instrument Care & Luthier Maintenance */}
+              <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-white font-semibold">
+                    <Wrench className="w-4 h-4 text-blue-400" />
+                    <span>Instrument Care & Luthier ({hoodAllocations.maintenancePercent}%)</span>
+                  </div>
+                  <span className="font-mono text-blue-300 font-bold">
+                    ${(((profile?.hoodVillageBalance || 480) * hoodAllocations.maintenancePercent) / 100).toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={hoodAllocations.maintenancePercent}
+                  onChange={(e) => setHoodAllocations({ ...hoodAllocations, maintenancePercent: Number(e.target.value) })}
+                  className="w-full accent-blue-400 bg-white/20 h-1.5 rounded-lg cursor-pointer"
+                />
+              </div>
+
+            </div>
+
+            {/* Total Percentage Calculation Note */}
+            <div className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between text-xs font-mono">
+              <span className="text-white/60">Allocated Percentage Total:</span>
+              <span className={`font-bold ${
+                (hoodAllocations.travelPercent + hoodAllocations.housingPercent + hoodAllocations.mealsPercent + hoodAllocations.maintenancePercent) === 100
+                  ? 'text-emerald-400'
+                  : 'text-amber-400'
+              }`}>
+                {hoodAllocations.travelPercent + hoodAllocations.housingPercent + hoodAllocations.mealsPercent + hoodAllocations.maintenancePercent}%
+              </span>
+            </div>
+
+            <button
+              onClick={() => handleSaveHoodAllocations(hoodAllocations)}
+              className="w-full py-3 rounded-xl bg-amber-400 text-black text-xs font-bold hover:bg-amber-300 transition shadow-lg flex items-center justify-center space-x-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>Save Fund Allocations</span>
+            </button>
+
           </div>
         </div>
       )}

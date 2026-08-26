@@ -11,6 +11,11 @@ import Link from 'next/link'
 interface StudioVideo {
   id: string
   projectId: string
+  ensembleId?: string
+  ensembleName?: string
+  institutionName?: string
+  featuredMusicianName?: string
+  uploaderType?: string
   title: string
   url: string
   date?: any
@@ -20,8 +25,11 @@ interface StudioVideo {
 }
 
 const PROJECT_OPTIONS = [
+  { value: 'beam-training-orchestra', label: 'BEAM Training Orchestra' },
+  { value: 'beam-professional-orchestra', label: 'BEAM Professional Orchestra' },
   { value: 'black-diaspora-symphony', label: 'Black Diaspora Symphony Orchestra' },
   { value: 'uwm-afro-caribbean-jazz', label: 'UWM Afro-Caribbean Jazz Orchestra' },
+  { value: 'chamber-ensemble', label: 'Chamber Ensembles & Steinway Recital Takes' },
 ]
 
 const INSTRUMENT_GROUP_OPTIONS = [
@@ -44,7 +52,9 @@ export default function AdminStudioPage() {
   
   const [formData, setFormData] = useState({
     file: null as File | null,
-    projectId: 'black-diaspora-symphony',
+    projectId: 'beam-training-orchestra',
+    institutionName: '',
+    featuredMusicianName: '',
     title: '',
     date: new Date().toISOString().split('T')[0], // Today's date as default
     time: new Date().toTimeString().slice(0, 5), // Current time HH:MM
@@ -163,9 +173,17 @@ export default function AdminStudioPage() {
       const [hour, minute] = formData.time.split(':').map(Number)
       const videoDate = new Date(year, month - 1, day, hour, minute)
 
-      // Create Firestore document
+      // Lookup ensemble label
+      const selectedProject = PROJECT_OPTIONS.find(p => p.value === formData.projectId)
+
+      // Create Firestore document with full association metadata
       const mediaData = {
         projectId: formData.projectId,
+        ensembleId: formData.projectId,
+        ensembleName: selectedProject?.label || formData.projectId,
+        institutionName: formData.institutionName.trim() || null,
+        featuredMusicianName: formData.featuredMusicianName.trim() || null,
+        uploaderType: 'admin',
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         date: Timestamp.fromDate(videoDate), // Convert Date to Firestore Timestamp
@@ -186,7 +204,9 @@ export default function AdminStudioPage() {
       // Reset form
       setFormData({
         file: null,
-        projectId: 'black-diaspora-symphony',
+        projectId: 'beam-training-orchestra',
+        institutionName: '',
+        featuredMusicianName: '',
         title: '',
         date: new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().slice(0, 5),
@@ -306,10 +326,10 @@ export default function AdminStudioPage() {
             />
           </div>
 
-          {/* Project */}
+          {/* Project / Ensemble */}
           <div>
             <label className="block text-sm font-medium text-white/70 mb-2">
-              Project *
+              Ensemble / Project Track *
             </label>
             <select
               value={formData.projectId}
@@ -323,6 +343,48 @@ export default function AdminStudioPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Institution / Location */}
+          <div>
+            <label className="block text-sm font-medium text-white/70 mb-2">
+              Host Institution / Venue (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.institutionName}
+              onChange={(e) => setFormData({ ...formData, institutionName: e.target.value })}
+              placeholder="e.g. Steinway Gallery Orlando, UW-Milwaukee Fine Arts, Milwaukee Symphony Hall"
+              className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+              disabled={uploading}
+            />
+            <div className="flex flex-wrap gap-2 mt-2">
+              {['Steinway Gallery Orlando', 'UW-Milwaukee', 'Milwaukee Symphony Hall'].map((inst) => (
+                <button
+                  key={inst}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, institutionName: inst })}
+                  className="px-2.5 py-1 text-[11px] bg-white/5 hover:bg-white/15 text-white/70 rounded-full border border-white/10"
+                >
+                  + {inst}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Featured Musician / Participant */}
+          <div>
+            <label className="block text-sm font-medium text-white/70 mb-2">
+              Featured Musician / Solo Participant (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.featuredMusicianName}
+              onChange={(e) => setFormData({ ...formData, featuredMusicianName: e.target.value })}
+              placeholder="e.g. Cordie Ruckus, Dayvin Hallmon, Steinway Artist Fellow"
+              className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-orchestra-gold"
+              disabled={uploading}
+            />
           </div>
 
           {/* Date */}

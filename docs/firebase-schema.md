@@ -277,7 +277,12 @@ interface Subscription {
 ```typescript
 interface ProjectRehearsalMedia {
   id: string            // doc id
-  projectId: string     // e.g. 'black-diaspora-symphony', 'uwm-afro-caribbean-jazz'
+  projectId: string     // e.g. 'beam-training-orchestra', 'beam-professional-orchestra', 'black-diaspora-symphony', 'uwm-afro-caribbean-jazz'
+  ensembleId?: string   // 'beam-training-orchestra' | 'beam-professional-orchestra' | 'black-diaspora-symphony' | 'uwm-afro-caribbean-jazz' | 'chamber-ensemble'
+  ensembleName?: string // e.g. 'BEAM Training Orchestra', 'BEAM Professional Orchestra'
+  institutionName?: string // e.g. 'Steinway Gallery Orlando', 'UW-Milwaukee', 'Milwaukee Symphony Hall'
+  featuredMusicianName?: string // e.g. 'Cordie Ruckus', 'Dayvin Hallmon'
+  uploaderType?: 'participant' | 'institution' | 'ensemble_director' | 'admin'
   title: string         // "Bonds – Excerpt 1"
   description?: string  // optional notes about the clip
   date: Timestamp       // when the rehearsal happened (or upload date)

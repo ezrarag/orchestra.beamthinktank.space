@@ -180,6 +180,20 @@ export interface LiveLocationBeacon {
   lastBeaconTime?: string
 }
 
+export interface HoodFundAllocation {
+  travelPercent: number
+  housingPercent: number
+  mealsPercent: number
+  maintenancePercent: number
+}
+
+export const DEFAULT_HOOD_ALLOCATION: HoodFundAllocation = {
+  travelPercent: 40,
+  housingPercent: 35,
+  mealsPercent: 15,
+  maintenancePercent: 10
+}
+
 export interface ParticipantDemographics {
   fullName: string
   email: string
@@ -202,6 +216,8 @@ export interface ParticipantDemographics {
   uncompensatedRehearsalHours: number
   beamCoinBalance: number
   usdTotalEarned: number
+  hoodVillageBalance?: number
+  hoodAllocations?: HoodFundAllocation
   headshotUrl?: string
 }
 
@@ -237,6 +253,8 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   homeHub: 'Milwaukee, WI / Chicago, IL',
   isRoamingActive: true,
   roamingCity: 'Orlando, FL (Steinway Gallery Residency)',
+  hoodVillageBalance: 480,
+  hoodAllocations: DEFAULT_HOOD_ALLOCATION,
   infrastructureNeeds: [
     { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/reimbursement for multi-city travel.' },
     { id: 'housing', label: 'Residency Housing', needed: true, priority: 'medium', description: 'Overnight lodgings for Orlando Steinway recording session.' },

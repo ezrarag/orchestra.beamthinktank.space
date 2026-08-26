@@ -4,16 +4,16 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'beam-orchestra-platform.firebaseapp.com',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'beam-orchestra-platform',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'beam-orchestra-platform.firebasestorage.app',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
 }
 
-// Check if Firebase config is complete
-const isFirebaseConfigured = Object.values(firebaseConfig).every(value => value && value !== 'undefined')
+// Check if Firebase config has valid API key
+const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'undefined')
 const missingFirebaseKeys = Object.entries(firebaseConfig)
   .filter(([_, value]) => !value || value === 'undefined')
   .map(([key]) => key)
@@ -23,9 +23,9 @@ let db: any = null
 let auth: any = null
 let storage: any = null
 
-if (isFirebaseConfigured) {
-  try {
-    // Initialize Firebase (avoid duplicate initialization)
+try {
+  // Initialize Firebase (avoid duplicate initialization)
+  if (isFirebaseConfigured || getApps().length > 0) {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
     
     // Initialize Firebase services
@@ -41,18 +41,11 @@ if (isFirebaseConfigured) {
           : null
       })
     }
-  } catch (error) {
-    console.error('Firebase initialization failed:', error)
+  } else {
+    console.warn('Firebase API key missing in .env.local. Sign-in popup requires NEXT_PUBLIC_FIREBASE_API_KEY.')
   }
-} else {
-  if (!firebaseConfig.projectId || firebaseConfig.projectId === 'undefined') {
-    console.error(
-      'beam-orchestra-platform Firebase client: missing env vars. Chamber content will not load.'
-    )
-  }
-  console.warn('Firebase configuration incomplete. Please check your environment variables.')
-  console.warn('Missing variables:', missingFirebaseKeys)
+} catch (error) {
+  console.error('Firebase initialization error:', error)
 }
 
 export { db, auth, storage }
-export default app

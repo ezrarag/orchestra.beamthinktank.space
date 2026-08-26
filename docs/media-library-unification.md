@@ -16,17 +16,22 @@ This ensures consistency across:
 **Document Structure:**
 ```typescript
 {
-  projectId: string                    // e.g., "black-diaspora-symphony"
-  title: string                       // Display title
+  projectId: string                    // e.g., "beam-training-orchestra", "beam-professional-orchestra", "black-diaspora-symphony"
+  ensembleId?: string                  // Ensemble ID key
+  ensembleName?: string                // Ensemble title ("BEAM Training Orchestra", "BEAM Professional Orchestra", etc.)
+  institutionName?: string             // Associated host institution ("Steinway Gallery", "UW-Milwaukee", etc.)
+  featuredMusicianName?: string        // Featured solo participant or musician name
+  uploaderType?: string                // 'participant' | 'institution' | 'ensemble_director' | 'admin'
+  title: string                        // Display title
   description?: string                 // Optional description
-  date: Timestamp                     // Date of rehearsal/performance
-  url: string                         // Firebase Storage download URL or external URL
-  thumbnailUrl?: string               // Optional thumbnail image URL
-  private: boolean                    // false = public, true = subscription-only
-  instrumentGroup?: string            // Optional: "Strings", "Winds", "Brass", etc.
-  createdAt: Timestamp               // When document was created
-  updatedAt: Timestamp                // When document was last updated
-  uploadedBy?: string                 // User email or UID
+  date: Timestamp                      // Date of rehearsal/performance
+  url: string                          // Firebase Storage download URL or external URL
+  thumbnailUrl?: string                // Optional thumbnail image URL
+  private: boolean                     // false = public, true = subscription-only
+  instrumentGroup?: string             // Optional: "Strings", "Winds", "Brass", etc.
+  createdAt: Timestamp                // When document was created
+  updatedAt: Timestamp                 // When document was last updated
+  uploadedBy?: string                  // User email or UID
 }
 ```
 
