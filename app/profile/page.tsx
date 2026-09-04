@@ -102,6 +102,10 @@ export default function ParticipantProfilePage() {
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [videoModalTitle, setVideoModalTitle] = useState<string | null>(null)
 
+  // Spatial Canvas Mode vs Dashboard View Mode State
+  const [viewMode, setViewMode] = useState<'canvas' | 'dashboard'>('canvas')
+  const [activeCanvasFolder, setActiveCanvasFolder] = useState<number | null>(null)
+
   // Institutional Booking Dual-Write Modal State
   const [showRecordBookingModal, setShowRecordBookingModal] = useState(false)
   const [bookingTitle, setBookingTitle] = useState('')
@@ -833,6 +837,308 @@ export default function ParticipantProfilePage() {
           </div>
         )}
 
+        {/* SPATIAL 4-FOLDER CANVAS VIEW MODE (HTML Attachment Prototype) */}
+        {viewMode === 'canvas' && (
+          <div className="relative w-full max-w-6xl mx-auto my-6 px-4 sm:px-6 z-20">
+            <div 
+              onClick={() => setActiveCanvasFolder(null)}
+              className="relative w-full h-[760px] sm:h-[820px] rounded-[28px] overflow-hidden border border-white/15 bg-[#0A0B0E] shadow-2xl transition-all duration-300"
+            >
+              {/* Dynamic Radial Gradient Background */}
+              <div 
+                className={`absolute inset-0 transition-all duration-300 pointer-events-none ${
+                  activeCanvasFolder !== null ? 'blur-sm brightness-75' : ''
+                }`}
+                style={{
+                  background: 'radial-gradient(circle at 20% 80%, rgba(192,132,252,0.10), transparent 55%), radial-gradient(circle at 80% 10%, rgba(212,175,55,0.12), transparent 55%), linear-gradient(160deg,#1c1930,#141520 55%,#0A0B0E)'
+                }}
+              />
+
+              {/* Overlaid Musician Name & Handle (Bottom Left) */}
+              <div className="absolute bottom-9 left-10 z-20 pointer-events-none space-y-1">
+                <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
+                  {displayName}
+                </h1>
+                <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
+                  {handleName}
+                </p>
+              </div>
+
+              {/* FOLDER 0: GIGS (Top-Left) */}
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
+                }}
+                className="absolute top-[120px] sm:top-[140px] left-[10%] sm:left-[200px] z-22 group"
+              >
+                <div 
+                  className={`w-16 h-16 rounded-2xl bg-blue-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                    activeCanvasFolder === 0 
+                      ? 'border-blue-400 bg-blue-500/30 -translate-y-1 shadow-lg shadow-blue-500/20' 
+                      : 'border-white/20 group-hover:border-blue-400/60 group-hover:-translate-y-0.5'
+                  }`}
+                >
+                  <Building2 className="w-7 h-7 text-blue-400" />
+                </div>
+                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
+                  GIGS
+                </p>
+
+                {/* Fanned-out Cards Stack */}
+                <div 
+                  className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
+                    activeCanvasFolder === 0 
+                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                      : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}
+                >
+                  {events.slice(0, 5).map((evt, i) => {
+                    const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
+                    const translations = ['-130px', '-65px', '0px', '65px', '130px']
+                    const yOffsets = ['-70px', '-125px', '-145px', '-125px', '-70px']
+                    return (
+                      <div
+                        key={evt.id || i}
+                        className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
+                        style={{
+                          transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
+                        }}
+                      >
+                        <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
+                          {evt.type}
+                        </span>
+                        <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
+                          {evt.title}
+                        </p>
+                        <p className="text-[10px] text-white/50 mt-1 truncate">
+                          {evt.cityState}
+                        </p>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
+                          <span className="text-emerald-400">${evt.usdStipend} USD</span>
+                          <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* FOLDER 1: ECOSYSTEM & FUNDS (Top-Right) */}
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
+                }}
+                className="absolute top-[120px] sm:top-[140px] right-[10%] sm:left-[720px] z-22 group"
+              >
+                <div 
+                  className={`w-16 h-16 rounded-2xl bg-amber-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                    activeCanvasFolder === 1 
+                      ? 'border-amber-400 bg-amber-500/30 -translate-y-1 shadow-lg shadow-amber-500/20' 
+                      : 'border-white/20 group-hover:border-amber-400/60 group-hover:-translate-y-0.5'
+                  }`}
+                >
+                  <Coins className="w-7 h-7 text-amber-400" />
+                </div>
+                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
+                  ECOSYSTEM & FUNDS
+                </p>
+
+                {/* Fanned-out Fund Cards Stack */}
+                <div 
+                  className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
+                    activeCanvasFolder === 1 
+                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                      : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}
+                >
+                  {/* Card 1: Institutional Earnings */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowRecordBookingModal(true)
+                    }}
+                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-emerald-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
+                    style={{ transform: 'translate(-75px, -125px) rotate(-7deg)' }}
+                  >
+                    <p className="text-xl font-serif font-bold text-emerald-400">${profile?.usdTotalEarned || 0}</p>
+                    <p className="text-[9px] font-mono uppercase tracking-wider text-white/60 mt-1">Institutional Earnings</p>
+                    <span className="text-[8px] text-emerald-300 font-mono block mt-1">+ Dual-Write Booking</span>
+                  </div>
+
+                  {/* Card 2: Hood Village Fund */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowHoodAllocationModal(true)
+                    }}
+                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
+                    style={{ transform: 'translate(0px, -145px) rotate(0deg)' }}
+                  >
+                    <p className="text-xl font-serif font-bold text-amber-400">${(profile?.hoodVillageBalance || 0).toLocaleString()}</p>
+                    <p className="text-[9px] font-mono uppercase tracking-wider text-amber-300 mt-1">Hood Village Fund</p>
+                    <p className="text-[8px] text-white/50 mt-1 leading-tight">From hoods.beamthinktank.space + committed institutional bookings</p>
+                  </div>
+
+                  {/* Card 3: Events & Gigs Count */}
+                  <div
+                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl text-center"
+                    style={{ transform: 'translate(75px, -125px) rotate(7deg)' }}
+                  >
+                    <p className="text-xl font-serif font-bold text-purple-300">{events.length}</p>
+                    <p className="text-[9px] font-mono uppercase tracking-wider text-white/60 mt-1">Events & Gigs</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOLDER 2: MEDIA & PORTFOLIO (Bottom-Left) */}
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
+                }}
+                className="absolute top-[400px] sm:top-[420px] left-[10%] sm:left-[200px] z-22 group"
+              >
+                <div 
+                  className={`w-16 h-16 rounded-2xl bg-purple-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                    activeCanvasFolder === 2 
+                      ? 'border-purple-400 bg-purple-500/30 -translate-y-1 shadow-lg shadow-purple-500/20' 
+                      : 'border-white/20 group-hover:border-purple-400/60 group-hover:-translate-y-0.5'
+                  }`}
+                >
+                  <Video className="w-7 h-7 text-purple-400" />
+                </div>
+                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
+                  MEDIA & PORTFOLIO
+                </p>
+
+                {/* Fanned-out Media Cards Stack */}
+                <div 
+                  className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
+                    activeCanvasFolder === 2 
+                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                      : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}
+                >
+                  <div
+                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
+                    style={{ transform: 'translate(-85px, -95px) rotate(-7deg)' }}
+                  >
+                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">STEINWAY SESSION</span>
+                    <p className="text-xs font-bold text-white mt-1 leading-tight">Schumann Adagio & Allegro — Orlando</p>
+                  </div>
+
+                  <div
+                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
+                    style={{ transform: 'translate(0px, -120px) rotate(0deg)' }}
+                  >
+                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">ORCHESTRAL PERFORMANCE</span>
+                    <p className="text-xs font-bold text-white mt-1 leading-tight">Margaret Bonds — BDSO Annual Concert</p>
+                  </div>
+
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowCatalogModal(true)
+                    }}
+                    className="absolute w-44 p-3 rounded-2xl bg-gradient-to-br from-amber-400/20 to-black/80 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
+                    style={{ transform: 'translate(85px, -95px) rotate(7deg)' }}
+                  >
+                    <p className="text-xs font-bold text-amber-300">Browse BEAM Catalog →</p>
+                    <p className="text-[9px] text-white/50 mt-1">Attach recordings & masterworks</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOLDER 3: LOGISTICS (Bottom-Right) */}
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
+                }}
+                className="absolute top-[400px] sm:top-[420px] right-[10%] sm:left-[720px] z-22 group"
+              >
+                <div 
+                  className={`w-16 h-16 rounded-2xl bg-teal-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                    activeCanvasFolder === 3 
+                      ? 'border-teal-400 bg-teal-500/30 -translate-y-1 shadow-lg shadow-teal-500/20' 
+                      : 'border-white/20 group-hover:border-teal-400/60 group-hover:-translate-y-0.5'
+                  }`}
+                >
+                  <Truck className="w-7 h-7 text-teal-400" />
+                </div>
+                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
+                  LOGISTICS
+                </p>
+
+                {/* Fanned-out Logistics Cards Stack */}
+                <div 
+                  className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
+                    activeCanvasFolder === 3 
+                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                      : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}
+                >
+                  {/* Card 1: Live Beacon */}
+                  <div
+                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+                    style={{ transform: 'translate(-130px, -70px) rotate(-14deg)' }}
+                  >
+                    <p className="text-xs font-bold text-white">Live Location Beacon</p>
+                    <p className="text-[10px] text-white/60 mt-0.5 truncate">
+                      {isBroadcastingLocation ? `Broadcasting — ${liveBeaconCity}` : 'Paused'}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsBroadcastingLocation(!isBroadcastingLocation)
+                      }}
+                      className={`mt-2 w-10 h-5 rounded-full relative transition border border-white/20 ${
+                        isBroadcastingLocation ? 'bg-teal-400' : 'bg-white/20'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                          isBroadcastingLocation ? 'left-5' : 'left-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Card 2: Ground Transit */}
+                  <div
+                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+                    style={{ transform: 'translate(-65px, -125px) rotate(-7deg)' }}
+                  >
+                    <p className="text-xs font-bold text-white">Ground Transit</p>
+                    <span className="font-mono text-[9px] font-bold text-red-400 uppercase tracking-wider block mt-1">HIGH PRIORITY</span>
+                  </div>
+
+                  {/* Card 3: Housing */}
+                  <div
+                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+                    style={{ transform: 'translate(65px, -125px) rotate(7deg)' }}
+                  >
+                    <p className="text-xs font-bold text-white">Residency Housing</p>
+                    <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
+                  </div>
+
+                  {/* Card 4: Per Diem / Meals */}
+                  <div
+                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+                    style={{ transform: 'translate(130px, -70px) rotate(14deg)' }}
+                  >
+                    <p className="text-xs font-bold text-white">Per Diem / Meals</p>
+                    <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Viewport Height (68dvh) Hero Container */}
         <div className="relative w-full h-[68dvh] min-h-[360px] max-h-[640px] overflow-hidden bg-[#0A0B0E]">
           {/* Full-bleed Cover/Profile Photo or Dark Gradient Fallback */}
@@ -865,6 +1171,32 @@ export default function ParticipantProfilePage() {
                   <span>Signed In</span>
                 </span>
               ) : null}
+
+              {/* Spatial Canvas vs Dashboard View Mode Toggle Pill */}
+              <div className="flex items-center p-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-xs">
+                <button
+                  onClick={() => setViewMode('canvas')}
+                  className={`px-3 py-1 rounded-full font-mono text-[11px] font-bold transition flex items-center space-x-1.5 ${
+                    viewMode === 'canvas'
+                      ? 'bg-amber-400 text-black shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Spatial Canvas</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('dashboard')}
+                  className={`px-3 py-1 rounded-full font-mono text-[11px] font-bold transition flex items-center space-x-1.5 ${
+                    viewMode === 'dashboard'
+                      ? 'bg-amber-400 text-black shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  <Layers className="w-3 h-3" />
+                  <span>Dashboard</span>
+                </button>
+              </div>
 
               {/* How This Works ? Help Button */}
               <button
