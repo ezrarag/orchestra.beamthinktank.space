@@ -14,6 +14,7 @@ import {
   fetchParticipantProfile, 
   saveParticipantProfile, 
   ensureParticipantProfileExists,
+  dualWriteInstitutionalCommitmentAsGig,
   DEFAULT_EZRA_PROFILE,
   DEFAULT_EZRA_EVENTS,
   BEAM_CATALOG_WORKS,
@@ -64,7 +65,8 @@ import {
   Radio,
   Tv,
   ShieldCheck,
-  SlidersHorizontal
+  SlidersHorizontal,
+  HelpCircle
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
@@ -95,6 +97,19 @@ export default function ParticipantProfilePage() {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showLogisticsDrawer, setShowLogisticsDrawer] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+
+  // Redesign Packet: Help Modal & Video Explainer Modal State
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [videoModalTitle, setVideoModalTitle] = useState<string | null>(null)
+
+  // Institutional Booking Dual-Write Modal State
+  const [showRecordBookingModal, setShowRecordBookingModal] = useState(false)
+  const [bookingTitle, setBookingTitle] = useState('')
+  const [bookingVenue, setBookingVenue] = useState('')
+  const [bookingCityState, setBookingCityState] = useState('Milwaukee, WI')
+  const [bookingDate, setBookingDate] = useState('2026-03-15')
+  const [bookingType, setBookingType] = useState<EventPlayed['type']>('Full Symphony')
+  const [bookingStipend, setBookingStipend] = useState<number>(250)
 
   const handleShareProfile = () => {
     const shareUrl = typeof window !== 'undefined' 
@@ -197,6 +212,38 @@ export default function ParticipantProfilePage() {
     setShowHoodAllocationModal(false)
     if (targetEmail) {
       await saveParticipantProfile(targetEmail, { hoodAllocations: updated }, user?.uid)
+    }
+  }
+
+  const handleRecordInstitutionalBooking = async () => {
+    if (!bookingTitle.trim() || !bookingVenue.trim() || !bookingCityState.trim()) {
+      alert('Please fill out the contract title, venue, and city/state.')
+      return
+    }
+    const stipendNum = Number(bookingStipend) || 200
+    try {
+      const result = await dualWriteInstitutionalCommitmentAsGig(
+        targetEmail || BDSO_SANDBOX_EMAIL,
+        {
+          title: bookingTitle.trim(),
+          venue: bookingVenue.trim(),
+          cityState: bookingCityState.trim(),
+          date: bookingDate || new Date().toISOString().split('T')[0],
+          type: bookingType,
+          usdStipend: stipendNum,
+          status: 'Confirmed'
+        },
+        user?.uid
+      )
+      setEvents(result.events)
+      setProfile(result.profile)
+      setShowRecordBookingModal(false)
+      setBookingTitle('')
+      setBookingVenue('')
+      alert(`Institutional booking commitment recorded! Dual-written to Gigs list and updated total earnings to $${result.profile.usdTotalEarned}.`)
+    } catch (err) {
+      console.error('Error recording institutional booking:', err)
+      alert('Could not record booking. Please try again.')
     }
   }
 
@@ -819,6 +866,15 @@ export default function ParticipantProfilePage() {
                 </span>
               ) : null}
 
+              {/* How This Works ? Help Button */}
+              <button
+                onClick={() => setShowHelpModal(true)}
+                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-lg"
+                title="How This Works Explainer"
+              >
+                <HelpCircle className="w-5 h-5 text-amber-400" />
+              </button>
+
               {/* ... Dropdown Action Menu */}
               <div className="relative">
                 <button
@@ -975,9 +1031,20 @@ export default function ParticipantProfilePage() {
 
             {/* Stats Bar */}
             <div className="w-full grid grid-cols-3 gap-3 text-center">
-              <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
+              {/* Clickable Institutional Earnings Card (Dual-Write Dual-Source Sync) */}
+              <div
+                onClick={() => setShowRecordBookingModal(true)}
+                className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 to-black/60 backdrop-blur-md border border-emerald-500/30 hover:border-emerald-500/60 transition cursor-pointer group shadow-lg text-center space-y-1"
+                title="Click to test dual-writing an institutional booking commitment"
+              >
                 <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 0}</p>
-                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Institutional Earnings</p>
+                <p className="text-xs font-semibold text-emerald-300 uppercase font-sans tracking-wider">
+                  Institutional Earnings
+                </p>
+                <div className="inline-flex items-center space-x-1 text-[10px] text-emerald-300/70 group-hover:text-emerald-300 transition font-mono">
+                  <Plus className="w-3 h-3 text-emerald-400" />
+                  <span>+ Record Booking Dual-Write</span>
+                </div>
               </div>
 
               {/* Clickable Hood Village Support Fund Card */}
@@ -2156,6 +2223,268 @@ export default function ParticipantProfilePage() {
               className="w-full py-2 text-xs text-white/40 hover:text-white font-medium pt-2"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Record Institutional Booking Dual-Write Modal */}
+      {showRecordBookingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-lg p-6 rounded-3xl bg-[#14151C] border border-emerald-500/40 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-serif font-bold text-white">Record Institutional Booking (Dual-Write)</h3>
+                  <p className="text-xs text-white/50">Syncs institutional contract commitment directly as a gig & updates stipend earnings.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowRecordBookingModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">Contract / Concert Title</label>
+                <input
+                  type="text"
+                  value={bookingTitle}
+                  onChange={(e) => setBookingTitle(e.target.value)}
+                  placeholder="e.g. BDSO Annual Concert at Bradley Symphony Center"
+                  className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">Venue Name</label>
+                  <input
+                    type="text"
+                    value={bookingVenue}
+                    onChange={(e) => setBookingVenue(e.target.value)}
+                    placeholder="e.g. Miller High Life Theatre"
+                    className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">City & State</label>
+                  <input
+                    type="text"
+                    value={bookingCityState}
+                    onChange={(e) => setBookingCityState(e.target.value)}
+                    placeholder="e.g. Milwaukee, WI"
+                    className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">Performance Date</label>
+                  <input
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">Gig Category</label>
+                  <select
+                    value={bookingType}
+                    onChange={(e) => setBookingType(e.target.value as EventPlayed['type'])}
+                    className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                  >
+                    <option value="Full Symphony">Full Symphony</option>
+                    <option value="Chamber Residency">Chamber Residency</option>
+                    <option value="Sectional & Workshop">Sectional & Workshop</option>
+                    <option value="Gala Showcase">Gala Showcase</option>
+                    <option value="Tour">Tour</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-1 uppercase tracking-wider font-mono">Stipend Amount ($ USD)</label>
+                  <input
+                    type="number"
+                    value={bookingStipend}
+                    onChange={(e) => setBookingStipend(Number(e.target.value))}
+                    className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white font-sans focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-white/10 flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setShowRecordBookingModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRecordInstitutionalBooking}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-bold transition flex items-center space-x-1.5 shadow-lg"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Confirm & Dual-Write Booking</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* How This Works Explainer Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-xl p-6 rounded-3xl bg-[#14151D] border border-amber-400/40 space-y-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-white">How This Works — Ecosystem Architecture</h3>
+                  <p className="text-xs text-white/60">Overview of your musician profile, dual funding sources, and logistics.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHelpModal(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Area 1: Gigs */}
+              <div className="p-4 rounded-2xl bg-black/50 border border-blue-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Building2 className="w-4 h-4 text-blue-400" />
+                    <span>1. Gigs</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setShowHelpModal(false)
+                      setVideoModalTitle('Gigs')
+                    }}
+                    className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[10px] font-bold flex items-center space-x-1 hover:bg-blue-500/30 transition"
+                  >
+                    <PlayCircle className="w-3 h-3" />
+                    <span>Watch Explainer</span>
+                  </button>
+                </div>
+                <p className="text-white/70 leading-relaxed">
+                  Contract and performance opportunities pitched directly to you. Includes stipends ($ USD) and BEAM credit allocations for regional work.
+                </p>
+              </div>
+
+              {/* Area 2: Ecosystem & Funds */}
+              <div className="p-4 rounded-2xl bg-black/50 border border-amber-400/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Coins className="w-4 h-4 text-amber-400" />
+                    <span>2. Ecosystem & Funds (Dual-Source Support)</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setShowHelpModal(false)
+                      setVideoModalTitle('Ecosystem & Funds')
+                    }}
+                    className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold flex items-center space-x-1 hover:bg-amber-400/30 transition"
+                  >
+                    <PlayCircle className="w-3 h-3" />
+                    <span>Watch Explainer</span>
+                  </button>
+                </div>
+                <p className="text-white/70 leading-relaxed">
+                  Support flows from two sources: patrons backing you through the Hood (<code className="text-amber-300 font-mono">hoods.beamthinktank.space</code>), and institutions committing directly to book you. An institutional commitment dual-writes as an upcoming or past gig.
+                </p>
+              </div>
+
+              {/* Area 3: Media & Portfolio */}
+              <div className="p-4 rounded-2xl bg-black/50 border border-purple-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Video className="w-4 h-4 text-purple-400" />
+                    <span>3. Media & Portfolio</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setShowHelpModal(false)
+                      setVideoModalTitle('Media & Portfolio')
+                    }}
+                    className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold flex items-center space-x-1 hover:bg-purple-500/30 transition"
+                  >
+                    <PlayCircle className="w-3 h-3" />
+                    <span>Watch Explainer</span>
+                  </button>
+                </div>
+                <p className="text-white/70 leading-relaxed">
+                  Your studio recordings, Steinway sessions, and CV, presented directly to institutions and partner halls considering you for contracts.
+                </p>
+              </div>
+
+              {/* Area 4: Logistics */}
+              <div className="p-4 rounded-2xl bg-black/50 border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Truck className="w-4 h-4 text-emerald-400" />
+                    <span>4. Logistics & Support</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setShowHelpModal(false)
+                      setVideoModalTitle('Logistics')
+                    }}
+                    className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center space-x-1 hover:bg-emerald-500/30 transition"
+                  >
+                    <PlayCircle className="w-3 h-3" />
+                    <span>Watch Explainer</span>
+                  </button>
+                </div>
+                <p className="text-white/70 leading-relaxed">
+                  Life360 GPS location beacon sharing plus ground transit, residency housing, and per diem support status dispatching.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowHelpModal(false)}
+              className="w-full py-3 rounded-xl bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-lg mt-2"
+            >
+              Done & Close Explainer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Video Explainer Preview Modal */}
+      {videoModalTitle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans">
+          <div className="w-full max-w-lg p-6 rounded-3xl bg-[#0F1015] border border-white/20 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <p className="text-sm font-bold text-white">{videoModalTitle} — Explainer Video</p>
+              <button onClick={() => setVideoModalTitle(null)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="aspect-video bg-black/70 rounded-2xl border border-white/10 flex flex-col items-center justify-center space-y-2 p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                <PlayCircle className="w-6 h-6" />
+              </div>
+              <p className="text-xs text-white/80 font-semibold">{videoModalTitle} Architecture Overview</p>
+              <p className="text-[11px] text-white/50">Explainer clip for {videoModalTitle}. Dual-source funding & logistics overview.</p>
+            </div>
+            <button
+              onClick={() => setVideoModalTitle(null)}
+              className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition"
+            >
+              Close Video
             </button>
           </div>
         </div>

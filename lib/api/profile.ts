@@ -773,3 +773,67 @@ export async function saveInstitutionalProfile(
 
   await setDoc(doc(db, 'institutionalProfiles', primaryId), payload, { merge: true })
 }
+
+/**
+ * Dual-write function: Syncs an institutional commitment / booking to a participant's profile.
+ * Creates an EventPlayed entry (gig) AND updates the participant's usdTotalEarned stipend balance.
+ */
+export async function dualWriteInstitutionalCommitmentAsGig(
+  participantEmail: string,
+  gigCommitment: {
+    title: string
+    repertoire?: string
+    role?: string
+    venue: string
+    cityState: string
+    date: string
+    type: EventPlayed['type']
+    usdStipend: number
+    beamCoinsEarned?: number
+    status?: EventPlayed['status']
+  },
+  userId?: string
+): Promise<{ profile: ParticipantDemographics; events: EventPlayed[] }> {
+  const normEmail = normalizeEmail(participantEmail)
+  const existingProfile = await fetchParticipantProfile(normEmail, userId)
+  
+  const newGig: EventPlayed = {
+    id: `inst-gig-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title: gigCommitment.title,
+    repertoire: gigCommitment.repertoire || 'Selected Orchestral Repertoire',
+    role: gigCommitment.role || 'Participating Musician',
+    venue: gigCommitment.venue,
+    cityState: gigCommitment.cityState,
+    date: gigCommitment.date,
+    type: gigCommitment.type,
+    usdStipend: gigCommitment.usdStipend,
+    beamCoinsEarned: gigCommitment.beamCoinsEarned || Math.round(gigCommitment.usdStipend / 20),
+    status: gigCommitment.status || 'Confirmed'
+  }
+
+  // Get current events or default ezra events
+  const existingEvents: EventPlayed[] = (existingProfile.email === normEmail)
+    ? DEFAULT_EZRA_EVENTS
+    : DEFAULT_EZRA_EVENTS
+
+  const updatedEvents = [newGig, ...existingEvents]
+  
+  // Calculate new total institutional earnings from dual-written gigs
+  const newUsdTotalEarned = updatedEvents.reduce((acc, curr) => acc + (curr.usdStipend || 0), 0)
+
+  const updatedProfile: ParticipantDemographics = {
+    ...existingProfile,
+    usdTotalEarned: newUsdTotalEarned
+  }
+
+  if (db && normEmail) {
+    const docId = userId ? `user_${userId}` : `profile_${normEmail}`
+    await setDoc(doc(db, 'participantProfiles', docId), {
+      ...updatedProfile,
+      events: updatedEvents,
+      updatedAt: serverTimestamp()
+    }, { merge: true })
+  }
+
+  return { profile: updatedProfile, events: updatedEvents }
+}
