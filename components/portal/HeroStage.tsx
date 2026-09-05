@@ -276,100 +276,67 @@ export default function HeroStage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute left-0 top-full mt-2 w-72 rounded-2xl bg-[#090b14]/95 backdrop-blur-xl border border-white/15 p-2 shadow-2xl z-50 text-left normal-case tracking-normal"
+                    className="absolute left-0 top-full mt-2.5 w-[340px] rounded-[18px] bg-[#090b14]/97 backdrop-blur-2xl border border-white/12 p-2.5 shadow-[0_24px_60px_rgba(0,0,0,0.55)] z-50 text-left normal-case tracking-normal"
                   >
-                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300/80 border-b border-white/10 mb-1">
-                      Network Destinations & Profiles
+                    <div className="px-2.5 pt-2 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/40">
+                      Switch Portal
                     </div>
 
-                    {/* 1. Musician Participants Profile */}
+                    {/* 1. Musician & Crew Portal */}
                     <Link
                       href="/profile"
                       onClick={() => {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
-                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white group"
                     >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-emerald-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-white">Participants</span>
-                          <span className="text-[10px] font-mono text-emerald-400 font-semibold">(Musicians)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          Musicians, Section Leaders & Resident Cellists
-                        </div>
-                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#34d399]" />
+                      <span className="flex-1 text-[13px] font-semibold text-white">Musician &amp; Crew Portal</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
 
-                    {/* 2. Institutional Cohorts & Businesses */}
+                    {/* 2. Presenter & Venue Portal */}
                     <Link
                       href="/institution/profile"
                       onClick={() => {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
-                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white group"
                     >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-purple-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-purple-300">Institutions</span>
-                          <span className="text-[10px] font-mono text-purple-400 font-semibold">(BADO / BDSO)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          Ballet & Dance Orchestra, BDSO & Business Partners
-                        </div>
-                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#c084fc]" />
+                      <span className="flex-1 text-[13px] font-semibold text-white">Presenter &amp; Venue Portal</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
 
-                    {/* 3. Studio & Media Vault (Audience Viewers) */}
+                    {/* 3. Watch & Subscribe */}
                     <Link
                       href="/audience/profile"
                       onClick={() => {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
-                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white"
+                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white group"
                     >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-blue-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-blue-300">Studio & Media Vault</span>
-                          <span className="text-[10px] font-mono text-blue-400 font-semibold">(Viewers)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          Watch Recital Recordings, Steinway Takes & Streams
-                        </div>
-                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#60a5fa]" />
+                      <span className="flex-1 text-[13px] font-semibold text-white">Watch &amp; Subscribe</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
 
-                    {/* 4. General Orchestra Admin */}
+                    {/* 4. Admin Directory */}
                     <Link
                       href="/admin/login"
                       onClick={() => {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
-                      className="w-full flex items-start space-x-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white/80 hover:text-white border-t border-white/10 pt-2"
+                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 border-t border-white/8 mt-0.5 pt-3 group"
                     >
-                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 bg-amber-400" />
-                      <div>
-                        <div className="text-xs font-bold flex items-center justify-between gap-2">
-                          <span className="text-amber-300">Orchestra Admin</span>
-                          <span className="text-[10px] font-mono text-amber-400 font-semibold">(Admin)</span>
-                        </div>
-                        <div className="text-[11px] text-white/50 leading-tight mt-0.5">
-                          Central Directory for ezra@readyaimgo.biz
-                        </div>
-                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#fbbf24]" />
+                      <span className="flex-1 text-[13px] font-semibold text-[#fbbf24]">Admin Directory</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
-
-                    {/* Section Divider */}
-                    <div className="px-3 pt-2 text-[9px] font-bold uppercase tracking-[0.2em] text-white/30 border-t border-white/10 mt-1 mb-0.5">
-                      STAGE DOORS & CAROUSEL
-                    </div>
 
                     {CATEGORIES.map((cat, idx) => (
                       <button
