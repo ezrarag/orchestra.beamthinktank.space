@@ -66,7 +66,8 @@ import {
   Tv,
   ShieldCheck,
   SlidersHorizontal,
-  HelpCircle
+  HelpCircle,
+  ArrowUpRight
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
