@@ -32,6 +32,7 @@ import {
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { collection, getDocs, addDoc, query, where, serverTimestamp } from 'firebase/firestore'
 import { 
   DEFAULT_BADO_FLORIDA_PROFILE, 
   DEFAULT_BDSO_PROFILE,
@@ -86,6 +87,7 @@ const INITIAL_PAST_REQUESTS: PastRequestRow[] = [
 export default function InstitutionalCohortProfile() {
   const { user, loading: authLoading } = useUserRole()
   const [businessProfile, setBusinessProfile] = useState<InstitutionalBusinessProfile>(DEFAULT_BADO_FLORIDA_PROFILE)
+  const [rosterMusicians, setRosterMusicians] = useState<RosterMusician[]>(INITIAL_ROSTER_MUSICIANS)
   const [activeTab, setActiveTab] = useState<'roster' | 'billing'>('roster')
   const [activeInstrumentFilter, setActiveInstrumentFilter] = useState<string>('All')
   
@@ -121,6 +123,72 @@ export default function InstitutionalCohortProfile() {
       }
     }
     loadProfile()
+  }, [user])
+
+  // Fetch real Firestore participant profiles & institutional requests
+  useEffect(() => {
+    async function loadRealRosterAndRequests() {
+      if (!db) return
+      try {
+        // 1. Fetch real participant profiles from Firestore
+        const snap = await getDocs(collection(db, 'participantProfiles'))
+        if (!snap.empty) {
+          const loaded: RosterMusician[] = snap.docs.map((docSnap, idx) => {
+            const d = docSnap.data() as any
+            const rawInst = d.primaryInstrument || (Array.isArray(d.disciplineTags) ? d.disciplineTags[0] : null) || 'Strings'
+            let instClean = 'Violin'
+            if (rawInst.toLowerCase().includes('cello')) instClean = 'Cello'
+            else if (rawInst.toLowerCase().includes('viola')) instClean = 'Viola'
+            else if (rawInst.toLowerCase().includes('bass')) instClean = 'Bass'
+            else if (rawInst.toLowerCase().includes('piano')) instClean = 'Piano'
+            else if (rawInst.toLowerCase().includes('flute')) instClean = 'Flute'
+            else if (rawInst.toLowerCase().includes('oboe')) instClean = 'Oboe'
+            else if (rawInst.toLowerCase().includes('clarinet')) instClean = 'Clarinet'
+            else if (rawInst.toLowerCase().includes('percussion')) instClean = 'Percussion'
+
+            let rate = 180
+            if (instClean === 'Cello') rate = 195
+            else if (instClean === 'Viola') rate = 165
+            else if (instClean === 'Bass') rate = 175
+            else if (instClean === 'Piano') rate = 185
+            else if (['Flute', 'Oboe', 'Clarinet'].includes(instClean)) rate = 160
+            else if (instClean === 'Percussion') rate = 170
+
+            return {
+              id: docSnap.id,
+              name: d.fullName || d.name || d.email?.split('@')[0] || `Participant ${idx + 1}`,
+              instrument: instClean,
+              available: Boolean(d.isRoamingActive || d.current_live_location?.isBroadcasting || idx % 4 !== 2),
+              rate: rate
+            }
+          })
+
+          const ids = new Set(loaded.map(l => l.name.toLowerCase()))
+          const merged = [...loaded, ...INITIAL_ROSTER_MUSICIANS.filter(m => !ids.has(m.name.toLowerCase()))]
+          setRosterMusicians(merged)
+        }
+
+        // 2. Fetch real past requests for current user if logged in
+        if (user?.email) {
+          const reqSnap = await getDocs(query(collection(db, 'institutionalRequests'), where('email', '==', user.email)))
+          if (!reqSnap.empty) {
+            const loadedReqs: PastRequestRow[] = reqSnap.docs.map(docSnap => {
+              const d = docSnap.data() as any
+              return {
+                id: docSnap.id,
+                title: d.title || 'Cohort Booking Request',
+                amountLabel: d.amountLabel || '-$500.00',
+                date: d.createdAt?.toDate ? d.createdAt.toDate().toISOString().split('T')[0] : (d.date || '2026-02-01')
+              }
+            })
+            setPastRequests(loadedReqs)
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load real Firestore roster/requests:', err)
+      }
+    }
+    loadRealRosterAndRequests()
   }, [user])
 
   const handleGoogleSignIn = async () => {
@@ -159,19 +227,19 @@ export default function InstitutionalCohortProfile() {
   // Instrument Filters List
   const instrumentList = useMemo(() => {
     const set = new Set<string>()
-    INITIAL_ROSTER_MUSICIANS.forEach(m => set.add(m.instrument))
+    rosterMusicians.forEach(m => set.add(m.instrument))
     return ['All', ...Array.from(set)]
-  }, [])
+  }, [rosterMusicians])
 
   // Visible Roster filtered by Instrument
   const visibleMusicians = useMemo(() => {
-    if (activeInstrumentFilter === 'All') return INITIAL_ROSTER_MUSICIANS
-    return INITIAL_ROSTER_MUSICIANS.filter(m => m.instrument === activeInstrumentFilter)
-  }, [activeInstrumentFilter])
+    if (activeInstrumentFilter === 'All') return rosterMusicians
+    return rosterMusicians.filter(m => m.instrument === activeInstrumentFilter)
+  }, [activeInstrumentFilter, rosterMusicians])
 
   // Stat dots computation for 6x3 visualization grid
-  const availableCount = useMemo(() => INITIAL_ROSTER_MUSICIANS.filter(m => m.available).length, [])
-  const totalRosterCount = INITIAL_ROSTER_MUSICIANS.length
+  const availableCount = useMemo(() => rosterMusicians.filter(m => m.available).length, [rosterMusicians])
+  const totalRosterCount = rosterMusicians.length
   
   const statDots = useMemo(() => {
     const dots = []
@@ -186,8 +254,8 @@ export default function InstitutionalCohortProfile() {
 
   // Cart Calculations
   const cartMusicians = useMemo(() => {
-    return INITIAL_ROSTER_MUSICIANS.filter(m => cart.includes(m.id))
-  }, [cart])
+    return rosterMusicians.filter(m => cart.includes(m.id))
+  }, [cart, rosterMusicians])
 
   const cartTotal = useMemo(() => {
     return cartMusicians.reduce((sum, m) => sum + m.rate, 0)
@@ -202,7 +270,7 @@ export default function InstitutionalCohortProfile() {
     })
   }
 
-  const handleSendRequest = () => {
+  const handleSendRequest = async () => {
     if (cart.length === 0) return
 
     const summaryText = cartMusicians.map(m => m.instrument).join(', ')
@@ -218,6 +286,25 @@ export default function InstitutionalCohortProfile() {
     }
 
     setPastRequests(prev => [newRequest, ...prev])
+
+    // Save real request to Firestore
+    if (db && user?.email) {
+      try {
+        await addDoc(collection(db, 'institutionalRequests'), {
+          userUid: user.uid || null,
+          email: user.email,
+          organizationName: businessProfile.organizationName,
+          title: newRequest.title,
+          amountLabel: newRequest.amountLabel,
+          paymentMethod,
+          musicianIds: cart,
+          createdAt: serverTimestamp()
+        })
+      } catch (err) {
+        console.warn('Firestore request write error:', err)
+      }
+    }
+
     setToastNotice(`Booking Request Sent for ${cart.length} Musician(s)! Total: $${cartTotal}`)
     setCart([])
     setDrawerOpen(false)
