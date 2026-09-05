@@ -103,7 +103,7 @@ export default function ParticipantProfilePage() {
   const [videoModalTitle, setVideoModalTitle] = useState<string | null>(null)
 
   // Spatial Canvas Mode vs Dashboard View Mode State
-  const [viewMode, setViewMode] = useState<'canvas' | 'dashboard'>('canvas')
+  const [layoutVariant, setLayoutVariant] = useState<'dock' | 'scattered'>('dock')
   const [activeCanvasFolder, setActiveCanvasFolder] = useState<number | null>(null)
 
   // Institutional Booking Dual-Write Modal State
@@ -218,6 +218,12 @@ export default function ParticipantProfilePage() {
       await saveParticipantProfile(targetEmail, { hoodAllocations: updated }, user?.uid)
     }
   }
+
+  // Calculated Fund & Balance Totals
+  const allocatedHoodAmount = (profile?.hoodVillageBalance || 0).toLocaleString()
+  const institutionalEarningsTotal = (profile?.usdTotalEarned || 0).toLocaleString()
+  const totalFundingsCombined = ((profile?.hoodVillageBalance || 0) + (profile?.usdTotalEarned || 0)).toLocaleString()
+  const beamCoinsTotal = (profile?.beamCoinBalance || events.reduce((acc, e) => acc + (e.beamCoinsEarned || 0), 0)).toLocaleString()
 
   const handleRecordInstitutionalBooking = async () => {
     if (!bookingTitle.trim() || !bookingVenue.trim() || !bookingCityState.trim()) {
@@ -794,9 +800,10 @@ export default function ParticipantProfilePage() {
 
   const displayName = editName || user?.displayName || profile?.fullName || targetEmail.split('@')[0]
   const handleName = `@${(editEmail || targetEmail).split('@')[0]}`
+  const bgPhoto = user?.photoURL || profilePhoto || profile?.headshotUrl || ''
 
   return (
-    <div className="min-h-screen bg-[#07080A] text-white font-sans selection:bg-white/20">
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0A0B0E] text-white font-sans select-none">
       
       {/* Hidden File Inputs */}
       <input
@@ -821,15 +828,39 @@ export default function ParticipantProfilePage() {
         className="hidden"
       />
 
-      {/* Main Full Viewport Width Container */}
-      <div className="relative min-h-screen w-full flex flex-col justify-between overflow-hidden shadow-2xl bg-[#0F1015]">
-        
+      {/* 100vh x 100vw VIEWPORT LOCKED SPATIAL CANVAS CONTAINER */}
+      <div 
+        onClick={() => setActiveCanvasFolder(null)}
+        className="relative w-full h-full overflow-hidden flex flex-col justify-between"
+      >
+        {/* Dynamic Ambient Background Photo (Google Social Login Photo) */}
+        {bgPhoto ? (
+          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <img
+              src={bgPhoto}
+              alt={displayName}
+              className="w-full h-full object-cover opacity-35 filter blur-[3px] scale-105 transition-all duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#0A0B0E]/90" />
+          </div>
+        ) : null}
+
+        {/* Ambient Radial Gradient Overlay (Semi-transparent so photo shows behind) */}
+        <div 
+          className={`absolute inset-0 transition-all duration-300 pointer-events-none z-[1] ${
+            activeCanvasFolder !== null ? 'blur-sm brightness-75' : ''
+          }`}
+          style={{
+            background: 'radial-gradient(circle at 20% 80%, rgba(192,132,252,0.22), transparent 55%), radial-gradient(circle at 80% 10%, rgba(212,175,55,0.25), transparent 55%), linear-gradient(160deg, rgba(28,25,48,0.65), rgba(20,21,32,0.80) 55%, rgba(10,11,14,0.92))'
+          }}
+        />
+
         {/* Sandbox Preview Banner */}
         {isSandboxPreview && !user && (
-          <div className="bg-amber-500/10 border-b border-amber-500/30 px-6 py-2 flex items-center justify-between text-xs font-mono text-amber-200">
+          <div className="absolute top-0 inset-x-0 z-40 bg-amber-500/10 border-b border-amber-500/30 px-6 py-1.5 flex items-center justify-between text-xs font-mono text-amber-200">
             <span>⚡ SANDBOX PREVIEW (BDSO CORE)</span>
             <button
-              onClick={() => setIsSandboxPreview(false)}
+              onClick={(e) => { e.stopPropagation(); setIsSandboxPreview(false); }}
               className="underline text-amber-300 hover:text-white"
             >
               Exit Preview
@@ -837,1128 +868,615 @@ export default function ParticipantProfilePage() {
           </div>
         )}
 
-        {/* SPATIAL 4-FOLDER CANVAS VIEW MODE (HTML Attachment Prototype) */}
-        {viewMode === 'canvas' && (
-          <div className="relative w-full max-w-6xl mx-auto my-6 px-4 sm:px-6 z-20">
-            <div 
-              onClick={() => setActiveCanvasFolder(null)}
-              className="relative w-full h-[760px] sm:h-[820px] rounded-[28px] overflow-hidden border border-white/15 bg-[#0A0B0E] shadow-2xl transition-all duration-300"
-            >
-              {/* Dynamic Radial Gradient Background */}
-              <div 
-                className={`absolute inset-0 transition-all duration-300 pointer-events-none ${
-                  activeCanvasFolder !== null ? 'blur-sm brightness-75' : ''
-                }`}
-                style={{
-                  background: 'radial-gradient(circle at 20% 80%, rgba(192,132,252,0.10), transparent 55%), radial-gradient(circle at 80% 10%, rgba(212,175,55,0.12), transparent 55%), linear-gradient(160deg,#1c1930,#141520 55%,#0A0B0E)'
-                }}
-              />
+        {/* Top Floating Control Bar Overlay */}
+        <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-6 pointer-events-auto">
+          {/* Top-Left: Close X Button */}
+          <Link
+            href="/"
+            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
+            title="Return Home"
+          >
+            <X className="w-5 h-5" />
+          </Link>
 
-              {/* Overlaid Musician Name & Handle (Bottom Left) */}
-              <div className="absolute bottom-9 left-10 z-20 pointer-events-none space-y-1">
-                <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
-                  {displayName}
-                </h1>
-                <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
-                  {handleName}
-                </p>
-              </div>
+          {/* Top-Right: Status Badge, Help ? Button, Context ... Menu */}
+          <div className="flex items-center space-x-3 relative">
+            {user || isSandboxPreview ? (
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1.5 shadow-lg">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Signed In</span>
+              </span>
+            ) : null}
 
-              {/* FOLDER 0: GIGS (Top-Left) */}
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
-                }}
-                className="absolute top-[120px] sm:top-[140px] left-[10%] sm:left-[200px] z-22 group"
-              >
-                <div 
-                  className={`w-16 h-16 rounded-2xl bg-blue-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                    activeCanvasFolder === 0 
-                      ? 'border-blue-400 bg-blue-500/30 -translate-y-1 shadow-lg shadow-blue-500/20' 
-                      : 'border-white/20 group-hover:border-blue-400/60 group-hover:-translate-y-0.5'
-                  }`}
-                >
-                  <Building2 className="w-7 h-7 text-blue-400" />
-                </div>
-                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
-                  GIGS
-                </p>
-
-                {/* Fanned-out Cards Stack */}
-                <div 
-                  className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
-                    activeCanvasFolder === 0 
-                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
-                      : 'opacity-0 translate-y-4 pointer-events-none'
-                  }`}
-                >
-                  {events.slice(0, 5).map((evt, i) => {
-                    const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
-                    const translations = ['-130px', '-65px', '0px', '65px', '130px']
-                    const yOffsets = ['-70px', '-125px', '-145px', '-125px', '-70px']
-                    return (
-                      <div
-                        key={evt.id || i}
-                        className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
-                        style={{
-                          transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
-                        }}
-                      >
-                        <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
-                          {evt.type}
-                        </span>
-                        <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
-                          {evt.title}
-                        </p>
-                        <p className="text-[10px] text-white/50 mt-1 truncate">
-                          {evt.cityState}
-                        </p>
-                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
-                          <span className="text-emerald-400">${evt.usdStipend} USD</span>
-                          <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* FOLDER 1: ECOSYSTEM & FUNDS (Top-Right) */}
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
-                }}
-                className="absolute top-[120px] sm:top-[140px] right-[10%] sm:left-[720px] z-22 group"
-              >
-                <div 
-                  className={`w-16 h-16 rounded-2xl bg-amber-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                    activeCanvasFolder === 1 
-                      ? 'border-amber-400 bg-amber-500/30 -translate-y-1 shadow-lg shadow-amber-500/20' 
-                      : 'border-white/20 group-hover:border-amber-400/60 group-hover:-translate-y-0.5'
-                  }`}
-                >
-                  <Coins className="w-7 h-7 text-amber-400" />
-                </div>
-                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
-                  ECOSYSTEM & FUNDS
-                </p>
-
-                {/* Fanned-out Fund Cards Stack */}
-                <div 
-                  className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
-                    activeCanvasFolder === 1 
-                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
-                      : 'opacity-0 translate-y-4 pointer-events-none'
-                  }`}
-                >
-                  {/* Card 1: Institutional Earnings */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowRecordBookingModal(true)
-                    }}
-                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-emerald-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
-                    style={{ transform: 'translate(-75px, -125px) rotate(-7deg)' }}
-                  >
-                    <p className="text-xl font-serif font-bold text-emerald-400">${profile?.usdTotalEarned || 0}</p>
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-white/60 mt-1">Institutional Earnings</p>
-                    <span className="text-[8px] text-emerald-300 font-mono block mt-1">+ Dual-Write Booking</span>
-                  </div>
-
-                  {/* Card 2: Hood Village Fund */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowHoodAllocationModal(true)
-                    }}
-                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
-                    style={{ transform: 'translate(0px, -145px) rotate(0deg)' }}
-                  >
-                    <p className="text-xl font-serif font-bold text-amber-400">${(profile?.hoodVillageBalance || 0).toLocaleString()}</p>
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-amber-300 mt-1">Hood Village Fund</p>
-                    <p className="text-[8px] text-white/50 mt-1 leading-tight">From hoods.beamthinktank.space + committed institutional bookings</p>
-                  </div>
-
-                  {/* Card 3: Events & Gigs Count */}
-                  <div
-                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl text-center"
-                    style={{ transform: 'translate(75px, -125px) rotate(7deg)' }}
-                  >
-                    <p className="text-xl font-serif font-bold text-purple-300">{events.length}</p>
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-white/60 mt-1">Events & Gigs</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* FOLDER 2: MEDIA & PORTFOLIO (Bottom-Left) */}
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
-                }}
-                className="absolute top-[400px] sm:top-[420px] left-[10%] sm:left-[200px] z-22 group"
-              >
-                <div 
-                  className={`w-16 h-16 rounded-2xl bg-purple-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                    activeCanvasFolder === 2 
-                      ? 'border-purple-400 bg-purple-500/30 -translate-y-1 shadow-lg shadow-purple-500/20' 
-                      : 'border-white/20 group-hover:border-purple-400/60 group-hover:-translate-y-0.5'
-                  }`}
-                >
-                  <Video className="w-7 h-7 text-purple-400" />
-                </div>
-                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
-                  MEDIA & PORTFOLIO
-                </p>
-
-                {/* Fanned-out Media Cards Stack */}
-                <div 
-                  className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
-                    activeCanvasFolder === 2 
-                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
-                      : 'opacity-0 translate-y-4 pointer-events-none'
-                  }`}
-                >
-                  <div
-                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
-                    style={{ transform: 'translate(-85px, -95px) rotate(-7deg)' }}
-                  >
-                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">STEINWAY SESSION</span>
-                    <p className="text-xs font-bold text-white mt-1 leading-tight">Schumann Adagio & Allegro — Orlando</p>
-                  </div>
-
-                  <div
-                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
-                    style={{ transform: 'translate(0px, -120px) rotate(0deg)' }}
-                  >
-                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">ORCHESTRAL PERFORMANCE</span>
-                    <p className="text-xs font-bold text-white mt-1 leading-tight">Margaret Bonds — BDSO Annual Concert</p>
-                  </div>
-
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowCatalogModal(true)
-                    }}
-                    className="absolute w-44 p-3 rounded-2xl bg-gradient-to-br from-amber-400/20 to-black/80 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
-                    style={{ transform: 'translate(85px, -95px) rotate(7deg)' }}
-                  >
-                    <p className="text-xs font-bold text-amber-300">Browse BEAM Catalog →</p>
-                    <p className="text-[9px] text-white/50 mt-1">Attach recordings & masterworks</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* FOLDER 3: LOGISTICS (Bottom-Right) */}
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
-                }}
-                className="absolute top-[400px] sm:top-[420px] right-[10%] sm:left-[720px] z-22 group"
-              >
-                <div 
-                  className={`w-16 h-16 rounded-2xl bg-teal-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
-                    activeCanvasFolder === 3 
-                      ? 'border-teal-400 bg-teal-500/30 -translate-y-1 shadow-lg shadow-teal-500/20' 
-                      : 'border-white/20 group-hover:border-teal-400/60 group-hover:-translate-y-0.5'
-                  }`}
-                >
-                  <Truck className="w-7 h-7 text-teal-400" />
-                </div>
-                <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
-                  LOGISTICS
-                </p>
-
-                {/* Fanned-out Logistics Cards Stack */}
-                <div 
-                  className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
-                    activeCanvasFolder === 3 
-                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
-                      : 'opacity-0 translate-y-4 pointer-events-none'
-                  }`}
-                >
-                  {/* Card 1: Live Beacon */}
-                  <div
-                    className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
-                    style={{ transform: 'translate(-130px, -70px) rotate(-14deg)' }}
-                  >
-                    <p className="text-xs font-bold text-white">Live Location Beacon</p>
-                    <p className="text-[10px] text-white/60 mt-0.5 truncate">
-                      {isBroadcastingLocation ? `Broadcasting — ${liveBeaconCity}` : 'Paused'}
-                    </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setIsBroadcastingLocation(!isBroadcastingLocation)
-                      }}
-                      className={`mt-2 w-10 h-5 rounded-full relative transition border border-white/20 ${
-                        isBroadcastingLocation ? 'bg-teal-400' : 'bg-white/20'
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                          isBroadcastingLocation ? 'left-5' : 'left-0.5'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Card 2: Ground Transit */}
-                  <div
-                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
-                    style={{ transform: 'translate(-65px, -125px) rotate(-7deg)' }}
-                  >
-                    <p className="text-xs font-bold text-white">Ground Transit</p>
-                    <span className="font-mono text-[9px] font-bold text-red-400 uppercase tracking-wider block mt-1">HIGH PRIORITY</span>
-                  </div>
-
-                  {/* Card 3: Housing */}
-                  <div
-                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
-                    style={{ transform: 'translate(65px, -125px) rotate(7deg)' }}
-                  >
-                    <p className="text-xs font-bold text-white">Residency Housing</p>
-                    <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
-                  </div>
-
-                  {/* Card 4: Per Diem / Meals */}
-                  <div
-                    className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
-                    style={{ transform: 'translate(130px, -70px) rotate(14deg)' }}
-                  >
-                    <p className="text-xs font-bold text-white">Per Diem / Meals</p>
-                    <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* Dynamic Viewport Height (68dvh) Hero Container */}
-        <div className="relative w-full h-[68dvh] min-h-[360px] max-h-[640px] overflow-hidden bg-[#0A0B0E]">
-          {/* Full-bleed Cover/Profile Photo or Dark Gradient Fallback */}
-          {profilePhoto ? (
-            <img
-              src={profilePhoto}
-              alt={displayName}
-              onError={() => setProfilePhoto('')}
-              className="w-full h-full object-cover object-center"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#241F38] via-[#151724] to-[#0A0B0E] flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(212,175,55,0.12),_transparent_65%)]" />
-            </div>
-          )}
-
-          {/* Top Floating Header Control Bar */}
-          <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between max-w-6xl mx-auto w-full px-6 pt-6 pb-4">
-            <Link
-              href="/"
-              className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition shadow-lg"
-            >
-              <X className="w-5 h-5" />
-            </Link>
-
-            <div className="flex items-center space-x-2 relative">
-              {user || isSandboxPreview ? (
-                <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Signed In</span>
-                </span>
-              ) : null}
-
-              {/* Spatial Canvas vs Dashboard View Mode Toggle Pill */}
-              <div className="flex items-center p-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-xs">
-                <button
-                  onClick={() => setViewMode('canvas')}
-                  className={`px-3 py-1 rounded-full font-mono text-[11px] font-bold transition flex items-center space-x-1.5 ${
-                    viewMode === 'canvas'
-                      ? 'bg-amber-400 text-black shadow-md'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>Spatial Canvas</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('dashboard')}
-                  className={`px-3 py-1 rounded-full font-mono text-[11px] font-bold transition flex items-center space-x-1.5 ${
-                    viewMode === 'dashboard'
-                      ? 'bg-amber-400 text-black shadow-md'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  <Layers className="w-3 h-3" />
-                  <span>Dashboard</span>
-                </button>
-              </div>
-
-              {/* How This Works ? Help Button */}
+            {/* How This Works ? Help Button */}
+            <div className="relative">
               <button
-                onClick={() => setShowHelpModal(true)}
-                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-lg"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowHelpModal(!showHelpModal)
+                  setShowMoreMenu(false)
+                }}
+                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
                 title="How This Works Explainer"
               >
                 <HelpCircle className="w-5 h-5 text-amber-400" />
               </button>
 
-              {/* ... Dropdown Action Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-lg"
-                  title="More Options Menu"
-                >
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-
-                {showMoreMenu && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-30" 
-                      onClick={() => setShowMoreMenu(false)} 
-                    />
-                    <div className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-[#151722]/95 backdrop-blur-xl border border-white/20 shadow-2xl z-40 space-y-1 text-xs">
-                      <button
-                        onClick={() => {
-                          setIsEditingBio(true)
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                      >
-                        <Edit3 className="w-4 h-4 text-amber-400" />
-                        <span>Edit Profile & CV</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowPhotoModal(true)
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                      >
-                        <UserIcon className="w-4 h-4 text-purple-400" />
-                        <span>Update Headshot Photo</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          handleShareProfile()
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                      >
-                        <Copy className="w-4 h-4 text-emerald-400" />
-                        <span>{shareCopied ? 'Link Copied!' : 'Copy Shareable Link'}</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowLogisticsDrawer(true)
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                      >
-                        <Truck className="w-4 h-4 text-blue-400" />
-                        <span>Logistics & Support Settings</span>
-                      </button>
-
-                      <div className="border-t border-white/10 my-1" />
-
-                      {!user && !isSandboxPreview ? (
-                        <button
-                          onClick={() => {
-                            handleGoogleSignIn()
-                            setShowMoreMenu(false)
-                          }}
-                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-amber-400/20 text-amber-300 flex items-center space-x-2.5 transition"
-                        >
-                          <LogIn className="w-4 h-4 text-amber-400" />
-                          <span>Google Sign In</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            handleSignOut()
-                            setShowMoreMenu(false)
-                          }}
-                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-red-500/20 text-red-300 flex items-center space-x-2.5 transition"
-                        >
-                          <LogOut className="w-4 h-4 text-red-400" />
-                          <span>Sign Out</span>
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom-anchored Scrim (~40% of photo height) for text legibility */}
-          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0F1015] via-[#0F1015]/80 to-transparent pointer-events-none z-10" />
-
-          {/* Overlaid Left-Aligned Name & Handle */}
-          <div className="absolute bottom-4 inset-x-0 z-20">
-            <div className="max-w-6xl mx-auto w-full px-6 text-left space-y-1">
-              <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-md">
-                {displayName}
-              </h1>
-              <p className="text-sm sm:text-base font-sans font-medium text-white/80 tracking-tight drop-shadow">
-                {handleName}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* TWO PILLARS HERO CARD & STATS BAR */}
-        <div className="relative z-10 py-4">
-          <div className="max-w-6xl mx-auto w-full px-6 space-y-4">
-            
-            {/* The Two Pillars Welcome Banner */}
-            <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-950/40 via-purple-950/30 to-black/60 backdrop-blur-xl border border-amber-400/30 shadow-2xl space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                <div>
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-mono font-bold mb-2">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>BEAM Musician Ecosystem</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-serif font-bold text-white leading-tight">
-                    Play Institutions. Build Your Village. Tour at Zero Cost.
-                  </h2>
-                  <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl">
-                    BEAM bridges direct institutional contracting with community patron backing so you earn professional stipends while touring with full travel & lodging coverage.
-                  </p>
-                </div>
-              </div>
-
-              {/* Two Pillars Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="p-4 rounded-2xl bg-black/40 border border-amber-400/20 space-y-1.5">
-                  <div className="flex items-center space-x-2 text-amber-300 font-bold font-mono">
-                    <Building2 className="w-4 h-4" />
-                    <span>1. Direct Institutional Work</span>
-                  </div>
-                  <p className="text-white/70 text-[11px] leading-relaxed">
-                    Verified profiles are directly pitched to partner orchestras, halls, and Steinway recording sessions contracting through BEAM.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/20 space-y-1.5">
-                  <div className="flex items-center space-x-2 text-purple-300 font-bold font-mono">
-                    <Coins className="w-4 h-4" />
-                    <span>2. Community Village Support (&quot;The Hood&quot;)</span>
-                  </div>
-                  <p className="text-white/70 text-[11px] leading-relaxed">
-                    Family, friends, and patrons follow & back your profile to cover travel, lodging, and continuing education at zero out-of-pocket cost.
-                  </p>
-                </div>
-              </div>
             </div>
 
-            {/* Stats Bar */}
-            <div className="w-full grid grid-cols-3 gap-3 text-center">
-              {/* Clickable Institutional Earnings Card (Dual-Write Dual-Source Sync) */}
-              <div
-                onClick={() => setShowRecordBookingModal(true)}
-                className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 to-black/60 backdrop-blur-md border border-emerald-500/30 hover:border-emerald-500/60 transition cursor-pointer group shadow-lg text-center space-y-1"
-                title="Click to test dual-writing an institutional booking commitment"
+            {/* Context Dropdown Menu ... */}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowMoreMenu(!showMoreMenu)
+                  setShowHelpModal(false)
+                }}
+                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
+                title="More Options Menu"
               >
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-serif">${profile?.usdTotalEarned || 0}</p>
-                <p className="text-xs font-semibold text-emerald-300 uppercase font-sans tracking-wider">
-                  Institutional Earnings
-                </p>
-                <div className="inline-flex items-center space-x-1 text-[10px] text-emerald-300/70 group-hover:text-emerald-300 transition font-mono">
-                  <Plus className="w-3 h-3 text-emerald-400" />
-                  <span>+ Record Booking Dual-Write</span>
-                </div>
-              </div>
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
 
-              {/* Clickable Hood Village Support Fund Card */}
-              <div
-                onClick={() => setShowHoodAllocationModal(true)}
-                className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/40 to-black/60 backdrop-blur-md border border-amber-400/30 hover:border-amber-400/60 transition cursor-pointer group shadow-lg text-center space-y-1"
-                title="Click to manage Hood fund allocations"
-              >
-                <div className="flex items-center justify-center space-x-1.5 text-amber-400">
-                  <span className="text-2xl sm:text-3xl font-bold font-serif">
-                    ${(profile?.hoodVillageBalance || 0).toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs font-semibold text-amber-300 uppercase font-sans tracking-wider">
-                  Hood Village Fund
-                </p>
-                <div className="inline-flex items-center space-x-1 text-[10px] text-white/50 group-hover:text-amber-200 transition font-mono">
-                  <SlidersHorizontal className="w-3 h-3 text-amber-400" />
-                  <span>Configure Allocations</span>
-                </div>
-              </div>
+              {showMoreMenu && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-30" 
+                    onClick={() => setShowMoreMenu(false)} 
+                  />
+                  <div className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-[#151722]/95 backdrop-blur-xl border border-white/20 shadow-2xl z-40 space-y-1 text-xs">
+                    <button
+                      onClick={() => {
+                        setIsEditingBio(true)
+                        setShowMoreMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                    >
+                      <Edit3 className="w-4 h-4 text-amber-400" />
+                      <span>Edit Profile & CV</span>
+                    </button>
 
-              <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-2xl sm:text-3xl font-bold text-purple-300 font-serif">{events.length}</p>
-                <p className="text-xs text-white/60 uppercase font-sans tracking-wider mt-1">Events & Gigs</p>
-              </div>
-            </div>
+                    <button
+                      onClick={() => {
+                        setShowPhotoModal(true)
+                        setShowMoreMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                    >
+                      <UserIcon className="w-4 h-4 text-purple-400" />
+                      <span>Update Headshot Photo</span>
+                    </button>
 
-            {/* Bio Box & Live CV Edit Mode Form */}
-            <div className="w-full p-5 sm:p-6 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 text-left">
-              {isEditingBio ? (
-                <div className="space-y-5">
-                  
-                  {/* CV & Contact Card Upload Header */}
-                  <div className="space-y-3 pb-3 border-b border-white/10">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
-                        Contact Information & CV Parser
-                      </span>
+                    <button
+                      onClick={() => {
+                        handleShareProfile()
+                        setShowMoreMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                    >
+                      <Copy className="w-4 h-4 text-emerald-400" />
+                      <span>{shareCopied ? 'Link Copied!' : 'Copy Shareable Link'}</span>
+                    </button>
 
-                      <div className="flex items-center space-x-2">
-                        {/* Upload & Parse CV Button */}
-                        <button
-                          type="button"
-                          onClick={() => cvFileInputRef.current?.click()}
-                          className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-medium border border-amber-400/40 flex items-center space-x-1.5 transition"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Upload & Parse CV</span>
-                        </button>
+                    <button
+                      onClick={() => {
+                        setShowLogisticsDrawer(true)
+                        setShowMoreMenu(false)
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                    >
+                      <Truck className="w-4 h-4 text-blue-400" />
+                      <span>Logistics & Support Settings</span>
+                    </button>
 
-                        {/* Import .vcf Button */}
-                        <button
-                          type="button"
-                          onClick={() => vcardFileInputRef.current?.click()}
-                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/15 flex items-center space-x-1.5 transition"
-                        >
-                          <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Import .vcf</span>
-                        </button>
-                      </div>
-                    </div>
+                    <div className="border-t border-white/10 my-1" />
 
-                    {vcardImportedNotice && (
-                      <div className="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center space-x-1.5">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span>Parsed .vcf card! Review inputs below before saving.</span>
-                      </div>
-                    )}
-
-                    {cvImportedNotice && (
-                      <div className="p-2.5 rounded-lg bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-medium flex items-center space-x-1.5">
-                        <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
-                        <span>CV Parsed Successfully! Review extracted role pills & fields below before saving.</span>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Full Name</label>
-                        <input
-                          type="text"
-                          name="name"
-                          autoComplete="name"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Full Name"
-                          className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Email Address</label>
-                        <input
-                          type="email"
-                          name="email"
-                          autoComplete="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="email@domain.com"
-                          className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Phone Number</label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          autoComplete="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="(555) 000-0000"
-                          className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* EDITABLE DISCIPLINE & ROLE PILLS MODULE */}
-                  <div className="space-y-2.5 pb-3 border-b border-white/10">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
-                        Artistic Role & Discipline Pills (CV Header)
-                      </span>
-                      <span className="text-[10px] text-white/40 font-mono">Click (✕) to remove any incorrect role tag</span>
-                    </div>
-
-                    {/* Interactive Pills List */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {disciplinePills.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-white text-xs font-mono font-semibold"
-                        >
-                          <span>{tag}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePill(tag)}
-                            className="w-4 h-4 rounded-full bg-white/20 hover:bg-red-500/80 text-white flex items-center justify-center text-[10px] transition ml-1"
-                            title={`Remove ${tag}`}
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Add Custom Role Tag Input */}
-                    <div className="flex items-center space-x-2 pt-1">
-                      <input
-                        type="text"
-                        value={newTagInput}
-                        onChange={(e) => setNewTagInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            handleAddPill(newTagInput)
-                          }
-                        }}
-                        placeholder="Add custom role tag (e.g. Resident Cellist, Media Producer)"
-                        className="flex-1 px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-amber-400"
-                      />
+                    {!user && !isSandboxPreview ? (
                       <button
-                        type="button"
-                        onClick={() => handleAddPill(newTagInput)}
-                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition"
+                        onClick={() => {
+                          handleGoogleSignIn()
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-amber-400/20 text-amber-300 flex items-center space-x-2.5 transition"
                       >
-                        + Add Pill
+                        <LogIn className="w-4 h-4 text-amber-400" />
+                        <span>Google Sign In</span>
                       </button>
-                    </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          handleSignOut()
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-red-500/20 text-red-300 flex items-center space-x-2.5 transition"
+                      >
+                        <LogOut className="w-4 h-4 text-red-400" />
+                        <span>Sign Out</span>
+                      </button>
+                    )}
                   </div>
-
-                  {/* Bio Textarea Section */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Musician Bio & Cultural Notes</label>
-                    <textarea
-                      rows={3}
-                      value={bioText}
-                      onChange={(e) => setBioText(e.target.value)}
-                      className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
-                    />
-                  </div>
-
-                  {/* Save All Edits Button */}
-                  <button
-                    onClick={handleSaveAllEdits}
-                    disabled={saving}
-                    className="w-full py-3 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition shadow-lg"
-                  >
-                    {saving ? 'Saving Live CV & Profile...' : 'Save Live CV & Profile'}
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs sm:text-sm text-white/90 leading-relaxed font-sans">
-                  {bioText}
-                </p>
+                </>
               )}
             </div>
-
           </div>
         </div>
 
-        {/* 4 DISTINCT PARTICIPANT WRAPAROUND MODULES */}
-        <div className="relative z-10 py-6 pb-16">
-          <div className="max-w-6xl mx-auto w-full px-6 space-y-6">
-            
-            {/* Module Switcher Tabs */}
-            <div className="flex items-center justify-between overflow-x-auto border-b border-white/10 pb-3 no-scrollbar gap-2">
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setActiveTab('nodes')}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                    activeTab === 'nodes'
-                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                      : 'text-white/50 hover:text-white'
-                  }`}
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>1. Upcoming Work & Node Gigs</span>
-                </button>
+        {/* Overlaid Musician Name & Handle (Bottom Left) */}
+        <div className="absolute bottom-9 left-10 z-20 pointer-events-none space-y-1">
+          <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
+            {displayName}
+          </h1>
+          <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
+            {handleName}
+          </p>
+        </div>
 
-                <button
-                  onClick={() => setActiveTab('portfolio')}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 ${
-                    activeTab === 'portfolio'
-                      ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                      : 'text-white/50 hover:text-white'
-                  }`}
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  <span>2. Media Portfolio & CV</span>
-                </button>
-              </div>
+        {/* FOLDER 0: GIGS */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
+          }}
+          style={
+            layoutVariant === 'dock'
+              ? { top: '150px', left: '200px' }
+              : { top: '120px', left: '140px' }
+          }
+          className="absolute z-22 group transition-all duration-500"
+        >
+          <div 
+            className={`w-16 h-16 rounded-2xl bg-blue-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+              activeCanvasFolder === 0 
+                ? 'border-blue-400 bg-blue-500/30 -translate-y-1 shadow-lg shadow-blue-500/20' 
+                : 'border-white/20 group-hover:border-blue-400/60 group-hover:-translate-y-0.5'
+            }`}
+          >
+            <Building2 className="w-7 h-7 text-blue-400" />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
+            GIGS
+          </p>
 
+          {/* Fanned-out Cards Stack */}
+          <div 
+            className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
+              activeCanvasFolder === 0 
+                ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}
+          >
+            {events.slice(0, 5).map((evt, i) => {
+              const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
+              const translations = ['-130px', '-65px', '0px', '65px', '130px']
+              const yOffsets = ['-70px', '-125px', '-145px', '-125px', '-70px']
+              return (
+                <div
+                  key={evt.id || i}
+                  className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
+                  style={{
+                    transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
+                  }}
+                >
+                  <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
+                    {evt.type}
+                  </span>
+                  <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
+                    {evt.title}
+                  </p>
+                  <p className="text-[10px] text-white/50 mt-1 truncate">
+                    {evt.cityState}
+                  </p>
+                  <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
+                    <span className="text-emerald-400">${evt.usdStipend} USD</span>
+                    <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* FOLDER 1: ECOSYSTEM & FUNDS */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
+          }}
+          style={
+            layoutVariant === 'dock'
+              ? { top: '150px', left: '760px' }
+              : { top: '200px', left: '680px' }
+          }
+          className="absolute z-22 group transition-all duration-500"
+        >
+          <div 
+            className={`w-16 h-16 rounded-2xl bg-amber-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+              activeCanvasFolder === 1 
+                ? 'border-amber-400 bg-amber-500/30 -translate-y-1 shadow-lg shadow-amber-500/20' 
+                : 'border-white/20 group-hover:border-amber-400/60 group-hover:-translate-y-0.5'
+            }`}
+          >
+            <Coins className="w-7 h-7 text-amber-400" />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
+            ECOSYSTEM & FUNDS
+          </p>
+
+          {/* Fanned-out Fund Cards Stack */}
+          <div 
+            className={`absolute left-8 top-8 transition-all duration-300 z-30 ${
+              activeCanvasFolder === 1 
+                ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}
+          >
+            {/* Institutional Earnings Card */}
+            <div
+              className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center"
+              style={{ transform: 'translate(-120px, -70px) rotate(-10deg)' }}
+            >
+              <p className="font-serif text-xl font-bold text-emerald-400">${institutionalEarningsTotal}</p>
+              <p className="text-[9px] text-white/50 uppercase font-mono mt-1">Institutional Earnings</p>
+            </div>
+
+            {/* Patron Support Allocation Card */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowHoodAllocationModal(true)
+              }}
+              className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl cursor-pointer hover:scale-105 transition text-center"
+              style={{ transform: 'translate(0px, -125px) rotate(0deg)' }}
+            >
+              <p className="font-serif text-xl font-bold text-amber-400">${allocatedHoodAmount}</p>
+              <p className="text-[9px] text-amber-300/80 uppercase font-mono mt-1">Hood Village Fund</p>
+              <p className="text-[8.5px] text-white/45 mt-1 leading-tight">From hoods.beamthinktank.space + committed institutional bookings</p>
+            </div>
+
+            {/* Events & Gigs Count Card */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowRecordBookingModal(true)
+              }}
+              className="absolute w-40 p-3 rounded-2xl bg-gradient-to-br from-purple-950/90 to-[#0F1015] backdrop-blur-xl border border-purple-400/50 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
+              style={{ transform: 'translate(120px, -70px) rotate(10deg)' }}
+            >
+              <p className="font-serif text-xl font-bold text-purple-300">{events.length}</p>
+              <p className="text-[9px] text-white/50 uppercase font-mono mt-1">Events & Gigs</p>
+              <p className="text-[9px] text-purple-300 font-bold mt-1.5">+ Book Gig Contract</p>
+            </div>
+          </div>
+        </div>
+
+        {/* FOLDER 2: MEDIA & PORTFOLIO */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
+          }}
+          style={
+            layoutVariant === 'dock'
+              ? { top: '430px', left: '200px' }
+              : { top: '460px', left: '240px' }
+          }
+          className="absolute z-22 group transition-all duration-500"
+        >
+          <div 
+            className={`w-16 h-16 rounded-2xl bg-purple-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+              activeCanvasFolder === 2 
+                ? 'border-purple-400 bg-purple-500/30 -translate-y-1 shadow-lg shadow-purple-500/20' 
+                : 'border-white/20 group-hover:border-purple-400/60 group-hover:-translate-y-0.5'
+            }`}
+          >
+            <Video className="w-7 h-7 text-purple-400" />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-32 -ml-8">
+            MEDIA & PORTFOLIO
+          </p>
+
+          {/* Fanned-out Media Cards Stack */}
+          <div 
+            className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
+              activeCanvasFolder === 2 
+                ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}
+          >
+            <div
+              className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
+              style={{ transform: 'translate(-85px, -95px) rotate(-7deg)' }}
+            >
+              <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">STEINWAY SESSION</span>
+              <p className="text-xs font-bold text-white mt-1 leading-tight">Schumann Adagio & Allegro — Orlando</p>
+            </div>
+
+            <div
+              className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl cursor-pointer hover:scale-105 transition"
+              style={{ transform: 'translate(0px, -120px) rotate(0deg)' }}
+            >
+              <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">ORCHESTRAL PERFORMANCE</span>
+              <p className="text-xs font-bold text-white mt-1 leading-tight">Margaret Bonds — BDSO Annual Concert</p>
+            </div>
+
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowCatalogModal(true)
+              }}
+              className="absolute w-44 p-3 rounded-2xl bg-gradient-to-br from-amber-400/20 to-black/80 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center cursor-pointer hover:scale-105 transition"
+              style={{ transform: 'translate(85px, -95px) rotate(7deg)' }}
+            >
+              <p className="text-xs font-bold text-amber-300">Browse BEAM Catalog →</p>
+              <p className="text-[9px] text-white/50 mt-1">Attach recordings & masterworks</p>
+            </div>
+          </div>
+        </div>
+
+        {/* FOLDER 3: LOGISTICS */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
+          }}
+          style={
+            layoutVariant === 'dock'
+              ? { top: '430px', left: '760px' }
+              : { top: '390px', left: '800px' }
+          }
+          className="absolute z-22 group transition-all duration-500"
+        >
+          <div 
+            className={`w-16 h-16 rounded-2xl bg-teal-500/15 backdrop-blur-md border transition-all duration-200 flex items-center justify-center cursor-pointer ${
+              activeCanvasFolder === 3 
+                ? 'border-teal-400 bg-teal-500/30 -translate-y-1 shadow-lg shadow-teal-500/20' 
+                : 'border-white/20 group-hover:border-teal-400/60 group-hover:-translate-y-0.5'
+            }`}
+          >
+            <Truck className="w-7 h-7 text-teal-400" />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-mono font-bold tracking-widest text-white/60 uppercase w-24">
+            LOGISTICS
+          </p>
+
+          {/* Fanned-out Logistics Cards Stack */}
+          <div 
+            className={`absolute left-8 top-0 transition-all duration-300 z-30 ${
+              activeCanvasFolder === 3 
+                ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                : 'opacity-0 translate-y-4 pointer-events-none'
+            }`}
+          >
+            {/* Card 1: Live Beacon */}
+            <div
+              className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+              style={{ transform: 'translate(-130px, -70px) rotate(-14deg)' }}
+            >
+              <p className="text-xs font-bold text-white">Live Location Beacon</p>
+              <p className="text-[10px] text-white/60 mt-0.5 truncate">
+                {isBroadcastingLocation ? `Broadcasting — ${liveBeaconCity}` : 'Paused'}
+              </p>
               <button
-                onClick={() => setShowLogisticsDrawer(true)}
-                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center space-x-1.5 bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsBroadcastingLocation(!isBroadcastingLocation)
+                }}
+                className={`mt-2 w-10 h-5 rounded-full relative transition border border-white/20 ${
+                  isBroadcastingLocation ? 'bg-teal-400' : 'bg-white/20'
+                }`}
               >
-                <Truck className="w-3.5 h-3.5" />
-                <span>Logistics & Support Settings</span>
+                <span
+                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                    isBroadcastingLocation ? 'left-5' : 'left-0.5'
+                  }`}
+                />
               </button>
             </div>
 
-            {/* MODULE 1: IDENTITY & CRAFT (PORTFOLIO & CV) */}
-            {activeTab === 'portfolio' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-serif font-bold text-white flex items-center space-x-2">
-                      <span>Media Portfolio & Recording CV</span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-mono">
-                        {portfolioItems.length} {portfolioItems.length === 1 ? 'Work' : 'Works'}
-                      </span>
-                    </h2>
-                    <p className="text-xs text-white/60">High-caliber recording sessions (e.g. Florida Steinway Sessions, Margaret Bonds Rehearsals) presented to institutions.</p>
-                  </div>
+            {/* Card 2: Ground Transit */}
+            <div
+              className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+              style={{ transform: 'translate(-65px, -125px) rotate(-7deg)' }}
+            >
+              <p className="text-xs font-bold text-white">Ground Transit</p>
+              <span className="font-mono text-[9px] font-bold text-red-400 uppercase tracking-wider block mt-1">HIGH PRIORITY</span>
+            </div>
 
-                  <div className="flex items-center space-x-2.5 shrink-0">
-                    <button
-                      onClick={() => setShowCatalogModal(true)}
-                      className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 text-black text-xs font-bold hover:brightness-110 transition shadow-lg flex items-center space-x-1.5"
-                    >
-                      <Sparkles className="w-4 h-4 fill-black/20" />
-                      <span>Select Works from BEAM Catalog</span>
-                    </button>
+            {/* Card 3: Housing */}
+            <div
+              className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+              style={{ transform: 'translate(65px, -125px) rotate(7deg)' }}
+            >
+              <p className="text-xs font-bold text-white">Residency Housing</p>
+              <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
+            </div>
 
-                    <button
-                      onClick={() => setShowAddMediaModal(true)}
-                      className="px-3.5 py-2 rounded-full bg-black/60 border border-white/20 text-white/80 hover:text-white text-xs font-semibold hover:border-white/40 transition flex items-center space-x-1.5"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Add Custom Link</span>
-                    </button>
-                  </div>
-                </div>
-
-                {portfolioItems.length === 0 ? (
-                  <div className="p-10 text-center rounded-2xl bg-black/40 border border-white/10 space-y-4">
-                    <Video className="w-10 h-10 text-amber-400/40 mx-auto" />
-                    <div>
-                      <p className="text-sm font-bold text-white">No works attached to your portfolio yet.</p>
-                      <p className="text-xs text-white/50 mt-1 max-w-md mx-auto">Select your uploaded recordings from the BEAM Orchestra Catalog (Steinway Gallery Sessions, Rehearsal Footage, Chamber Masterworks) or paste a custom link.</p>
-                    </div>
-
-                    <button
-                      onClick={() => setShowCatalogModal(true)}
-                      className="px-5 py-2.5 rounded-full bg-amber-400 text-black font-bold text-xs hover:bg-amber-300 transition shadow-lg inline-flex items-center space-x-2"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Browse BEAM Catalog Works</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {portfolioItems.map((item) => {
-                      const ytEmbed = getYouTubeEmbedUrl(item.url)
-                      const isMov = item.url.includes('firebasestorage') || item.url.toLowerCase().endsWith('.mov') || item.url.includes('.mov?')
-
-                      return (
-                        <div key={item.id} className="p-4 rounded-2xl bg-black/50 border border-white/10 hover:border-amber-400/40 transition space-y-3 shadow-lg flex flex-col justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-mono font-semibold">
-                                  {item.category}
-                                </span>
-                                {item.composer && (
-                                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono font-medium">
-                                    {item.composer}
-                                  </span>
-                                )}
-                              </div>
-                              {item.dateAdded && (
-                                <span className="text-[10px] text-white/40 font-mono shrink-0">{item.dateAdded}</span>
-                              )}
-                            </div>
-
-                            <h3 className="text-sm font-serif font-bold text-white leading-snug">{item.title}</h3>
-                            {item.description && (
-                              <p className="text-xs text-white/60 line-clamp-2 leading-relaxed">{item.description}</p>
-                            )}
-
-                            {/* Video / Embed Player Section */}
-                            <div className="pt-1">
-                              {ytEmbed ? (
-                                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
-                                  <iframe
-                                    src={ytEmbed}
-                                    title={item.title}
-                                    className="w-full h-full"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  />
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black group">
-                                    <video
-                                      src={item.url}
-                                      controls
-                                      playsInline
-                                      preload="metadata"
-                                      className="w-full h-44 object-cover rounded-xl"
-                                    >
-                                      <source src={item.url} type="video/mp4" />
-                                      <source src={item.url} type="video/quicktime" />
-                                      Your browser does not support video playback.
-                                    </video>
-
-                                    <button
-                                      onClick={() => setActivePlayingMedia(item)}
-                                      className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-amber-400 hover:text-black text-white text-[10px] font-bold backdrop-blur-md transition flex items-center space-x-1 border border-white/20"
-                                    >
-                                      <PlayCircle className="w-3.5 h-3.5" />
-                                      <span>Expand Player</span>
-                                    </button>
-                                  </div>
-
-                                  {isMov && (
-                                    <div className="p-2 rounded-lg bg-amber-400/10 border border-amber-400/20 text-[10px] font-mono text-amber-200/80 flex items-center justify-between">
-                                      <span>🎥 High-Definition QuickTime MOV Session</span>
-                                      <button
-                                        onClick={() => setActivePlayingMedia(item)}
-                                        className="text-amber-300 font-bold underline hover:text-white"
-                                      >
-                                        Open Fullscreen Modal
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Footer Action Bar */}
-                          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-                            <button
-                              onClick={() => setActivePlayingMedia(item)}
-                              className="text-amber-300 hover:text-amber-200 font-semibold flex items-center space-x-1 text-[11px]"
-                            >
-                              <PlayCircle className="w-3.5 h-3.5" />
-                              <span>Play in Modal</span>
-                            </button>
-
-                            <div className="flex items-center space-x-2">
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-white/60 hover:text-white flex items-center space-x-1 text-[11px]"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Direct Link</span>
-                              </a>
-
-                              <button
-                                onClick={() => handleRemovePortfolioItem(item.id)}
-                                className="text-red-400/70 hover:text-red-400 text-[11px] font-medium ml-2"
-                              >
-                                Detach
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Slide-Over Logistics & Support Settings Drawer */}
-            {showLogisticsDrawer && (
-              <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm transition-opacity font-sans">
-                <div 
-                  className="fixed inset-0" 
-                  onClick={() => setShowLogisticsDrawer(false)} 
-                />
-                <div className="relative z-10 w-full max-w-md h-full bg-[#14151D] border-l border-white/20 p-6 overflow-y-auto space-y-6 shadow-2xl flex flex-col justify-between">
-                  <div className="space-y-6">
-                    
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-9 h-9 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
-                          <Truck className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-serif font-bold text-white">Logistics & Support Settings</h3>
-                          <p className="text-xs text-white/50">Manage location beacon, roaming, and infrastructure needs.</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => setShowLogisticsDrawer(false)}
-                        className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* 1. Live Location Beacon Card */}
-                    <div className="p-4 rounded-2xl bg-black/40 border border-emerald-500/40 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-                          <span className="text-xs font-bold text-white">Life360 Live Location Beacon</span>
-                        </div>
-                        <button
-                          onClick={handleToggleBroadcasting}
-                          className={`w-10 h-5 rounded-full transition p-0.5 ${isBroadcastingLocation ? 'bg-emerald-500' : 'bg-white/20'}`}
-                        >
-                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isBroadcastingLocation ? 'translate-x-5' : ''}`} />
-                        </button>
-                      </div>
-                      
-                      {isBroadcastingLocation && (
-                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono space-y-2">
-                          <p className="text-emerald-300 font-bold">📍 Active Beacon: {liveBeaconCity}</p>
-                          <button
-                            onClick={handleCaptureLiveLocation}
-                            disabled={isGeoLoading}
-                            className="w-full py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition"
-                          >
-                            <Radio className={`w-3.5 h-3.5 ${isGeoLoading ? 'animate-spin' : ''}`} />
-                            <span>{isGeoLoading ? 'Capturing GPS...' : 'Refresh GPS Location'}</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 2. Roaming Presence Card */}
-                    <div className="p-4 rounded-2xl bg-black/40 border border-purple-500/30 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Navigation className="w-4 h-4 text-purple-400" />
-                          <span className="text-xs font-bold text-white">Roaming Presence Status</span>
-                        </div>
-                        <button
-                          onClick={handleToggleRoaming}
-                          className={`w-10 h-5 rounded-full transition p-0.5 ${isRoaming ? 'bg-purple-500' : 'bg-white/20'}`}
-                        >
-                          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isRoaming ? 'translate-x-5' : ''}`} />
-                        </button>
-                      </div>
-                      {isRoaming && (
-                        <p className="text-xs font-mono text-purple-300">Currently active in: <strong>{roamingLocation}</strong></p>
-                      )}
-                    </div>
-
-                    {/* 3. Infrastructure Needs Tags */}
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
-                        Wraparound Infrastructure Needs Tags
-                      </h4>
-                      <div className="space-y-2">
-                        {profile?.infrastructureNeeds?.map((need) => (
-                          <div
-                            key={need.id}
-                            className="p-3 rounded-xl bg-black/50 border border-white/10 text-xs flex items-center justify-between"
-                          >
-                            <span className="text-white font-medium">{need.label}</span>
-                            <span className="text-[10px] font-mono text-amber-300 capitalize">{need.priority}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <button
-                    onClick={() => setShowLogisticsDrawer(false)}
-                    className="w-full py-3 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition shadow-lg mt-4"
-                  >
-                    Done & Close Settings
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* MODULE 3: REGIONAL NODE ACCESS & OPPORTUNITIES */}
-            {activeTab === 'nodes' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-serif font-bold text-white">Regional Node Access & Contract Gigs</h2>
-                  <p className="text-xs text-white/60">Institutional partner hubs and contract opportunities mapped to your active region.</p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-black/40 border border-blue-500/30 space-y-3">
-                  <div className="flex items-center space-x-2 text-blue-300">
-                    <Building2 className="w-5 h-5" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider font-mono">Active Mapped Node Access</h3>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs space-y-2">
-                    <p className="font-bold text-white text-sm">
-                      {isBroadcastingLocation ? `Live Beacon: ${liveBeaconCity}` : (isRoaming ? 'Steinway Gallery Node — Orlando, FL' : 'Miller High Life Theatre / BDSO Node — Milwaukee, WI')}
-                    </p>
-                    <p className="text-white/70 leading-relaxed">
-                      {isBroadcastingLocation
-                        ? `BEAM logistics engine is tracking your live location in ${liveBeaconCity}. Ground transit and residency housing can be dispatched directly to your position.`
-                        : 'Access to Black Diaspora Symphony Orchestra rehearsal hall, string sectional studios, and sheet music repository.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider font-mono">
-                    Immediate Regional Opportunities ({events.length})
-                  </h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {events.map((event) => (
-                      <div
-                        key={event.id}
-                        className="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-white/30 transition space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-amber-300 uppercase font-semibold">{event.type}</span>
-                          <span className="text-[10px] text-white/50 font-mono">{event.cityState}</span>
-                        </div>
-
-                        <p className="text-xs font-bold text-white">{event.title}</p>
-                        <p className="text-[11px] text-white/60 truncate">{event.repertoire}</p>
-
-                        <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
-                          <span className="text-emerald-400 font-bold">${event.usdStipend} USD</span>
-                          <span className="text-amber-400 font-bold">+{event.beamCoinsEarned} BEAM</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-
+            {/* Card 4: Per Diem / Meals */}
+            <div
+              className="absolute w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl"
+              style={{ transform: 'translate(130px, -70px) rotate(14deg)' }}
+            >
+              <p className="text-xs font-bold text-white">Per Diem / Meals</p>
+              <span className="font-mono text-[9px] font-bold text-amber-400 uppercase tracking-wider block mt-1">MEDIUM</span>
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* Edit Profile & Live CV Modal */}
+      {isEditingBio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-sans overflow-y-auto">
+          <div className="w-full max-w-2xl p-6 sm:p-8 rounded-3xl bg-[#14151C] border border-white/20 space-y-6 shadow-2xl my-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-lg font-serif font-bold text-white">Edit Profile & Live CV</h3>
+                <p className="text-xs text-white/50">Update contact info, import CV/vCard, and modify artistic role tags.</p>
+              </div>
+              <button onClick={() => setIsEditingBio(false)} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* CV & Contact Card Upload Header */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
+                  Contact Information
+                </span>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => cvFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-medium border border-amber-400/40 flex items-center space-x-1.5 transition"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Upload & Parse CV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => vcardFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/15 flex items-center space-x-1.5 transition"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Import .vcf</span>
+                  </button>
+                </div>
+              </div>
+
+              {vcardImportedNotice && (
+                <div className="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Parsed .vcf card! Review inputs below before saving.</span>
+                </div>
+              )}
+
+              {cvImportedNotice && (
+                <div className="p-2.5 rounded-lg bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-medium flex items-center space-x-1.5">
+                  <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span>CV Parsed Successfully! Review extracted role pills & fields below before saving.</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Full Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    autoComplete="name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Full Name"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Email Address</label>
+                  <input
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="email@domain.com"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Phone Number</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    autoComplete="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="(555) 000-0000"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* EDITABLE DISCIPLINE & ROLE PILLS */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white/80 uppercase tracking-wider font-mono">
+                  Artistic Role & Discipline Pills
+                </span>
+                <span className="text-[10px] text-white/40 font-mono">Click (✕) to remove</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {disciplinePills.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-white text-xs font-mono font-semibold"
+                  >
+                    <span>{tag}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePill(tag)}
+                      className="w-4 h-4 rounded-full bg-white/20 hover:bg-red-500/80 text-white flex items-center justify-center text-[10px] transition ml-1"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddPill(newTagInput)
+                    }
+                  }}
+                  placeholder="Add custom role tag"
+                  className="flex-1 px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddPill(newTagInput)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition"
+                >
+                  + Add Pill
+                </button>
+              </div>
+            </div>
+
+            {/* Bio Textarea */}
+            <div className="space-y-2">
+              <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Musician Bio & Cultural Notes</label>
+              <textarea
+                rows={4}
+                value={bioText}
+                onChange={(e) => setBioText(e.target.value)}
+                className="w-full p-3 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                handleSaveAllEdits()
+                setIsEditingBio(false)
+              }}
+              disabled={saving}
+              className="w-full py-3 rounded-xl bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 transition shadow-lg"
+            >
+              {saving ? 'Saving CV & Profile...' : 'Save Live CV & Profile'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add / Upload Media Portfolio Item Modal */}
       {showAddMediaModal && (

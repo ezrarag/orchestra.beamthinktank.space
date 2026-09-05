@@ -195,24 +195,8 @@ export default function JoinInstitutionPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <article className="rounded-2xl border border-white/15 bg-white/[0.04] p-5 backdrop-blur-xl">
-            <h2 className="text-xl font-semibold">Delivery + Impact Snapshot</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm">Audience reached: 4,230</div>
-              <div className="rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm">Schools visited: 11</div>
-              <div className="rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm">Concerts delivered: 17</div>
-              <div className="rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm">Recruitment leads: 42</div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-white/12 bg-black/20 p-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-[#F5D37A]">Case Study</p>
-              <p className="mt-1 text-sm font-semibold">University of Wisconsin Milwaukee</p>
-              <p className="mt-1 text-sm text-white/80">Director: Dr. Jun Kim • Program: University Community Orchestra</p>
-            </div>
-          </article>
-
-          <aside className="rounded-2xl border border-white/15 bg-white/[0.04] p-5 backdrop-blur-xl">
+        <section className="grid gap-4">
+          <aside className="mx-auto w-full max-w-xl rounded-2xl border border-white/15 bg-white/[0.04] p-5 backdrop-blur-xl">
             <h2 className="text-xl font-semibold">Institution Verification</h2>
             <p className="mt-2 text-sm text-white/80">
               Use an institutional email (for example: <span className="font-semibold">@uwm.edu</span>, <span className="font-semibold">@school.edu</span>, or your verified nonprofit domain).
