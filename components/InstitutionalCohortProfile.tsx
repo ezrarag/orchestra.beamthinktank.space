@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import { collection, getDocs, addDoc, query, where, serverTimestamp } from 'firebase/firestore'
 import { 
   DEFAULT_BADO_FLORIDA_PROFILE, 
