@@ -331,6 +331,11 @@ export default function HeroStage() {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
+                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 text-white group border-t border-white/10 mt-1 pt-2.5"
+                    >
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#fbbf24]" />
+                      <span className="flex-1 text-[13px] font-semibold text-[#fbbf24]">Orchestra Admin</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
                   </motion.div>
                 )}
