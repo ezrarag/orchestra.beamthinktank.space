@@ -142,6 +142,7 @@ export default function ParticipantProfilePage() {
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
+  const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
   const [disciplinePills, setDisciplinePills] = useState<string[]>([])
   const [newTagInput, setNewTagInput] = useState('')
   const [vcardImportedNotice, setVcardImportedNotice] = useState(false)
@@ -281,6 +282,7 @@ export default function ParticipantProfilePage() {
         setEditName(user?.displayName || data.fullName || targetEmail.split('@')[0])
         setEditEmail(targetEmail)
         setEditPhone('(414) 555-0199')
+        setEditLinkedinUrl(data.linkedinUrl || (isBdsoEzra ? 'https://www.linkedin.com/in/ezrahaugabrooks' : ''))
         setDisciplinePills(data.disciplineTags || ['Resident Cellist', 'Steinway Recording Specialist', 'Media Producer'])
         setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
         setPortfolioItems(data.portfolioMedia || [])
@@ -670,6 +672,7 @@ export default function ParticipantProfilePage() {
         email: emailToUse,
         culturalCapitalNotes: bioText.trim(),
         headshotUrl: profilePhoto,
+        linkedinUrl: editLinkedinUrl.trim(),
         disciplineTags: disciplinePills,
         isRoamingActive: isRoaming,
         roamingCity: roamingLocation,
@@ -1006,9 +1009,23 @@ export default function ParticipantProfilePage() {
           <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
             {displayName}
           </h1>
-          <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
-            {handleName}
-          </p>
+          <div className="flex items-center space-x-3 pointer-events-auto">
+            <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
+              {handleName}
+            </p>
+            {(editLinkedinUrl || profile?.linkedinUrl) && (
+              <a
+                href={editLinkedinUrl || profile?.linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 rounded-full bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-blue-300 text-xs font-semibold flex items-center space-x-1.5 backdrop-blur-md transition shadow-md"
+                title="View LinkedIn Profile"
+              >
+                <span>LinkedIn Profile</span>
+                <ArrowUpRight className="w-3 h-3 text-blue-300" />
+              </a>
+            )}
+          </div>
         </div>
 
         {/* FOLDER 0: GIGS */}
@@ -1360,7 +1377,7 @@ export default function ParticipantProfilePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">Full Name</label>
                   <input
@@ -1397,6 +1414,17 @@ export default function ParticipantProfilePage() {
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="(555) 000-0000"
                     className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/50 block mb-0.5 uppercase tracking-wider">LinkedIn Profile URL</label>
+                  <input
+                    type="url"
+                    value={editLinkedinUrl}
+                    onChange={(e) => setEditLinkedinUrl(e.target.value)}
+                    placeholder="https://www.linkedin.com/in/username"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-sans focus:outline-none focus:border-blue-400"
                   />
                 </div>
               </div>

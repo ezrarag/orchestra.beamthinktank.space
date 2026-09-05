@@ -40,32 +40,32 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'watch',
     doorNumber: '01',
-    label: 'Studio & Media Vault',
+    label: 'Watch & Subscribe',
     subtitle: 'Watch & Explore Performances',
     description: 'Immerse in high-definition rehearsal recordings, chamber masterworks, and masterclass interviews celebrating Black classical heritage.',
-    colorAccent: '#D4AF37', // Orchestra Gold
-    ctaText: 'Explore Studio Vault',
-    ctaHref: '/studio'
+    colorAccent: '#60a5fa', // BEAM Blue
+    ctaText: 'Watch & Subscribe',
+    ctaHref: '/audience/profile'
   },
   {
     id: 'participate',
     doorNumber: '02',
-    label: 'Participant Network',
+    label: 'Musician & Crew Portal',
     subtitle: 'Perform, Earn & Redeem',
     description: 'Audition for professional contract orchestra projects, earn USD stipends up to $495 per project, and collect BEAM Coin credits.',
-    colorAccent: '#A855F7', // BEAM Purple
-    ctaText: 'Join Participant Network',
+    colorAccent: '#34d399', // Emerald Green
+    ctaText: 'Enter Musician & Crew Portal',
     ctaHref: '/profile'
   },
   {
     id: 'cohorts',
     doorNumber: '03',
-    label: 'Institutional Cohorts',
+    label: 'Presenter & Venue Portal',
     subtitle: 'Multi-City Ensemble Hubs',
     description: 'Partner orchestra hubs including BDSO and Concord Symphony, connecting musicians across Milwaukee, Concord, Orlando, Miami, and Tampa.',
-    colorAccent: '#3B82F6', // BEAM Blue
-    ctaText: 'View Ensembles & Cities',
-    ctaHref: '/cities'
+    colorAccent: '#c084fc', // Purple Accent
+    ctaText: 'Enter Presenter & Venue Portal',
+    ctaHref: '/institution/profile'
   }
 ]
 
@@ -331,40 +331,7 @@ export default function HeroStage() {
                         handleManualInteraction()
                         setIsDropdownOpen(false)
                       }}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all hover:bg-white/10 border-t border-white/8 mt-0.5 pt-3 group"
-                    >
-                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#fbbf24]" />
-                      <span className="flex-1 text-[13px] font-semibold text-[#fbbf24]">Admin Directory</span>
-                      <ArrowUpRight className="w-3.5 h-3.5 text-white/30 group-hover:text-white/70 transition" />
                     </Link>
-
-                    {CATEGORIES.map((cat, idx) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          handleManualInteraction()
-                          setActiveIndex(idx)
-                          setIsDropdownOpen(false)
-                        }}
-                        className={`w-full flex items-start space-x-3 p-2 rounded-xl transition-all ${
-                          activeIndex === idx
-                            ? 'bg-white/15 border border-white/20 text-white'
-                            : 'hover:bg-white/10 text-white/60 hover:text-white'
-                        }`}
-                      >
-                        <div
-                          className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                          style={{ backgroundColor: cat.colorAccent }}
-                        />
-                        <div>
-                          <div className="text-[11px] font-bold flex items-center justify-between gap-2">
-                            <span>{cat.label}</span>
-                            <span className="text-[9px] font-mono text-white/40">({cat.doorNumber})</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
                   </motion.div>
                 )}
               </AnimatePresence>

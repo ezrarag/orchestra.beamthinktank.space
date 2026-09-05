@@ -221,6 +221,7 @@ export interface ParticipantDemographics {
   academicInstitution?: string
   homeOrchestra?: string
   headshotUrl?: string
+  linkedinUrl?: string
 }
 
 export interface OrchestraCrossSiteRecordPayload {
@@ -255,6 +256,7 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
   homeHub: 'Milwaukee, WI / Chicago, IL',
   isRoamingActive: true,
   roamingCity: 'Orlando, FL (Steinway Gallery Residency)',
+  linkedinUrl: 'https://www.linkedin.com/in/ezrahaugabrooks',
   hoodVillageBalance: 0,
   hoodAllocations: DEFAULT_HOOD_ALLOCATION,
   infrastructureNeeds: [
