@@ -22,8 +22,33 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase()
 }
 
+function loadEnvFiles() {
+  const envFiles = ['.env.local', '.env']
+  for (const file of envFiles) {
+    const filePath = path.join(process.cwd(), file)
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8')
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+          const idx = trimmed.indexOf('=')
+          const key = trimmed.slice(0, idx).trim()
+          let val = trimmed.slice(idx + 1).trim()
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1)
+          }
+          if (key && !process.env[key]) {
+            process.env[key] = val
+          }
+        }
+      }
+    }
+  }
+}
+
 function initAdmin() {
   if (getApps().length > 0) return getApps()[0]
+  loadEnvFiles()
 
   const serviceAccountPath = path.join(process.cwd(), 'service-account.json')
   if (fs.existsSync(serviceAccountPath)) {
@@ -108,5 +133,23 @@ async function main() {
 
 main().catch((error) => {
   console.error('Test institution seed failed:', error)
+  const errStr = String(error)
+  if (errStr.includes('invalid_grant') || errStr.includes('invalid_rapt')) {
+    console.error('\n=============================================================')
+    console.error('🔑 FIREBASE AUTH / GOOGLE ADC RE-AUTHENTICATION REQUIRED')
+    console.error('=============================================================')
+    console.error('Your local Google Cloud SDK Application Default Credentials (ADC) have expired.')
+    console.error('Google Workspace security requires periodic re-authentication (invalid_rapt).\n')
+    console.error('To fix this and run the script successfully, choose ONE of these options:')
+    console.error('\n👉 OPTION 1 (Recommended - Quickest fix in terminal):')
+    console.error('   Run: gcloud auth application-default login')
+    console.error('   (Follow the browser prompt to re-authenticate with Google Cloud)\n')
+    console.error('👉 OPTION 2 (Using Service Account file):')
+    console.error('   Place your Firebase service account JSON key file as `service-account.json`')
+    console.error('   in the root directory of orchestra.beamthinktank.space\n')
+    console.error('👉 OPTION 3 (Using .env.local):')
+    console.error('   Add FIREBASE_ADMIN_CLIENT_EMAIL and FIREBASE_ADMIN_PRIVATE_KEY to `.env.local`')
+    console.error('=============================================================\n')
+  }
   process.exit(1)
 })
