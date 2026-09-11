@@ -1,60 +1,68 @@
+import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import type { CommitmentSummary, OpenCallSummary, SessionSummary } from '@/lib/types/portal'
-
-const upcomingSessions: SessionSummary[] = [
-  {
-    id: 'sess-01',
-    title: 'String Section Tracking',
-    date: '2026-02-25 18:00',
-    location: 'BEAM Studio A',
-    type: 'Recording',
-  },
-  {
-    id: 'sess-02',
-    title: 'Chamber Rehearsal Capture',
-    date: '2026-03-02 17:30',
-    location: 'Downtown Hall',
-    type: 'Workshop',
-  },
-]
-
-const commitments: CommitmentSummary[] = [
-  {
-    id: 'commit-01',
-    title: 'Session Call: Strings + Piano',
-    time: 'Wed, Feb 25 · 6:00 PM',
-    location: 'BEAM Studio A',
-  },
-  {
-    id: 'commit-02',
-    title: 'Dress Rehearsal',
-    time: 'Sat, Feb 28 · 10:00 AM',
-    location: 'Community Arts Center',
-  },
-]
-
-const openCalls: OpenCallSummary[] = [
-  {
-    id: 'call-01',
-    title: 'Paid Recording Block: Brass Section',
-    details: '4-hour session for regional collaboration showcase.',
-    paid: true,
-  },
-  {
-    id: 'call-02',
-    title: 'Volunteer Outreach Ensemble',
-    details: 'Community event set with chamber-sized instrumentation.',
-    paid: false,
-  },
-]
+import { fetchRecordingProjects } from '@/lib/api/recordingProjects'
 
 export async function fetchUpcomingSessions(_ngo: string): Promise<SessionSummary[]> {
-  return upcomingSessions
+  if (!db) return []
+
+  try {
+    const q = query(collection(db, 'sessions'), orderBy('date', 'asc'), limit(10))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      const rawType = typeof data.type === 'string' ? data.type : 'Recording'
+      const type: 'Recording' | 'Performance' | 'Workshop' =
+        rawType === 'Performance' || rawType === 'Workshop' ? rawType : 'Recording'
+
+      return {
+        id: docSnap.id,
+        title: typeof data.title === 'string' ? data.title : docSnap.id,
+        date: typeof data.date === 'string' ? data.date : 'TBD',
+        location: typeof data.location === 'string' ? data.location : 'Location TBD',
+        type,
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching sessions:', error)
+    return []
+  }
 }
 
 export async function fetchCommitments(_ngo: string, _userId?: string): Promise<CommitmentSummary[]> {
-  return commitments
+  if (!db) return []
+
+  try {
+    const q = _userId
+      ? query(collection(db, 'commitments'), where('userId', '==', _userId))
+      : query(collection(db, 'commitments'), limit(10))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        title: typeof data.title === 'string' ? data.title : docSnap.id,
+        time: typeof data.time === 'string' ? data.time : 'TBD',
+        location: typeof data.location === 'string' ? data.location : 'Location TBD',
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching commitments:', error)
+    return []
+  }
 }
 
 export async function fetchOpenCalls(_ngo: string): Promise<OpenCallSummary[]> {
-  return openCalls
+  try {
+    const projects = await fetchRecordingProjects('open_for_roster')
+    return projects.map((p) => ({
+      id: p.id,
+      title: `${p.title} (${p.city})`,
+      details: p.description || `Roles needed: ${p.rolesNeeded.map((r) => r.role).join(', ')}`,
+      paid: p.fundingPath !== 'unfunded',
+    }))
+  } catch (error) {
+    console.error('Error fetching open calls:', error)
+    return []
+  }
 }

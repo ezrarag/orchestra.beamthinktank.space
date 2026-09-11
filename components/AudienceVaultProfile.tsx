@@ -46,55 +46,12 @@ export interface VaultWatchItem {
   description?: string
 }
 
-const DEFAULT_WATCH_HISTORY: VaultWatchItem[] = [
-  {
-    id: 'v-1',
-    title: 'Schumann Adagio & Allegro — Steinway Gallery Orlando',
-    category: 'Steinway Session',
-    ensembleId: 'chamber-ensemble',
-    ensembleName: 'Chamber Ensembles & Steinway Recital Takes',
-    institutionName: 'Steinway Gallery Orlando',
-    featuredMusicianName: 'Cordie Ruckus & Steinway Artist Fellow',
-    uploaderType: 'institution',
-    duration: '11:42',
-    dateWatched: '2026-02-18',
-    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'v-2',
-    title: 'BEAM Training Orchestra — Margaret Bonds Ballad Rehearsal',
-    category: 'Orchestral Stream',
-    ensembleId: 'beam-training-orchestra',
-    ensembleName: 'BEAM Training Orchestra',
-    institutionName: 'BEAM Academy Milwaukee',
-    featuredMusicianName: 'BEAM Orchestra Fellows',
-    uploaderType: 'ensemble_director',
-    duration: '42:15',
-    dateWatched: '2026-01-24',
-    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'v-3',
-    title: 'Florence Price Piano Concerto — Professional Orchestra Take',
-    category: 'Masterclass',
-    ensembleId: 'beam-professional-orchestra',
-    ensembleName: 'BEAM Professional Orchestra',
-    institutionName: 'Milwaukee Symphony Hall',
-    featuredMusicianName: 'Dayvin Hallmon & Guest Soloist',
-    uploaderType: 'admin',
-    duration: '28:30',
-    dateWatched: '2025-12-15',
-    url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80'
-  }
-]
+const DEFAULT_WATCH_HISTORY: VaultWatchItem[] = []
 
 export default function AudienceVaultProfile() {
   const { user, loading: authLoading } = useUserRole()
   const [liveVaultMedia, setLiveVaultMedia] = useState<VaultWatchItem[]>([])
-  const [savedFavorites, setSavedFavorites] = useState<string[]>(['v-1', 'v-2'])
+  const [savedFavorites, setSavedFavorites] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'watchlist' | 'ensembles' | 'institutions' | 'participants' | 'favorites' | 'membership' | 'sync'>('watchlist')
   const [ensembleFilter, setEnsembleFilter] = useState<string>('all')
   const [institutionFilter, setInstitutionFilter] = useState<string>('all')
@@ -103,7 +60,7 @@ export default function AudienceVaultProfile() {
 
   // Fetch real-time media from Firestore projectRehearsalMedia collection
   useEffect(() => {
-    if (!db || !user) return
+    if (!db) return
 
     const q = query(
       collection(db, 'projectRehearsalMedia'),
@@ -143,7 +100,7 @@ export default function AudienceVaultProfile() {
     )
 
     return () => unsubscribe()
-  }, [user])
+  }, [])
 
   // Combine default static takes with live Firestore items
   const allVaultItems = useMemo(() => {

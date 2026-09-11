@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Footer from '@/components/Footer'
 import { Calendar, Clock, MapPin, DollarSign, Filter, Search } from 'lucide-react'
 // Removed Supabase import for deployment
+import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { format } from 'date-fns'
 
 type Performance = {
@@ -25,7 +27,7 @@ export default function PerformancesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville']
+  const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville', 'Milwaukee', 'Chicago']
 
   useEffect(() => {
     fetchPerformances()
@@ -38,57 +40,30 @@ export default function PerformancesPage() {
   const fetchPerformances = async () => {
     try {
       setLoading(true)
-      // For demo purposes, using mock data. In production, this would fetch from Supabase
-      const mockPerformances: Performance[] = [
-        {
-          id: '1',
-          title: 'Winter Concert Series',
-          date: '2024-12-15',
-          time: '19:00',
-          venue: 'Orlando Philharmonic Hall',
-          description: 'A celebration of classical masterpieces featuring our full orchestra performing works by Beethoven, Mozart, and Tchaikovsky.',
-          city: 'Orlando',
-          ticket_price: 25,
-          created_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '2',
-          title: 'Chamber Music Evening',
-          date: '2024-12-22',
-          time: '20:00',
-          venue: 'St. James Cathedral',
-          description: 'Intimate performances by our chamber ensembles featuring string quartets and wind quintets.',
-          city: 'Orlando',
-          ticket_price: 15,
-          created_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '3',
-          title: 'New Year\'s Gala',
-          date: '2025-01-01',
-          time: '21:00',
-          venue: 'Grand Bohemian Hotel',
-          description: 'Ring in the new year with classical favorites and champagne reception.',
-          city: 'Orlando',
-          ticket_price: 50,
-          created_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '4',
-          title: 'Spring Symphony',
-          date: '2025-03-15',
-          time: '18:30',
-          venue: 'Dr. Phillips Center',
-          description: 'Our spring concert featuring Vivaldi\'s Four Seasons and contemporary compositions.',
-          city: 'Orlando',
-          ticket_price: 30,
-          created_at: '2024-01-01T00:00:00Z'
+      if (!db) {
+        setPerformances([])
+        return
+      }
+      const q = query(collection(db, 'performances'), orderBy('date', 'asc'))
+      const snapshot = await getDocs(q)
+      const fetched: Performance[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data()
+        return {
+          id: docSnap.id,
+          title: typeof data.title === 'string' ? data.title : docSnap.id,
+          date: typeof data.date === 'string' ? data.date : new Date().toISOString().split('T')[0],
+          time: typeof data.time === 'string' ? data.time : '19:30',
+          venue: typeof data.venue === 'string' ? data.venue : 'Performance Hall TBD',
+          city: typeof data.city === 'string' ? data.city : 'Milwaukee',
+          description: typeof data.description === 'string' ? data.description : 'BEAM Orchestral Performance',
+          ticket_price: typeof data.ticket_price === 'number' ? data.ticket_price : 0,
+          created_at: typeof data.created_at === 'string' ? data.created_at : undefined,
         }
-      ]
-      
-      setPerformances(mockPerformances)
+      })
+      setPerformances(fetched)
     } catch (error) {
       console.error('Error fetching performances:', error)
+      setPerformances([])
     } finally {
       setLoading(false)
     }

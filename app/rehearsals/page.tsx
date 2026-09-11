@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Footer from '@/components/Footer'
 import { Calendar, Clock, MapPin, Users, Plus, Filter, Search } from 'lucide-react'
 // Removed Supabase import for deployment
+import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { format } from 'date-fns'
 
 type Rehearsal = {
@@ -27,7 +29,7 @@ export default function RehearsalsPage() {
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [selectedRehearsal, setSelectedRehearsal] = useState<any | null>(null)
 
-  const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville']
+  const cities = ['Orlando', 'Tampa', 'Miami', 'Jacksonville', 'Milwaukee', 'Chicago']
 
   useEffect(() => {
     fetchRehearsals()
@@ -40,57 +42,30 @@ export default function RehearsalsPage() {
   const fetchRehearsals = async () => {
     try {
       setLoading(true)
-      // For demo purposes, using mock data. In production, this would fetch from Supabase
-      const mockRehearsals: Rehearsal[] = [
-        {
-          id: '1',
-          date: '2024-12-10',
-          time: '19:00',
-          duration: 120,
-          location: 'Orlando Community Center',
-          city: 'Orlando',
-          description: 'Full orchestra rehearsal for Winter Concert Series. All sections welcome.',
-          max_participants: 60,
-          current_participants: 45
-        },
-        {
-          id: '2',
-          date: '2024-12-12',
-          time: '18:30',
-          duration: 90,
-          location: 'St. James Cathedral',
-          city: 'Orlando',
-          description: 'Chamber music rehearsal focusing on string quartets and wind ensembles.',
-          max_participants: 20,
-          current_participants: 18
-        },
-        {
-          id: '3',
-          date: '2024-12-14',
-          time: '14:00',
-          duration: 180,
-          location: 'Dr. Phillips Center',
-          city: 'Orlando',
-          description: 'Dress rehearsal for Winter Concert Series. Full performance run-through.',
-          max_participants: 80,
-          current_participants: 65
-        },
-        {
-          id: '4',
-          date: '2024-12-17',
-          time: '19:00',
-          duration: 120,
-          location: 'Orlando Community Center',
-          city: 'Orlando',
-          description: 'Sectional rehearsals: Strings, Woodwinds, Brass, and Percussion.',
-          max_participants: 60,
-          current_participants: 52
+      if (!db) {
+        setRehearsals([])
+        return
+      }
+      const q = query(collection(db, 'rehearsals'), orderBy('date', 'asc'))
+      const snapshot = await getDocs(q)
+      const fetched: Rehearsal[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data()
+        return {
+          id: docSnap.id,
+          date: typeof data.date === 'string' ? data.date : new Date().toISOString().split('T')[0],
+          time: typeof data.time === 'string' ? data.time : '18:30',
+          duration: typeof data.duration === 'number' ? data.duration : 120,
+          location: typeof data.location === 'string' ? data.location : 'Rehearsal Venue TBD',
+          city: typeof data.city === 'string' ? data.city : 'Milwaukee',
+          description: typeof data.description === 'string' ? data.description : 'BEAM Orchestral Rehearsal Session.',
+          max_participants: typeof data.max_participants === 'number' ? data.max_participants : 60,
+          current_participants: typeof data.current_participants === 'number' ? data.current_participants : 0,
         }
-      ]
-      
-      setRehearsals(mockRehearsals)
+      })
+      setRehearsals(fetched)
     } catch (error) {
       console.error('Error fetching rehearsals:', error)
+      setRehearsals([])
     } finally {
       setLoading(false)
     }

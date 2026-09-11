@@ -225,3 +225,28 @@ export async function upsertInstitutionProject(project: InstitutionProject): Pro
     { merge: true },
   )
 }
+
+export async function removeContactEmailFromInstitutionAccount(accountId: string, emailToRemove: string): Promise<void> {
+  if (!db) {
+    throw new Error('Institution account service is not initialized.')
+  }
+
+  const accountRef = doc(db, INSTITUTION_ACCOUNTS_COLLECTION, accountId)
+  const snap = await getDoc(accountRef)
+  if (!snap.exists()) return
+
+  const data = snap.data()
+  const contactEmails: string[] = Array.isArray(data.contactEmails) ? data.contactEmails : []
+  const normalizedToRemove = emailToRemove.trim().toLowerCase()
+  const updatedEmails = contactEmails.filter((e) => e.toLowerCase() !== normalizedToRemove)
+
+  await setDoc(
+    accountRef,
+    {
+      contactEmails: updatedEmails,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+}
+
