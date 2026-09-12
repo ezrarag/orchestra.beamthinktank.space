@@ -265,99 +265,18 @@ export const DEFAULT_EZRA_PROFILE: ParticipantDemographics = {
     { id: 'meals', label: 'Per Diem / Meal Access', needed: true, priority: 'medium', description: 'Catering & per diem support during multi-day contract runs.' },
     { id: 'instrument_maintenance', label: 'Instrument Maintenance / Luthier', needed: false, priority: 'low', description: 'Cello bow rehair & luthier adjustments.' }
   ],
-  portfolioMedia: [
-    {
-      id: 'p1',
-      title: 'Schumann Adagio & Allegro — Steinway Gallery Orlando',
-      url: 'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/Black%20Diaspora%20Symphony%2Fstudio%2FSchumann%20-%20Adagio%20-%20Take%20II%20-%20Dec%205.mov?alt=media&token=34d0e14a-1721-4826-8e43-e3099d4a81c4',
-      category: 'Steinway Session',
-      dateAdded: '2025-12-05'
-    },
-    {
-      id: 'p2',
-      title: 'Margaret Bonds Ballad of the Brown King — BDSO Annual Concert',
-      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      category: 'Orchestral Performance',
-      dateAdded: '2025-11-12'
-    }
-  ],
+  portfolioMedia: [],
   willingnessToTravel: true,
   ethnicity: 'Black / African Diaspora',
   pronouns: 'He / Him',
   educationBackground: 'Master of Music (M.M.) Cellist',
   culturalCapitalNotes: 'Cellist & Section Leader for Black Diaspora Symphony Orchestra. Repertoire specialist in Margaret Bonds, Florence Price, and William Grant Still.',
-  uncompensatedRehearsalHours: 24,
+  uncompensatedRehearsalHours: 0,
   beamCoinBalance: 0,
   usdTotalEarned: 0
 }
 
-export const DEFAULT_EZRA_EVENTS: EventPlayed[] = [
-  {
-    id: 'bdo-001',
-    title: 'Black Diaspora Symphony Orchestra Inaugural Masterworks',
-    repertoire: 'Margaret Bonds – Montgomery Variations',
-    role: 'Principal Cello',
-    venue: 'Bradley Symphony Center',
-    cityState: 'Milwaukee, WI',
-    date: '2025-11-15',
-    type: 'Full Symphony',
-    usdStipend: 200,
-    beamCoinsEarned: 10,
-    status: 'Played'
-  },
-  {
-    id: 'bdo-002',
-    title: 'BDSO Chamber Music Residency & Masterclass',
-    repertoire: 'R. Schumann – Adagio and Allegro, Op. 70 & W. G. Still – Spiritual Suite',
-    role: 'Lead Cellist / Chamber Soloist',
-    venue: 'Concord Performing Arts Hub',
-    cityState: 'Concord, NC',
-    date: '2025-12-05',
-    type: 'Chamber Residency',
-    usdStipend: 120,
-    beamCoinsEarned: 4,
-    status: 'Played'
-  },
-  {
-    id: 'bdo-003',
-    title: 'Sectional Intensive & Youth Mentorship Workshop',
-    repertoire: 'Florence Price – Symphony No. 1 in E Minor',
-    role: 'Section Leader & Mentor',
-    venue: 'Chicago Cultural Center',
-    cityState: 'Chicago, IL',
-    date: '2026-01-20',
-    type: 'Sectional & Workshop',
-    usdStipend: 165,
-    beamCoinsEarned: 8,
-    status: 'Played'
-  },
-  {
-    id: 'bdo-004',
-    title: 'BEAM Winter Gala & Composers Showcase',
-    repertoire: 'Black Diaspora Living Composers Suite',
-    role: 'Principal Cello',
-    venue: 'Dr. Phillips Center for the Performing Arts',
-    cityState: 'Orlando, FL',
-    date: '2026-02-14',
-    type: 'Gala Showcase',
-    usdStipend: 250,
-    beamCoinsEarned: 12,
-    status: 'Played'
-  },
-  {
-    id: 'bdo-005',
-    title: 'Spring 2026 BDSO Multi-City Tour',
-    repertoire: 'Margaret Bonds & Duke Ellington Symphonic Suite',
-    role: 'Principal Cello',
-    venue: 'Miller High Life Theatre',
-    cityState: 'Milwaukee, WI',
-    date: '2026-04-18',
-    type: 'Tour',
-    usdStipend: 300,
-    beamCoinsEarned: 14,
-    status: 'Scheduled'
-  }
-]
+export const DEFAULT_EZRA_EVENTS: EventPlayed[] = []
 
 export async function fetchParticipantProfile(
   email: string,
