@@ -44,6 +44,7 @@ export interface RecordingProject {
   venueRef?: string
   status: RecordingProjectStatus
   rolesNeeded: RoleNeeded[]
+  workIds?: string[]
   scoreFiles?: string[]
   targetDates?: string[]
   fundingPath: FundingPath
@@ -69,6 +70,7 @@ export function normalizeRecordingProject(id: string, data: Record<string, unkno
     venueRef: typeof data.venueRef === 'string' ? data.venueRef : undefined,
     status: (data.status as RecordingProjectStatus) || 'open_for_roster',
     rolesNeeded: Array.isArray(data.rolesNeeded) ? (data.rolesNeeded as RoleNeeded[]) : [],
+    workIds: Array.isArray(data.workIds) ? (data.workIds as string[]) : [],
     scoreFiles: Array.isArray(data.scoreFiles) ? (data.scoreFiles as string[]) : [],
     targetDates: Array.isArray(data.targetDates) ? (data.targetDates as string[]) : [],
     fundingPath: (data.fundingPath as FundingPath) || 'unfunded',

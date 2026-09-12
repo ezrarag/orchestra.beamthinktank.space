@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Music, ArrowRight, Plus, CheckCircle, Sparkles, X } from 'lucide-react'
+import { Music, ArrowRight, Plus, CheckCircle, Sparkles, X, FileText, Layers, Video } from 'lucide-react'
 import Image from 'next/image'
 import { useUserRole } from '@/lib/hooks/useUserRole'
 import {
@@ -14,6 +14,9 @@ import {
   type FundingPath,
 } from '@/lib/api/recordingProjects'
 import { createCommunityBookingInterest } from '@/lib/api/bookings'
+import WorkPickerModal from '@/components/works/WorkPickerModal'
+import ProjectProductionTab from '@/components/works/ProjectProductionTab'
+import { type WorkDocument } from '@/lib/api/works'
 
 const DEFAULT_PROJECT_IMAGE =
   'https://firebasestorage.googleapis.com/v0/b/beam-orchestra-platform.firebasestorage.app/o/pexels-afroromanzo-4028878.jpg?alt=media&token=b95bbe32-cc29-4ff7-815a-3dd558efa561'
@@ -23,8 +26,7 @@ export default function SelectProjectPage() {
   const { user } = useUserRole()
   const [projects, setProjects] = useState<RecordingProject[]>([])
   const [loadingProjects, setLoadingProjects] = useState(true)
-  const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  
+
   // Start Project Modal State
   const [showStartModal, setShowStartModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -39,6 +41,13 @@ export default function SelectProjectPage() {
     description: '',
     fundingPath: 'unfunded' as FundingPath,
   })
+
+  // Work Picker State
+  const [showWorkPicker, setShowWorkPicker] = useState(false)
+  const [selectedWork, setSelectedWork] = useState<WorkDocument | null>(null)
+
+  // Production Tab Drawer State
+  const [productionProject, setProductionProject] = useState<RecordingProject | null>(null)
 
   // Join Interest Modal State
   const [joinModalProject, setJoinModalProject] = useState<RecordingProject | null>(null)
@@ -85,6 +94,7 @@ export default function SelectProjectPage() {
         { role: 'Recording Engineer', filled: false },
         { role: 'Business / IP Manager', filled: false },
       ],
+      workIds: selectedWork ? [selectedWork.id] : [],
       fundingPath: formData.fundingPath,
       visibility: 'public',
       description: formData.description,
@@ -96,6 +106,7 @@ export default function SelectProjectPage() {
       setTimeout(() => {
         setSubmitSuccess(false)
         setShowStartModal(false)
+        setSelectedWork(null)
         setFormData({
           title: '',
           composer: '',
@@ -150,16 +161,23 @@ export default function SelectProjectPage() {
             BEAM Recording Projects
           </h1>
           <p className="text-gray-300 text-base sm:text-lg max-w-xl mx-auto">
-            Join an open roster recording project or submit a proposal to initiate a new BEAM standard recording block.
+            Join an open roster recording project or submit a proposal with score PDFs, audio references, and multimedia AR/VR assets.
           </p>
 
-          <div className="mt-6 flex justify-center gap-4">
+          <div className="mt-6 flex flex-wrap justify-center gap-4">
             <button
               onClick={() => setShowStartModal(true)}
               className="inline-flex items-center gap-2 bg-[#D4AF37] hover:bg-[#b8972e] text-black font-semibold px-6 py-3 rounded-xl transition-all shadow-lg"
             >
               <Plus className="w-5 h-5" />
               Start a Recording Project
+            </button>
+            <button
+              onClick={() => setShowWorkPicker(true)}
+              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold px-5 py-3 rounded-xl transition-all border border-white/20"
+            >
+              <FileText className="w-4 h-4 text-[#D4AF37]" />
+              Works Library & Uploads
             </button>
           </div>
         </motion.div>
@@ -210,6 +228,12 @@ export default function SelectProjectPage() {
                       <span className="bg-white/10 text-white/80 text-xs px-2.5 py-0.5 rounded-full">
                         {project.city}
                       </span>
+                      {project.workIds && project.workIds.length > 0 && (
+                        <span className="bg-purple-500/20 text-purple-300 text-xs px-2.5 py-0.5 rounded-full border border-purple-500/30 flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          {project.workIds.length} Linked Work(s)
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-xl font-bold text-white mb-1 group-hover:text-[#D4AF37] transition-colors">
@@ -247,6 +271,14 @@ export default function SelectProjectPage() {
                     >
                       <span>Join Project Roster</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+
+                    <button
+                      onClick={() => setProductionProject(project)}
+                      className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-xs text-gray-300 hover:text-white px-3.5 py-1.5 rounded-lg transition-all border border-white/10 flex items-center gap-1.5"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <span>Multimedia & AR/VR</span>
                     </button>
                   </div>
                 </div>
@@ -287,7 +319,7 @@ export default function SelectProjectPage() {
                     Propose a Recording Project
                   </h2>
                   <p className="text-gray-300 text-sm mb-6">
-                    Initiate a BEAM standard recording session cut with assigned roles for conductors, engineers, and musicians.
+                    Initiate a BEAM standard recording session cut with assigned roles and linked score/audio works.
                   </p>
 
                   <form onSubmit={handleStartProjectSubmit} className="space-y-4">
@@ -331,6 +363,37 @@ export default function SelectProjectPage() {
                           className="w-full bg-white/5 border border-white/15 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37]"
                         />
                       </div>
+                    </div>
+
+                    {/* Connect Score / Work Section */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold uppercase text-purple-300">
+                          Linked Work & Score File
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowWorkPicker(true)}
+                          className="text-xs text-[#D4AF37] hover:underline font-medium flex items-center gap-1"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {selectedWork ? 'Change Work' : 'Search / Upload Work'}
+                        </button>
+                      </div>
+
+                      {selectedWork ? (
+                        <div className="bg-black/30 p-3 rounded-lg border border-purple-500/30 text-xs">
+                          <span className="font-bold text-white block">{selectedWork.title}</span>
+                          <span className="text-gray-300 block">Composer: {selectedWork.composer}</span>
+                          <span className="text-purple-300 text-[10px] block mt-1">
+                            {selectedWork.files.score.length} Score PDF(s) attached
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400">
+                          No score work linked yet. Click to search existing works or upload score PDFs.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -402,6 +465,50 @@ export default function SelectProjectPage() {
                   </form>
                 </>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Work Picker Modal Component */}
+      <WorkPickerModal
+        isOpen={showWorkPicker}
+        onClose={() => setShowWorkPicker(false)}
+        onSelectWork={(work) => {
+          setSelectedWork(work)
+          setFormData((prev) => ({
+            ...prev,
+            title: prev.title || work.title,
+            composer: prev.composer || work.composer,
+            arranger: prev.arranger || work.arranger || '',
+          }))
+        }}
+        initialComposer={formData.composer}
+        initialTitle={formData.title}
+      />
+
+      {/* Production & Multimedia Drawer/Modal */}
+      <AnimatePresence>
+        {productionProject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-3xl w-full max-h-[90vh] overflow-y-auto relative"
+            >
+              <button
+                onClick={() => setProductionProject(null)}
+                className="absolute top-6 right-6 text-gray-400 hover:text-white z-10"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <ProjectProductionTab
+                recordingProjectId={productionProject.id}
+                workIds={productionProject.workIds}
+                onClose={() => setProductionProject(null)}
+              />
             </motion.div>
           </div>
         )}
