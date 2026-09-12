@@ -69,7 +69,8 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   HelpCircle,
-  ArrowUpRight
+  ArrowUpRight,
+  Search
 } from 'lucide-react'
 
 const BDSO_SANDBOX_EMAIL = 'sandbox.musician@beamthinktank.space'
@@ -834,411 +835,637 @@ export default function ParticipantProfilePage() {
         className="hidden"
       />
 
-      {/* 100vh x 100vw VIEWPORT LOCKED SPATIAL CANVAS CONTAINER */}
-      <div 
-        onClick={() => setActiveCanvasFolder(null)}
-        className="relative w-full h-full overflow-hidden flex flex-col justify-between"
-      >
-        {/* Dynamic Ambient Background Photo (Google Social Login Photo) */}
-        {bgPhoto ? (
-          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            <img
-              src={bgPhoto}
-              alt={displayName}
-              className="w-full h-full object-cover opacity-35 filter blur-[3px] scale-105 transition-all duration-700"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#0A0B0E]/90" />
-          </div>
-        ) : null}
+      {/* MAIN LAYOUT WRAPPER (HERO HEADER + SCROLLABLE HUB PANEL) */}
+      <div className="relative w-full min-h-screen bg-[#0A0B0E] text-white flex flex-col font-sans">
 
-        {/* Ambient Radial Gradient Overlay (Semi-transparent so photo shows behind) */}
+        {/* 1. HERO HEADER BAND */}
         <div 
-          className={`absolute inset-0 transition-all duration-300 pointer-events-none z-[1] ${
-            activeCanvasFolder !== null ? 'blur-sm brightness-75' : ''
-          }`}
-          style={{
-            background: 'radial-gradient(circle at 20% 80%, rgba(192,132,252,0.22), transparent 55%), radial-gradient(circle at 80% 10%, rgba(212,175,55,0.25), transparent 55%), linear-gradient(160deg, rgba(28,25,48,0.65), rgba(20,21,32,0.80) 55%, rgba(10,11,14,0.92))'
-          }}
-        />
+          onClick={() => setActiveCanvasFolder(null)}
+          className="relative w-full h-[56vh] min-h-[420px] flex flex-col justify-between overflow-hidden"
+        >
+          {/* Dynamic Ambient Background Photo */}
+          {bgPhoto ? (
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+              <img
+                src={bgPhoto}
+                alt={displayName}
+                className="w-full h-full object-cover opacity-35 filter blur-[3px] scale-105 transition-all duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#0A0B0E]" />
+            </div>
+          ) : null}
 
-        {/* Sandbox Preview Banner */}
-        {isSandboxPreview && !user && (
-          <div className="absolute top-0 inset-x-0 z-40 bg-amber-500/10 border-b border-amber-500/30 px-6 py-1.5 flex items-center justify-between text-xs font-mono text-amber-200">
-            <span>⚡ SANDBOX PREVIEW (BDSO CORE)</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsSandboxPreview(false); }}
-              className="underline text-amber-300 hover:text-white"
+          {/* Ambient Radial Gradient Overlay */}
+          <div 
+            className="absolute inset-0 transition-all duration-300 pointer-events-none z-[1]"
+            style={{
+              background: 'radial-gradient(circle at 20% 80%, rgba(192,132,252,0.22), transparent 55%), radial-gradient(circle at 80% 10%, rgba(212,175,55,0.25), transparent 55%), linear-gradient(160deg, rgba(28,25,48,0.65), rgba(20,21,32,0.80) 55%, rgba(10,11,14,0.95))'
+            }}
+          />
+
+          {/* Sandbox Preview Banner */}
+          {isSandboxPreview && !user && (
+            <div className="absolute top-0 inset-x-0 z-40 bg-amber-500/10 border-b border-amber-500/30 px-6 py-1.5 flex items-center justify-between text-xs font-mono text-amber-200">
+              <span>⚡ SANDBOX PREVIEW (BDSO CORE)</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsSandboxPreview(false); }}
+                className="underline text-amber-300 hover:text-white"
+              >
+                Exit Preview
+              </button>
+            </div>
+          )}
+
+          {/* Top Floating Control Bar Overlay */}
+          <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-6 pointer-events-auto">
+            {/* Top-Left: Close X Button (Preserved Return Home) */}
+            <Link
+              href="/"
+              className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
+              title="Return Home"
             >
-              Exit Preview
-            </button>
-          </div>
-        )}
+              <X className="w-5 h-5" />
+            </Link>
 
-        {/* Top Floating Control Bar Overlay */}
-        <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-6 pointer-events-auto">
-          {/* Top-Left: Close X Button */}
-          <Link
-            href="/"
-            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
-            title="Return Home"
-          >
-            <X className="w-5 h-5" />
-          </Link>
+            {/* Centered Top Nav Dock (Pill Row) */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-31 pointer-events-auto">
+              <div className="flex items-center gap-1 sm:gap-1.5 bg-[#0A0B0F]/80 backdrop-blur-2xl border border-white/15 rounded-full p-1 shadow-2xl">
+                {/* Item 0: GIGS */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                    activeCanvasFolder === 0
+                      ? 'bg-blue-500/25 border-blue-400/70 text-white shadow-md shadow-blue-500/20'
+                      : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Building2 className={`w-3.5 h-3.5 ${activeCanvasFolder === 0 ? 'text-blue-400' : 'text-white/60'}`} />
+                  <span className="text-[10px] font-bold tracking-wider uppercase">Gigs</span>
+                </button>
 
-          {/* Centered Top Nav Dock (Pill Row) */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-31 pointer-events-auto">
-            <div className="flex items-center gap-1 sm:gap-1.5 bg-[#0A0B0F]/75 backdrop-blur-2xl border border-white/15 rounded-full p-1 shadow-2xl">
-              {/* Item 0: GIGS */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                  activeCanvasFolder === 0
-                    ? 'bg-blue-500/25 border-blue-400/70 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Building2 className={`w-3.5 h-3.5 ${activeCanvasFolder === 0 ? 'text-blue-400' : 'text-white/60'}`} />
-                <span className="text-[10px] font-bold tracking-wider uppercase">Gigs</span>
-              </button>
+                {/* Item 1: FUNDS */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                    activeCanvasFolder === 1
+                      ? 'bg-[#D4AF37]/25 border-[#D4AF37]/70 text-white shadow-md shadow-[#D4AF37]/20'
+                      : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Coins className={`w-3.5 h-3.5 ${activeCanvasFolder === 1 ? 'text-[#D4AF37]' : 'text-white/60'}`} />
+                  <span className="text-[10px] font-bold tracking-wider uppercase">Funds</span>
+                </button>
 
-              {/* Item 1: FUNDS */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                  activeCanvasFolder === 1
-                    ? 'bg-[#D4AF37]/25 border-[#D4AF37]/70 text-white shadow-md shadow-[#D4AF37]/20'
-                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Coins className={`w-3.5 h-3.5 ${activeCanvasFolder === 1 ? 'text-[#D4AF37]' : 'text-white/60'}`} />
-                <span className="text-[10px] font-bold tracking-wider uppercase">Funds</span>
-              </button>
+                {/* Item 2: MEDIA */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                    activeCanvasFolder === 2
+                      ? 'bg-purple-500/25 border-purple-400/70 text-white shadow-md shadow-purple-500/20'
+                      : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Video className={`w-3.5 h-3.5 ${activeCanvasFolder === 2 ? 'text-purple-400' : 'text-white/60'}`} />
+                  <span className="text-[10px] font-bold tracking-wider uppercase">Media</span>
+                </button>
 
-              {/* Item 2: MEDIA */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                  activeCanvasFolder === 2
-                    ? 'bg-purple-500/25 border-purple-400/70 text-white shadow-md shadow-purple-500/20'
-                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Video className={`w-3.5 h-3.5 ${activeCanvasFolder === 2 ? 'text-purple-400' : 'text-white/60'}`} />
-                <span className="text-[10px] font-bold tracking-wider uppercase">Media</span>
-              </button>
-
-              {/* Item 3: WORKS */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowWorkPickerModal(true)
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:border-pink-400/70 hover:bg-pink-500/20 transition-all cursor-pointer"
-                title="Works Library & Recording Projects Submission"
-              >
-                <Music className="w-3.5 h-3.5 text-pink-400" />
-                <span className="text-[10px] font-bold tracking-wider uppercase text-pink-300">Works</span>
-              </button>
-
-              {/* Item 4: LOGISTICS */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-                  activeCanvasFolder === 3
-                    ? 'bg-teal-500/25 border-teal-400/70 text-white shadow-md shadow-teal-500/20'
-                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Truck className={`w-3.5 h-3.5 ${activeCanvasFolder === 3 ? 'text-teal-400' : 'text-white/60'}`} />
-                <span className="text-[10px] font-bold tracking-wider uppercase">Logistics</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Top-Right: Status Badge, Help ? Button, Context ... Menu */}
-          <div className="flex items-center space-x-3 relative">
-            {user || isSandboxPreview ? (
-              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1.5 shadow-lg">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Signed In</span>
-              </span>
-            ) : null}
-
-            {/* How This Works ? Help Button */}
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowHelpModal(!showHelpModal)
-                  setShowMoreMenu(false)
-                }}
-                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
-                title="How This Works Explainer"
-              >
-                <HelpCircle className="w-5 h-5 text-amber-400" />
-              </button>
-
-            </div>
-
-            {/* Context Dropdown Menu ... */}
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowMoreMenu(!showMoreMenu)
-                  setShowHelpModal(false)
-                }}
-                className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
-                title="More Options Menu"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
-
-              {showMoreMenu && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-30" 
-                    onClick={() => setShowMoreMenu(false)} 
-                  />
-                  <div className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-[#151722]/95 backdrop-blur-xl border border-white/20 shadow-2xl z-40 space-y-1 text-xs">
-                    <button
-                      onClick={() => {
-                        setIsEditingBio(true)
-                        setShowMoreMenu(false)
-                      }}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                    >
-                      <Edit3 className="w-4 h-4 text-amber-400" />
-                      <span>Edit Profile & CV</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowPhotoModal(true)
-                        setShowMoreMenu(false)
-                      }}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                    >
-                      <UserIcon className="w-4 h-4 text-purple-400" />
-                      <span>Update Headshot Photo</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        handleShareProfile()
-                        setShowMoreMenu(false)
-                      }}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                    >
-                      <Copy className="w-4 h-4 text-emerald-400" />
-                      <span>{shareCopied ? 'Link Copied!' : 'Copy Shareable Link'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowLogisticsDrawer(true)
-                        setShowMoreMenu(false)
-                      }}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
-                    >
-                      <Truck className="w-4 h-4 text-blue-400" />
-                      <span>Logistics & Support Settings</span>
-                    </button>
-
-                    <div className="border-t border-white/10 my-1" />
-
-                    {!user && !isSandboxPreview ? (
-                      <button
-                        onClick={() => {
-                          handleGoogleSignIn()
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-amber-400/20 text-amber-300 flex items-center space-x-2.5 transition"
-                      >
-                        <LogIn className="w-4 h-4 text-amber-400" />
-                        <span>Google Sign In</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          handleSignOut()
-                          setShowMoreMenu(false)
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-red-500/20 text-red-300 flex items-center space-x-2.5 transition"
-                      >
-                        <LogOut className="w-4 h-4 text-red-400" />
-                        <span>Sign Out</span>
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Overlaid Musician Name & Handle (Bottom Left) */}
-        <div className="absolute bottom-9 left-10 z-20 pointer-events-none space-y-1">
-          <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
-            {displayName}
-          </h1>
-          <div className="flex items-center space-x-3 pointer-events-auto">
-            <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
-              {handleName}
-            </p>
-            {(editLinkedinUrl || profile?.linkedinUrl) && (
-              <a
-                href={editLinkedinUrl || profile?.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1 rounded-full bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-blue-300 text-xs font-semibold flex items-center space-x-1.5 backdrop-blur-md transition shadow-md"
-                title="View LinkedIn Profile"
-              >
-                <span>LinkedIn Profile</span>
-                <ArrowUpRight className="w-3 h-3 text-blue-300" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* TOP DOCK ACTIVE FOLDER POPOVERS */}
-        {/* Fanned-out Gigs Stack / Empty State */}
-        {activeCanvasFolder === 0 && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-            {events.length === 0 ? (
-              <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/50 shadow-2xl text-center">
-                <Building2 className="w-7 h-7 text-blue-400 mx-auto mb-2" />
-                <p className="font-bold text-xs text-white mb-1">No Gigs Booked Yet</p>
-                <p className="text-[10px] text-white/60 leading-relaxed">
-                  When an institution commits a project or booking to you, it will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="relative w-64 h-48">
-                {events.slice(0, 5).map((evt, i) => {
-                  const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
-                  const translations = ['-100px', '-50px', '0px', '50px', '100px']
-                  const yOffsets = ['10px', '40px', '55px', '40px', '10px']
-                  return (
-                    <div
-                      key={evt.id || i}
-                      className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
-                      style={{
-                        transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
-                      }}
-                    >
-                      <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
-                        {evt.type}
-                      </span>
-                      <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
-                        {evt.title}
-                      </p>
-                      <p className="text-[10px] text-white/50 mt-1 truncate">
-                        {evt.cityState}
-                      </p>
-                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
-                        <span className="text-emerald-400">${evt.usdStipend} USD</span>
-                        <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Fanned-out Fund Cards Stack */}
-        {activeCanvasFolder === 1 && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-            <div className="relative w-64 h-36 flex justify-center items-center gap-3">
-              <div
-                className="w-36 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center"
-              >
-                <p className="font-serif text-lg font-bold text-emerald-400">${institutionalEarningsTotal}</p>
-                <p className="text-[9px] text-white/50 uppercase font-mono mt-0.5">Earnings</p>
-              </div>
-
-              <div
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowHoodAllocationModal(true)
-                }}
-                className="w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl cursor-pointer hover:scale-105 transition text-center"
-              >
-                <p className="font-serif text-lg font-bold text-amber-400">${allocatedHoodAmount}</p>
-                <p className="text-[9px] text-amber-300/80 uppercase font-mono mt-0.5">Hood Fund</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Media Stack / Empty State */}
-        {activeCanvasFolder === 2 && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-            {portfolioItems.length === 0 ? (
-              <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/50 shadow-2xl text-center">
-                <Video className="w-7 h-7 text-purple-400 mx-auto mb-2" />
-                <p className="font-bold text-xs text-white mb-1">No Portfolio Media Yet</p>
-                <p className="text-[10px] text-white/60 leading-relaxed mb-3">
-                  Upload scores, recordings, or masterwork audio to build your participant portfolio.
-                </p>
+                {/* Item 3: WORKS */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowWorkPickerModal(true)
                   }}
-                  className="bg-[#D4AF37] text-black font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-[#b8972e]"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:border-pink-400/70 hover:bg-pink-500/20 transition-all cursor-pointer"
+                  title="Works Library & Recording Projects Submission"
+                >
+                  <Music className="w-3.5 h-3.5 text-pink-400" />
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-pink-300">Works</span>
+                </button>
+
+                {/* Item 4: LOGISTICS */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                    activeCanvasFolder === 3
+                      ? 'bg-teal-500/25 border-teal-400/70 text-white shadow-md shadow-teal-500/20'
+                      : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Truck className={`w-3.5 h-3.5 ${activeCanvasFolder === 3 ? 'text-teal-400' : 'text-white/60'}`} />
+                  <span className="text-[10px] font-bold tracking-wider uppercase">Logistics</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Top-Right: Status Badge, Help ? Button, Context ... Menu */}
+            <div className="flex items-center space-x-3 relative">
+              {user || isSandboxPreview ? (
+                <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-500/40 text-emerald-300 text-xs font-mono font-semibold flex items-center space-x-1.5 shadow-lg">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Signed In</span>
+                </span>
+              ) : null}
+
+              {/* How This Works ? Help Button */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowHelpModal(!showHelpModal)
+                    setShowMoreMenu(false)
+                  }}
+                  className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
+                  title="How This Works Explainer"
+                >
+                  <HelpCircle className="w-5 h-5 text-amber-400" />
+                </button>
+              </div>
+
+              {/* Context Dropdown Menu ... */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowMoreMenu(!showMoreMenu)
+                    setShowHelpModal(false)
+                  }}
+                  className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-xl"
+                  title="More Options Menu"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+
+                {showMoreMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-30" 
+                      onClick={() => setShowMoreMenu(false)} 
+                    />
+                    <div className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-[#151722]/95 backdrop-blur-xl border border-white/20 shadow-2xl z-40 space-y-1 text-xs">
+                      <button
+                        onClick={() => {
+                          setIsEditingBio(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Edit3 className="w-4 h-4 text-amber-400" />
+                        <span>Edit Profile & CV</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowPhotoModal(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <UserIcon className="w-4 h-4 text-purple-400" />
+                        <span>Update Headshot Photo</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleShareProfile()
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Copy className="w-4 h-4 text-emerald-400" />
+                        <span>{shareCopied ? 'Link Copied!' : 'Copy Shareable Link'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowLogisticsDrawer(true)
+                          setShowMoreMenu(false)
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-white/10 text-white flex items-center space-x-2.5 transition"
+                      >
+                        <Truck className="w-4 h-4 text-blue-400" />
+                        <span>Logistics & Support Settings</span>
+                      </button>
+
+                      <div className="border-t border-white/10 my-1" />
+
+                      {!user && !isSandboxPreview ? (
+                        <button
+                          onClick={() => {
+                            handleGoogleSignIn()
+                            setShowMoreMenu(false)
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-amber-400/20 text-amber-300 flex items-center space-x-2.5 transition"
+                        >
+                          <LogIn className="w-4 h-4 text-amber-400" />
+                          <span>Google Sign In</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleSignOut()
+                            setShowMoreMenu(false)
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-red-500/20 text-red-300 flex items-center space-x-2.5 transition"
+                        >
+                          <LogOut className="w-4 h-4 text-red-400" />
+                          <span>Sign Out</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Overlaid Musician Name & Handle (Bottom Left of Hero) */}
+          <div className="absolute bottom-8 left-8 sm:left-10 z-20 pointer-events-none space-y-1">
+            <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-wide drop-shadow-lg">
+              {displayName}
+            </h1>
+            <div className="flex items-center space-x-3 pointer-events-auto">
+              <p className="text-sm sm:text-base font-sans font-medium text-white/75 drop-shadow">
+                {handleName}
+              </p>
+              {(editLinkedinUrl || profile?.linkedinUrl) && (
+                <a
+                  href={editLinkedinUrl || profile?.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 rounded-full bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-blue-300 text-xs font-semibold flex items-center space-x-1.5 backdrop-blur-md transition shadow-md"
+                  title="View LinkedIn Profile"
+                >
+                  <span>LinkedIn Profile</span>
+                  <ArrowUpRight className="w-3 h-3 text-blue-300" />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. SCROLLABLE HUB PANEL UNDERNEATH HERO */}
+        <div id="hub-panel" className="w-full bg-[#0A0B0E] border-t border-white/10 p-6 sm:p-10 space-y-10 z-20">
+          
+          {/* A. Quick-Access Category Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-white/10">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">Musician Ecosystem Hub</h2>
+              <p className="text-xs sm:text-sm text-white/60 mt-1">
+                Explore gig bookings, dual-source funding, portfolio recordings, score submissions, and logistics.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setActiveCanvasFolder(null)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${
+                  activeCanvasFolder === null
+                    ? 'bg-white text-black font-bold'
+                    : 'bg-white/5 border border-white/15 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                All Sections
+              </button>
+              <button
+                onClick={() => setActiveCanvasFolder(0)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                  activeCanvasFolder === 0
+                    ? 'bg-blue-500/20 border border-blue-400 text-blue-300 font-bold'
+                    : 'bg-white/5 border border-white/15 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Gigs</span>
+              </button>
+              <button
+                onClick={() => setActiveCanvasFolder(1)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                  activeCanvasFolder === 1
+                    ? 'bg-amber-500/20 border border-amber-400 text-amber-300 font-bold'
+                    : 'bg-white/5 border border-white/15 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400" />
+                <span>Funds</span>
+              </button>
+              <button
+                onClick={() => setActiveCanvasFolder(2)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                  activeCanvasFolder === 2
+                    ? 'bg-purple-500/20 border border-purple-400 text-purple-300 font-bold'
+                    : 'bg-white/5 border border-white/15 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5 text-purple-400" />
+                <span>Media</span>
+              </button>
+              <button
+                onClick={() => setShowWorkPickerModal(true)}
+                className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 bg-pink-500/20 border border-pink-400/60 text-pink-300 hover:bg-pink-500/30"
+              >
+                <Music className="w-3.5 h-3.5 text-pink-400" />
+                <span>Works</span>
+              </button>
+              <button
+                onClick={() => setActiveCanvasFolder(3)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition flex items-center space-x-1.5 ${
+                  activeCanvasFolder === 3
+                    ? 'bg-teal-500/20 border border-teal-400 text-teal-300 font-bold'
+                    : 'bg-white/5 border border-white/15 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5 text-teal-400" />
+                <span>Logistics</span>
+              </button>
+            </div>
+          </div>
+
+          {/* B. Recording Projects Pipeline Featured Banner (Step 4 Callout) */}
+          <div className="w-full p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-blue-500/15 border border-amber-400/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
+            <div className="space-y-1 max-w-2xl">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 font-mono text-[11px] font-bold">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>RECORDING PROJECTS &amp; TRAINING PIPELINE</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-serif font-bold text-white">
+                Pitch Works, Select Recording Projects &amp; Join Orchestra Pipelines
+              </h3>
+              <p className="text-xs sm:text-sm text-white/70 leading-relaxed">
+                Connect your compositions and performance portfolio directly with active recording projects, Steinway gallery sessions, and professional training ensembles across the network.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/musician/select-project')}
+              className="px-5 py-3 rounded-2xl bg-[#D4AF37] hover:bg-[#b8972e] text-black font-bold text-xs sm:text-sm transition flex items-center space-x-2 shrink-0 shadow-lg"
+            >
+              <span>Explore Recording Projects</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* C. Category 0: Gigs & Engagements Section */}
+          {(activeCanvasFolder === null || activeCanvasFolder === 0) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-serif font-bold text-white">Gigs &amp; Contract Bookings</h3>
+                </div>
+                <span className="text-xs font-mono text-blue-400">{events.length} Gig(s) Booked</span>
+              </div>
+
+              {events.length === 0 ? (
+                <div className="w-full p-8 rounded-3xl bg-[#0F1015] border border-blue-500/20 text-center space-y-3">
+                  <Building2 className="w-10 h-10 text-blue-400/60 mx-auto" />
+                  <h4 className="font-serif font-bold text-base text-white">No Gigs Booked Yet</h4>
+                  <p className="text-xs text-white/60 max-w-md mx-auto leading-relaxed">
+                    When partner institutions, halls, or orchestras commit a gig or performance booking to you, it will appear here with compensation breakdown and repertoire details.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {events.map((evt, i) => (
+                    <div
+                      key={evt.id || i}
+                      className="p-5 rounded-2xl bg-[#0F1015] border border-blue-400/30 hover:border-blue-400/60 transition space-y-3 shadow-lg"
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                          {evt.type}
+                        </span>
+                        <span className="text-xs text-white/50">{evt.cityState}</span>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-white">{evt.title}</h4>
+                        <p className="text-xs text-white/60 mt-1">{evt.repertoire}</p>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 border-t border-white/10 text-xs font-mono font-bold">
+                        <span className="text-emerald-400">${evt.usdStipend} USD Stipend</span>
+                        <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* D. Category 1: Funds & Ecosystem Section */}
+          {(activeCanvasFolder === null || activeCanvasFolder === 1) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Coins className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-lg font-serif font-bold text-white">Ecosystem &amp; Dual-Source Funds</h3>
+                </div>
+                <button
+                  onClick={() => setShowHoodAllocationModal(true)}
+                  className="text-xs font-mono font-bold text-amber-400 hover:text-amber-300 underline"
+                >
+                  Configure Allocations
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl bg-[#0F1015] border border-emerald-500/30 space-y-2">
+                  <p className="text-xs text-white/50 font-mono uppercase">Institutional Earnings</p>
+                  <p className="font-serif text-3xl font-bold text-emerald-400">${institutionalEarningsTotal}</p>
+                  <p className="text-[11px] text-white/60">Direct payouts from dual-written gig commitments.</p>
+                </div>
+
+                <div 
+                  onClick={() => setShowHoodAllocationModal(true)}
+                  className="p-5 rounded-2xl bg-[#0F1015] border border-amber-400/40 hover:border-amber-400 cursor-pointer transition space-y-2"
+                >
+                  <p className="text-xs text-amber-300/80 font-mono uppercase">Hood Village Fund</p>
+                  <p className="font-serif text-3xl font-bold text-amber-400">${allocatedHoodAmount}</p>
+                  <p className="text-[11px] text-amber-200/60">Patron backing via hoods.beamthinktank.space</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#0F1015] border border-purple-500/30 space-y-2">
+                  <p className="text-xs text-white/50 font-mono uppercase">BEAM Coin Balance</p>
+                  <p className="font-serif text-3xl font-bold text-purple-300">{profile?.beamCoinBalance || 0} BEAM</p>
+                  <p className="text-[11px] text-white/60">Participant governance &amp; recording tokens.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* E. Category 2: Media & Portfolio Section */}
+          {(activeCanvasFolder === null || activeCanvasFolder === 2) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-2">
+                  <Video className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-lg font-serif font-bold text-white">Media Portfolio &amp; Recordings</h3>
+                </div>
+                <button
+                  onClick={() => setShowWorkPickerModal(true)}
+                  className="px-4 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#b8972e] text-black font-bold text-xs transition"
                 >
                   Upload Work / Score
                 </button>
               </div>
-            ) : (
-              <div className="relative w-64 h-36 flex flex-col gap-2">
-                {portfolioItems.map((m: MediaPortfolioItem) => (
-                  <div
-                    key={m.id}
-                    className="p-3 rounded-xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-xl"
+
+              {portfolioItems.length === 0 ? (
+                <div className="w-full p-8 rounded-3xl bg-[#0F1015] border border-purple-500/20 text-center space-y-3">
+                  <Video className="w-10 h-10 text-purple-400/60 mx-auto" />
+                  <h4 className="font-serif font-bold text-base text-white">No Portfolio Media Yet</h4>
+                  <p className="text-xs text-white/60 max-w-md mx-auto leading-relaxed">
+                    Upload scores, studio audio, or masterwork video clips to build your participant CV presented to partner institutions.
+                  </p>
+                  <button
+                    onClick={() => setShowWorkPickerModal(true)}
+                    className="px-4 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#b8972e] text-black font-semibold text-xs transition"
                   >
-                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">{m.category}</span>
-                    <p className="text-xs font-bold text-white mt-0.5 truncate">{m.title}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Fanned-out Logistics Cards Stack */}
-        {activeCanvasFolder === 3 && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-            <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl text-center space-y-3">
-              <p className="text-xs font-bold text-white">Logistics & Travel Support</p>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowLogisticsDrawer(true)
-                }}
-                className="bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-400/40 font-semibold text-xs px-4 py-2 rounded-xl transition"
-              >
-                Open Logistics Panel
-              </button>
+                    Upload Work / Score
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {portfolioItems.map((item: MediaPortfolioItem) => (
+                    <div
+                      key={item.id}
+                      className="p-5 rounded-2xl bg-[#0F1015] border border-purple-400/30 hover:border-purple-400/60 transition space-y-3"
+                    >
+                      <span className="px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                        {item.category}
+                      </span>
+                      <h4 className="font-bold text-sm text-white leading-tight">{item.title}</h4>
+                      {item.composer && <p className="text-xs text-white/50">Composer: {item.composer}</p>}
+                      {item.url && (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1.5 text-xs text-purple-300 hover:text-white font-semibold pt-2 border-t border-white/10"
+                        >
+                          <span>Open Media Link</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
+          {/* F. Category 3: Works & Repertoire Library */}
+          {(activeCanvasFolder === null || activeCanvasFolder === 3) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-2">
+                  <Music className="w-5 h-5 text-pink-400" />
+                  <h3 className="text-lg font-serif font-bold text-white">Works Library &amp; Repertoire Catalog</h3>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setShowCatalogModal(true)}
+                    className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition"
+                  >
+                    Browse Full Catalog
+                  </button>
+                  <button
+                    onClick={() => setShowWorkPickerModal(true)}
+                    className="px-3.5 py-2 rounded-xl bg-pink-500/20 border border-pink-400/60 text-pink-300 hover:bg-pink-500/30 text-xs font-semibold transition"
+                  >
+                    Submit Work / Score
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-[#0F1015] border border-pink-500/30 space-y-4">
+                <p className="text-xs text-white/70 leading-relaxed">
+                  Submit original compositions, arrangements, or claim historical masterworks (Bonds, Price, Still) into your active performance portfolio.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setShowWorkPickerModal(true)}
+                    className="px-4 py-2.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 border border-pink-400/50 text-pink-300 font-bold text-xs transition flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Upload Score, Audio or MIDI</span>
+                  </button>
+                  <button
+                    onClick={() => setShowCatalogModal(true)}
+                    className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-bold text-xs transition flex items-center space-x-2"
+                  >
+                    <Search className="w-4 h-4 text-amber-400" />
+                    <span>Claim Recordings from BEAM Catalog</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* G. Category 4: Logistics & Support Section */}
+          {(activeCanvasFolder === null || activeCanvasFolder === 3) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Truck className="w-5 h-5 text-teal-400" />
+                  <h3 className="text-lg font-serif font-bold text-white">Logistics &amp; Travel Support</h3>
+                </div>
+                <button
+                  onClick={() => setShowLogisticsDrawer(true)}
+                  className="text-xs font-mono font-bold text-teal-400 hover:text-teal-300 underline"
+                >
+                  Open Logistics Drawer
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-5 rounded-2xl bg-[#0F1015] border border-teal-500/30 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-sm text-white">Live Location Beacon</h4>
+                    <button
+                      onClick={handleToggleBroadcasting}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition ${
+                        isBroadcastingLocation
+                          ? 'bg-teal-500/20 text-teal-300 border border-teal-400/50'
+                          : 'bg-white/10 text-white/50 border border-white/15'
+                      }`}
+                    >
+                      {isBroadcastingLocation ? 'Broadcasting ON' : 'Broadcasting OFF'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/60 leading-relaxed">
+                    {isBroadcastingLocation
+                      ? `Active beacon: ${liveBeaconCity || 'Live GPS tracking enabled for ground transit dispatch.'}`
+                      : 'Enable live location sharing to receive residency housing and transit dispatch updates.'}
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#0F1015] border border-white/10 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Infrastructure Need Tags</h4>
+                    <p className="text-xs text-white/60 mt-1">Ground transit, housing, per diem, and luthier support.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowLogisticsDrawer(true)}
+                    className="w-full py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-400/40 text-xs font-bold transition"
+                  >
+                    View &amp; Edit Infrastructure Needs
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
 
       {/* Edit Profile & Live CV Modal */}
