@@ -72,7 +72,7 @@ import {
   ArrowUpRight
 } from 'lucide-react'
 
-const BDSO_SANDBOX_EMAIL = 'ezra.haugabrooks@gmail.com'
+const BDSO_SANDBOX_EMAIL = 'sandbox.musician@beamthinktank.space'
 
 function getYouTubeEmbedUrl(url: string): string | null {
   if (!url) return null
@@ -91,8 +91,6 @@ export default function ParticipantProfilePage() {
   const targetEmail = (user?.email && user.email !== 'admin@local.dev')
     ? user.email 
     : (isSandboxPreview ? BDSO_SANDBOX_EMAIL : '')
-
-  const isBdsoEzra = targetEmail.toLowerCase() === BDSO_SANDBOX_EMAIL
 
   const [profile, setProfile] = useState<ParticipantDemographics | null>(null)
   const [events, setEvents] = useState<EventPlayed[]>([])
@@ -154,11 +152,11 @@ export default function ParticipantProfilePage() {
   const [cvImportedNotice, setCvImportedNotice] = useState(false)
 
   // Live Location Beacon State (Life360 Cross-Domain Sync)
-  const [isBroadcastingLocation, setIsBroadcastingLocation] = useState(true)
-  const [liveBeaconCity, setLiveBeaconCity] = useState('Atlanta, GA')
-  const [liveLat, setLiveLat] = useState(33.749)
-  const [liveLng, setLiveLng] = useState(-84.388)
-  const [liveAccuracy, setLiveAccuracy] = useState(12)
+  const [isBroadcastingLocation, setIsBroadcastingLocation] = useState(false)
+  const [liveBeaconCity, setLiveBeaconCity] = useState('')
+  const [liveLat, setLiveLat] = useState<number | undefined>(undefined)
+  const [liveLng, setLiveLng] = useState<number | undefined>(undefined)
+  const [liveAccuracy, setLiveAccuracy] = useState(0)
   const [isGeoLoading, setIsGeoLoading] = useState(false)
   const [geoError, setGeoError] = useState('')
 
@@ -286,14 +284,14 @@ export default function ParticipantProfilePage() {
         setBioText(data.culturalCapitalNotes || 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.')
         setEditName(user?.displayName || data.fullName || targetEmail.split('@')[0])
         setEditEmail(targetEmail)
-        setEditPhone('(414) 555-0199')
-        setEditLinkedinUrl(data.linkedinUrl || (isBdsoEzra ? 'https://www.linkedin.com/in/ezrahaugabrooks' : ''))
-        setDisciplinePills(data.disciplineTags || ['Resident Cellist', 'Steinway Recording Specialist', 'Media Producer'])
-        setEvents(isBdsoEzra ? DEFAULT_EZRA_EVENTS : [])
+        setEditPhone('')
+        setEditLinkedinUrl(data.linkedinUrl || '')
+        setDisciplinePills(data.disciplineTags || (data.primaryInstrument ? [data.primaryInstrument] : []))
+        setEvents([])
         setPortfolioItems(data.portfolioMedia || [])
         if (data.hoodAllocations) setHoodAllocations(data.hoodAllocations)
         setIsRoaming(Boolean(data.isRoamingActive))
-        setRoamingLocation(data.roamingCity || 'Orlando, FL (Steinway Gallery Residency)')
+        setRoamingLocation(data.roamingCity || '')
 
         if (data.current_live_location) {
           setIsBroadcastingLocation(Boolean(data.current_live_location.isBroadcasting))
@@ -314,7 +312,7 @@ export default function ParticipantProfilePage() {
     if (targetEmail || !authLoading) {
       loadProfile()
     }
-  }, [targetEmail, user?.uid, user?.photoURL, user?.displayName, isBdsoEzra, authLoading])
+  }, [targetEmail, user?.uid, user?.photoURL, user?.displayName, authLoading])
 
   const handleGoogleSignIn = async () => {
     if (!auth) {

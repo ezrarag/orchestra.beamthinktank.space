@@ -298,45 +298,39 @@ export async function fetchParticipantProfile(
 
       if (snap.exists()) {
         const data = snap.data()
-        const isEzra = normEmail === 'ezra.haugabrooks@gmail.com'
-        const defaultBase = isEzra ? DEFAULT_EZRA_PROFILE : {}
 
         return {
-          fullName: data.fullName || googleName || data.name || (isEzra ? DEFAULT_EZRA_PROFILE.fullName : normEmail.split('@')[0]),
+          fullName: data.fullName || googleName || data.name || normEmail.split('@')[0],
           email: normEmail,
-          primaryRole: data.primaryRole || (isEzra ? DEFAULT_EZRA_PROFILE.primaryRole : 'BEAM Participant Musician'),
-          originProject: data.originProject || (isEzra ? DEFAULT_EZRA_PROFILE.originProject : 'BEAM Orchestra Network'),
-          primaryInstrument: data.primaryInstrument || (isEzra ? DEFAULT_EZRA_PROFILE.primaryInstrument : 'Strings / Musician'),
-          disciplineTags: data.disciplineTags || (isEzra ? DEFAULT_EZRA_PROFILE.disciplineTags : [data.primaryInstrument || 'Strings / Musician']),
-          secondaryInstruments: data.secondaryInstruments || (isEzra ? DEFAULT_EZRA_PROFILE.secondaryInstruments : []),
-          homeHub: data.homeHub || (isEzra ? DEFAULT_EZRA_PROFILE.homeHub : 'Member Hub'),
-          isRoamingActive: typeof data.isRoamingActive === 'boolean' ? data.isRoamingActive : (isEzra ? true : false),
-          roamingCity: data.roamingCity || (isEzra ? DEFAULT_EZRA_PROFILE.roamingCity : ''),
-          current_live_location: data.current_live_location || (isEzra ? DEFAULT_EZRA_PROFILE.current_live_location : { isBroadcasting: false }),
-          infrastructureNeeds: data.infrastructureNeeds || (isEzra ? DEFAULT_EZRA_PROFILE.infrastructureNeeds : [
+          primaryRole: data.primaryRole || 'BEAM Participant Musician',
+          originProject: data.originProject || 'BEAM Orchestra Network',
+          primaryInstrument: data.primaryInstrument || 'Strings / Musician',
+          disciplineTags: data.disciplineTags || [data.primaryInstrument || 'Strings / Musician'],
+          secondaryInstruments: data.secondaryInstruments || [],
+          homeHub: data.homeHub || 'Member Hub',
+          isRoamingActive: typeof data.isRoamingActive === 'boolean' ? data.isRoamingActive : false,
+          roamingCity: data.roamingCity || '',
+          current_live_location: data.current_live_location || { isBroadcasting: false },
+          infrastructureNeeds: data.infrastructureNeeds || [
             { id: 'transit', label: 'Ground Transportation / Transit', needed: true, priority: 'high', description: 'Institutional vehicle/transit pass support.' },
             { id: 'housing', label: 'Residency Housing', needed: false, priority: 'medium' },
             { id: 'meals', label: 'Per Diem / Meal Access', needed: false, priority: 'medium' }
-          ]),
-          portfolioMedia: data.portfolioMedia || (isEzra ? DEFAULT_EZRA_PROFILE.portfolioMedia : []),
+          ],
+          portfolioMedia: data.portfolioMedia || [],
           willingnessToTravel: typeof data.willingnessToTravel === 'boolean' ? data.willingnessToTravel : true,
-          ethnicity: data.ethnicity || (isEzra ? DEFAULT_EZRA_PROFILE.ethnicity : 'BEAM Artist'),
-          pronouns: data.pronouns || (isEzra ? DEFAULT_EZRA_PROFILE.pronouns : 'They / Them'),
-          educationBackground: data.educationBackground || (isEzra ? DEFAULT_EZRA_PROFILE.educationBackground : 'BEAM Musician Participant'),
-          culturalCapitalNotes: data.culturalCapitalNotes || (isEzra ? DEFAULT_EZRA_PROFILE.culturalCapitalNotes : 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.'),
-          uncompensatedRehearsalHours: typeof data.uncompensatedRehearsalHours === 'number' ? data.uncompensatedRehearsalHours : (isEzra ? 24 : 0),
-          beamCoinBalance: typeof data.beamCoinBalance === 'number' ? data.beamCoinBalance : (isEzra ? 48 : 0),
-          usdTotalEarned: typeof data.usdTotalEarned === 'number' ? data.usdTotalEarned : (isEzra ? 1485 : 0),
-          headshotUrl: data.headshotUrl || googlePhoto || (isEzra ? DEFAULT_EZRA_PROFILE.headshotUrl : '')
+          ethnicity: data.ethnicity || 'BEAM Artist',
+          pronouns: data.pronouns || 'They / Them',
+          educationBackground: data.educationBackground || 'BEAM Musician Participant',
+          culturalCapitalNotes: data.culturalCapitalNotes || 'Welcome to BEAM Orchestra! Click Edit Profile to complete your musician bio, contact card, and repertoire specialties.',
+          uncompensatedRehearsalHours: typeof data.uncompensatedRehearsalHours === 'number' ? data.uncompensatedRehearsalHours : 0,
+          beamCoinBalance: typeof data.beamCoinBalance === 'number' ? data.beamCoinBalance : 0,
+          usdTotalEarned: typeof data.usdTotalEarned === 'number' ? data.usdTotalEarned : 0,
+          headshotUrl: data.headshotUrl || googlePhoto || ''
         }
       }
     } catch (err) {
       console.warn('Could not read Firestore participant profile, creating default:', err)
     }
-  }
-
-  if (normEmail === 'ezra.haugabrooks@gmail.com') {
-    return DEFAULT_EZRA_PROFILE
   }
 
   // Clean brand-new user profile (0 stats, clean empty state)
@@ -405,8 +399,7 @@ export async function ensureParticipantProfileExists(user: { uid: string; email?
     if (!snap.exists()) {
       const altSnap = await getDoc(doc(db, 'participantProfiles', altId))
       if (!altSnap.exists()) {
-        const isEzra = normEmail === 'ezra.haugabrooks@gmail.com'
-        const initialProfile: Partial<ParticipantDemographics> = isEzra ? DEFAULT_EZRA_PROFILE : {
+        const initialProfile: Partial<ParticipantDemographics> = {
           fullName: user.displayName || normEmail.split('@')[0],
           email: normEmail,
           primaryRole: 'BEAM Participant Musician',
@@ -732,10 +725,7 @@ export async function dualWriteInstitutionalCommitmentAsGig(
     status: gigCommitment.status || 'Confirmed'
   }
 
-  // Get current events or default ezra events
-  const existingEvents: EventPlayed[] = (existingProfile.email === normEmail)
-    ? DEFAULT_EZRA_EVENTS
-    : DEFAULT_EZRA_EVENTS
+  const existingEvents: EventPlayed[] = []
 
   const updatedEvents = [newGig, ...existingEvents]
   
