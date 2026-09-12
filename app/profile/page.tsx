@@ -887,6 +887,88 @@ export default function ParticipantProfilePage() {
             <X className="w-5 h-5" />
           </Link>
 
+          {/* Centered Top Nav Dock (Pill Row) */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-31 pointer-events-auto">
+            <div className="flex items-center gap-1 sm:gap-1.5 bg-[#0A0B0F]/75 backdrop-blur-2xl border border-white/15 rounded-full p-1 shadow-2xl">
+              {/* Item 0: GIGS */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeCanvasFolder === 0
+                    ? 'bg-blue-500/25 border-blue-400/70 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Building2 className={`w-3.5 h-3.5 ${activeCanvasFolder === 0 ? 'text-blue-400' : 'text-white/60'}`} />
+                <span className="text-[10px] font-bold tracking-wider uppercase">Gigs</span>
+              </button>
+
+              {/* Item 1: FUNDS */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeCanvasFolder === 1
+                    ? 'bg-[#D4AF37]/25 border-[#D4AF37]/70 text-white shadow-md shadow-[#D4AF37]/20'
+                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Coins className={`w-3.5 h-3.5 ${activeCanvasFolder === 1 ? 'text-[#D4AF37]' : 'text-white/60'}`} />
+                <span className="text-[10px] font-bold tracking-wider uppercase">Funds</span>
+              </button>
+
+              {/* Item 2: MEDIA */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeCanvasFolder === 2
+                    ? 'bg-purple-500/25 border-purple-400/70 text-white shadow-md shadow-purple-500/20'
+                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Video className={`w-3.5 h-3.5 ${activeCanvasFolder === 2 ? 'text-purple-400' : 'text-white/60'}`} />
+                <span className="text-[10px] font-bold tracking-wider uppercase">Media</span>
+              </button>
+
+              {/* Item 3: WORKS */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowWorkPickerModal(true)
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:border-pink-400/70 hover:bg-pink-500/20 transition-all cursor-pointer"
+                title="Works Library & Recording Projects Submission"
+              >
+                <Music className="w-3.5 h-3.5 text-pink-400" />
+                <span className="text-[10px] font-bold tracking-wider uppercase text-pink-300">Works</span>
+              </button>
+
+              {/* Item 4: LOGISTICS */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeCanvasFolder === 3
+                    ? 'bg-teal-500/25 border-teal-400/70 text-white shadow-md shadow-teal-500/20'
+                    : 'bg-white/[0.04] border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Truck className={`w-3.5 h-3.5 ${activeCanvasFolder === 3 ? 'text-teal-400' : 'text-white/60'}`} />
+                <span className="text-[10px] font-bold tracking-wider uppercase">Logistics</span>
+              </button>
+            </div>
+          </div>
+
           {/* Top-Right: Status Badge, Help ? Button, Context ... Menu */}
           <div className="flex items-center space-x-3 relative">
             {user || isSandboxPreview ? (
@@ -1033,222 +1115,131 @@ export default function ParticipantProfilePage() {
           </div>
         </div>
 
-        {/* UNIFIED RESPONSIVE DOCK BAR */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-3 sm:gap-6 bg-[#0F1015]/90 border border-white/20 backdrop-blur-2xl px-5 sm:px-8 py-3.5 rounded-3xl shadow-2xl max-w-[95vw] pointer-events-auto transition-all">
-
-          {/* DOCK ITEM 0: GIGS */}
-          <div className="relative group">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActiveCanvasFolder(activeCanvasFolder === 0 ? null : 0)
-              }}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-500/20 backdrop-blur-md border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer ${
-                activeCanvasFolder === 0
-                  ? 'border-blue-400 bg-blue-500/40 -translate-y-1 shadow-lg shadow-blue-500/30'
-                  : 'border-white/25 hover:border-blue-400 hover:-translate-y-0.5'
-              }`}
-            >
-              <Building2 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-400" />
-              <span className="text-[9px] font-mono font-bold tracking-wider text-white/70 uppercase mt-0.5">GIGS</span>
-            </button>
-
-            {/* Fanned-out Gigs Stack / Empty State */}
-            {activeCanvasFolder === 0 && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-                {events.length === 0 ? (
-                  <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/50 shadow-2xl text-center">
-                    <Building2 className="w-7 h-7 text-blue-400 mx-auto mb-2" />
-                    <p className="font-bold text-xs text-white mb-1">No Gigs Booked Yet</p>
-                    <p className="text-[10px] text-white/60 leading-relaxed">
-                      When an institution commits a project or booking to you, it will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="relative w-64 h-48">
-                    {events.slice(0, 5).map((evt, i) => {
-                      const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
-                      const translations = ['-100px', '-50px', '0px', '50px', '100px']
-                      const yOffsets = ['-10px', '-40px', '-55px', '-40px', '-10px']
-                      return (
-                        <div
-                          key={evt.id || i}
-                          className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
-                          style={{
-                            transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
-                          }}
-                        >
-                          <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
-                            {evt.type}
-                          </span>
-                          <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
-                            {evt.title}
-                          </p>
-                          <p className="text-[10px] text-white/50 mt-1 truncate">
-                            {evt.cityState}
-                          </p>
-                          <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
-                            <span className="text-emerald-400">${evt.usdStipend} USD</span>
-                            <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+        {/* TOP DOCK ACTIVE FOLDER POPOVERS */}
+        {/* Fanned-out Gigs Stack / Empty State */}
+        {activeCanvasFolder === 0 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
+            {events.length === 0 ? (
+              <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/50 shadow-2xl text-center">
+                <Building2 className="w-7 h-7 text-blue-400 mx-auto mb-2" />
+                <p className="font-bold text-xs text-white mb-1">No Gigs Booked Yet</p>
+                <p className="text-[10px] text-white/60 leading-relaxed">
+                  When an institution commits a project or booking to you, it will appear here.
+                </p>
               </div>
-            )}
-          </div>
-
-          {/* DOCK ITEM 1: ECOSYSTEM & FUNDS */}
-          <div className="relative group">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActiveCanvasFolder(activeCanvasFolder === 1 ? null : 1)
-              }}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-500/20 backdrop-blur-md border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer ${
-                activeCanvasFolder === 1
-                  ? 'border-amber-400 bg-amber-500/40 -translate-y-1 shadow-lg shadow-amber-500/30'
-                  : 'border-white/25 hover:border-amber-400 hover:-translate-y-0.5'
-              }`}
-            >
-              <Coins className="w-6 h-6 sm:w-7 sm:h-7 text-amber-400" />
-              <span className="text-[9px] font-mono font-bold tracking-wider text-white/70 uppercase mt-0.5">FUNDS</span>
-            </button>
-
-            {/* Fanned-out Fund Cards Stack */}
-            {activeCanvasFolder === 1 && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-                <div className="relative w-64 h-36 flex justify-center items-center gap-3">
-                  <div
-                    className="w-36 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center"
-                  >
-                    <p className="font-serif text-lg font-bold text-emerald-400">${institutionalEarningsTotal}</p>
-                    <p className="text-[9px] text-white/50 uppercase font-mono mt-0.5">Earnings</p>
-                  </div>
-
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowHoodAllocationModal(true)
-                    }}
-                    className="w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl cursor-pointer hover:scale-105 transition text-center"
-                  >
-                    <p className="font-serif text-lg font-bold text-amber-400">${allocatedHoodAmount}</p>
-                    <p className="text-[9px] text-amber-300/80 uppercase font-mono mt-0.5">Hood Fund</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* DOCK ITEM 2: MEDIA & PORTFOLIO */}
-          <div className="relative group">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActiveCanvasFolder(activeCanvasFolder === 2 ? null : 2)
-              }}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-500/20 backdrop-blur-md border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer ${
-                activeCanvasFolder === 2
-                  ? 'border-purple-400 bg-purple-500/40 -translate-y-1 shadow-lg shadow-purple-500/30'
-                  : 'border-white/25 hover:border-purple-400 hover:-translate-y-0.5'
-              }`}
-            >
-              <Video className="w-6 h-6 sm:w-7 sm:h-7 text-purple-400" />
-              <span className="text-[9px] font-mono font-bold tracking-wider text-white/70 uppercase mt-0.5">MEDIA</span>
-            </button>
-
-            {/* Media Stack / Empty State */}
-            {activeCanvasFolder === 2 && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-                {portfolioItems.length === 0 ? (
-                  <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/50 shadow-2xl text-center">
-                    <Video className="w-7 h-7 text-purple-400 mx-auto mb-2" />
-                    <p className="font-bold text-xs text-white mb-1">No Portfolio Media Yet</p>
-                    <p className="text-[10px] text-white/60 leading-relaxed mb-3">
-                      Upload scores, recordings, or masterwork audio to build your participant portfolio.
-                    </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowWorkPickerModal(true)
+            ) : (
+              <div className="relative w-64 h-48">
+                {events.slice(0, 5).map((evt, i) => {
+                  const rotations = ['-14deg', '-7deg', '0deg', '7deg', '14deg']
+                  const translations = ['-100px', '-50px', '0px', '50px', '100px']
+                  const yOffsets = ['10px', '40px', '55px', '40px', '10px']
+                  return (
+                    <div
+                      key={evt.id || i}
+                      className="absolute w-44 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-blue-400/40 shadow-2xl transition hover:scale-105"
+                      style={{
+                        transform: `translate(${translations[i] || '0px'}, ${yOffsets[i] || '0px'}) rotate(${rotations[i] || '0deg'})`
                       }}
-                      className="bg-[#D4AF37] text-black font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-[#b8972e]"
                     >
-                      Upload Work / Score
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative w-64 h-36 flex flex-col gap-2">
-                    {portfolioItems.map((m: MediaPortfolioItem) => (
-                      <div
-                        key={m.id}
-                        className="p-3 rounded-xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-xl"
-                      >
-                        <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">{m.category}</span>
-                        <p className="text-xs font-bold text-white mt-0.5 truncate">{m.title}</p>
+                      <span className="font-mono text-[9px] font-bold text-blue-400 uppercase tracking-wider block">
+                        {evt.type}
+                      </span>
+                      <p className="mt-1 font-bold text-xs text-white leading-tight line-clamp-2">
+                        {evt.title}
+                      </p>
+                      <p className="text-[10px] text-white/50 mt-1 truncate">
+                        {evt.cityState}
+                      </p>
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10 text-[10px] font-mono font-bold">
+                        <span className="text-emerald-400">${evt.usdStipend} USD</span>
+                        <span className="text-amber-400">+{evt.beamCoinsEarned} BEAM</span>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
+        )}
 
-          {/* DOCK ITEM 3: WORKS & RECORDING (NEW DOCK ICON) */}
-          <div className="relative group">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowWorkPickerModal(true)
-              }}
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#D4AF37]/20 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#D4AF37] hover:-translate-y-0.5 transition-all duration-200 flex flex-col items-center justify-center cursor-pointer shadow-lg shadow-[#D4AF37]/10"
-              title="Works Library & Recording Projects Submission"
-            >
-              <Music className="w-6 h-6 sm:w-7 sm:h-7 text-[#D4AF37]" />
-              <span className="text-[9px] font-mono font-bold tracking-wider text-[#D4AF37] uppercase mt-0.5">WORKS</span>
-            </button>
+        {/* Fanned-out Fund Cards Stack */}
+        {activeCanvasFolder === 1 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
+            <div className="relative w-64 h-36 flex justify-center items-center gap-3">
+              <div
+                className="w-36 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl text-center"
+              >
+                <p className="font-serif text-lg font-bold text-emerald-400">${institutionalEarningsTotal}</p>
+                <p className="text-[9px] text-white/50 uppercase font-mono mt-0.5">Earnings</p>
+              </div>
+
+              <div
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowHoodAllocationModal(true)
+                }}
+                className="w-40 p-3 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-amber-400/40 shadow-2xl cursor-pointer hover:scale-105 transition text-center"
+              >
+                <p className="font-serif text-lg font-bold text-amber-400">${allocatedHoodAmount}</p>
+                <p className="text-[9px] text-amber-300/80 uppercase font-mono mt-0.5">Hood Fund</p>
+              </div>
+            </div>
           </div>
+        )}
 
-          {/* DOCK ITEM 4: LOGISTICS & SUPPORT */}
-          <div className="relative group">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setActiveCanvasFolder(activeCanvasFolder === 3 ? null : 3)
-              }}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-500/20 backdrop-blur-md border transition-all duration-200 flex flex-col items-center justify-center cursor-pointer ${
-                activeCanvasFolder === 3
-                  ? 'border-teal-400 bg-teal-500/40 -translate-y-1 shadow-lg shadow-teal-500/30'
-                  : 'border-white/25 hover:border-teal-400 hover:-translate-y-0.5'
-              }`}
-            >
-              <Truck className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" />
-              <span className="text-[9px] font-mono font-bold tracking-wider text-white/70 uppercase mt-0.5">LOGISTICS</span>
-            </button>
-
-            {/* Fanned-out Logistics Cards Stack */}
-            {activeCanvasFolder === 3 && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-                <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl text-center space-y-3">
-                  <p className="text-xs font-bold text-white">Logistics & Travel Support</p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowLogisticsDrawer(true)
-                    }}
-                    className="bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-400/40 font-semibold text-xs px-4 py-2 rounded-xl transition"
+        {/* Media Stack / Empty State */}
+        {activeCanvasFolder === 2 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
+            {portfolioItems.length === 0 ? (
+              <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/50 shadow-2xl text-center">
+                <Video className="w-7 h-7 text-purple-400 mx-auto mb-2" />
+                <p className="font-bold text-xs text-white mb-1">No Portfolio Media Yet</p>
+                <p className="text-[10px] text-white/60 leading-relaxed mb-3">
+                  Upload scores, recordings, or masterwork audio to build your participant portfolio.
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowWorkPickerModal(true)
+                  }}
+                  className="bg-[#D4AF37] text-black font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-[#b8972e]"
+                >
+                  Upload Work / Score
+                </button>
+              </div>
+            ) : (
+              <div className="relative w-64 h-36 flex flex-col gap-2">
+                {portfolioItems.map((m: MediaPortfolioItem) => (
+                  <div
+                    key={m.id}
+                    className="p-3 rounded-xl bg-[#0F1015]/95 backdrop-blur-xl border border-purple-400/40 shadow-xl"
                   >
-                    Open Logistics Panel
-                  </button>
-                </div>
+                    <span className="font-mono text-[9px] font-bold text-purple-300 uppercase block">{m.category}</span>
+                    <p className="text-xs font-bold text-white mt-0.5 truncate">{m.title}</p>
+                  </div>
+                ))}
               </div>
             )}
           </div>
+        )}
 
-        </div>
+        {/* Fanned-out Logistics Cards Stack */}
+        {activeCanvasFolder === 3 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
+            <div className="w-64 p-4 rounded-2xl bg-[#0F1015]/95 backdrop-blur-xl border border-teal-400/40 shadow-2xl text-center space-y-3">
+              <p className="text-xs font-bold text-white">Logistics & Travel Support</p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowLogisticsDrawer(true)
+                }}
+                className="bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-400/40 font-semibold text-xs px-4 py-2 rounded-xl transition"
+              >
+                Open Logistics Panel
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 
