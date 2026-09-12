@@ -470,6 +470,8 @@ export interface InstitutionalBusinessProfile {
   id: string
   organizationName: string
   legalName?: string
+  tagline?: string
+  originProject?: string
   email: string
   contactPerson: string
   incorporationStatus: 'Unincorporated / Incubating' | '501(c)(3) Non-Profit' | 'LLC' | 'C-Corp' | 'Pending Registration'

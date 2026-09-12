@@ -87,7 +87,7 @@ const INITIAL_PAST_REQUESTS: PastRequestRow[] = [
 export default function InstitutionalCohortProfile() {
   const { user, loading: authLoading } = useUserRole()
   const [businessProfile, setBusinessProfile] = useState<InstitutionalBusinessProfile>(DEFAULT_BADO_FLORIDA_PROFILE)
-  const [rosterMusicians, setRosterMusicians] = useState<RosterMusician[]>(INITIAL_ROSTER_MUSICIANS)
+  const [rosterMusicians, setRosterMusicians] = useState<RosterMusician[]>([])
   const [activeTab, setActiveTab] = useState<'roster' | 'billing'>('roster')
   const [activeInstrumentFilter, setActiveInstrumentFilter] = useState<string>('All')
   
@@ -98,8 +98,8 @@ export default function InstitutionalCohortProfile() {
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'per-request' | null>(null)
   
   // Cohort Credit Balance & Requests
-  const [cohortBalance, setCohortBalance] = useState<number>(2400)
-  const [pastRequests, setPastRequests] = useState<PastRequestRow[]>(INITIAL_PAST_REQUESTS)
+  const [cohortBalance, setCohortBalance] = useState<number>(0)
+  const [pastRequests, setPastRequests] = useState<PastRequestRow[]>([])
   const [toastNotice, setToastNotice] = useState<string | null>(null)
 
   const [signingIn, setSigningIn] = useState(false)
@@ -120,6 +120,9 @@ export default function InstitutionalCohortProfile() {
       if (user?.email) {
         const loaded = await fetchInstitutionalProfile(user.email, user.uid, user.displayName || undefined)
         setBusinessProfile(loaded)
+        if (typeof loaded.allocatedStipendsBudgetUsd === 'number') {
+          setCohortBalance(loaded.allocatedStipendsBudgetUsd)
+        }
       }
     }
     loadProfile()
@@ -163,9 +166,7 @@ export default function InstitutionalCohortProfile() {
             }
           })
 
-          const ids = new Set(loaded.map(l => l.name.toLowerCase()))
-          const merged = [...loaded, ...INITIAL_ROSTER_MUSICIANS.filter(m => !ids.has(m.name.toLowerCase()))]
-          setRosterMusicians(merged)
+          setRosterMusicians(loaded)
         }
 
         // 2. Fetch real past requests for current user if logged in
@@ -471,7 +472,9 @@ export default function InstitutionalCohortProfile() {
                     Presenter &amp; Venue
                   </span>
                   <span className="text-[11px] text-white/50 flex items-center gap-1">
-                    📍 Florida · Wisconsin · Illinois
+                    📍 {businessProfile.stateOperations && businessProfile.stateOperations.length > 0
+                      ? businessProfile.stateOperations.map(s => s.stateName).join(' · ')
+                      : 'Member States Network'}
                   </span>
                   <button className="text-[11px] font-semibold text-[#60a5fa] bg-[rgba(96,165,250,0.1)] border border-[rgba(96,165,250,0.3)] px-2.5 py-1 rounded-lg hover:bg-[rgba(96,165,250,0.2)] transition">
                     Import from LinkedIn
@@ -479,10 +482,10 @@ export default function InstitutionalCohortProfile() {
                 </div>
 
                 <h1 className="text-3xl sm:text-[34px] font-extrabold text-white leading-tight">
-                  {businessProfile.organizationName || 'Ballet & Dance Orchestra Florida'}
+                  {businessProfile.organizationName || 'BEAM Institutional Partner'}
                 </h1>
                 <p className="text-sm text-white/55 mt-1">
-                  Multi-state ballet &amp; dance production partner · BADO FL
+                  {businessProfile.originProject || businessProfile.tagline || 'Multi-state orchestra & performance partner'}
                 </p>
               </div>
             </div>
